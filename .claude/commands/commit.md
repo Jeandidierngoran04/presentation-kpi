@@ -6,7 +6,7 @@
 
 ## Mission
 
-Quand je lance `/commit`, exécute la séquence suivante dans le dépôt Git concerné (par défaut `jarvis-starter-kit/`, le seul dépôt Git de ce dossier ; utilise `git -C jarvis-starter-kit ...`). Si je précise un autre dossier, travaille dans celui-là.
+Quand je lance `/commit`, exécute la séquence suivante à la racine de `PROJET SOFTWARE` (un seul dépôt Git regroupe Jarvis et Jupply). Après le commit, envoie-le sur GitHub avec `git push` pour mettre la sauvegarde à l'abri : c'est la seule exception à la règle sur `git push` ci-dessous.
 
 ### Étape 1 : État des lieux
 
@@ -55,7 +55,7 @@ C'est sauvegardé. Commit [hash court] : "[message]"
 ## Règles importantes
 
 - Ne jamais commiter `.env` ou un fichier contenant de vraies clés/secrets
-- Ne jamais utiliser `git push`, `git reset --hard`, `git checkout --`, ou toute commande destructive sans demande explicite
+- Ne jamais utiliser `git push --force`, `git reset --hard`, `git checkout --`, ou toute commande destructive sans demande explicite
 - Ne jamais passer `--no-verify` ou sauter les hooks
 - Toujours demander validation du message avant de commiter, sauf si je dis explicitement "vas-y sans me demander"
 - Communication en français systématique, pas de tirets longs (em dashes)
