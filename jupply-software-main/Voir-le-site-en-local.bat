@@ -3,7 +3,7 @@ title Jupply Software - Apercu local
 cd /d "%~dp0"
 
 echo Demarrage du serveur local...
-start "Serveur local Jupply (ne pas fermer)" /min cmd /c "python -m http.server 8080"
+start "Serveur local Jupply (ne pas fermer)" /min cmd /c "node serveur-local.mjs"
 
 timeout /t 2 /nobreak >nul
 
