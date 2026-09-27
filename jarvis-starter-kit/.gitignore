@@ -1,0 +1,34 @@
+# --- Secrets ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- Dépendances ---
+node_modules/
+
+# --- Build ---
+dist/
+build/
+Build/
+.next/
+out/
+
+# --- Éditeurs ---
+.vscode/
+.idea/
+
+# --- Logs ---
+*.log
+logs/
+npm-debug.log*
+
+# --- Fichiers temporaires ---
+*.tmp
+*.temp
+.cache/

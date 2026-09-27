@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    html { scroll-behavior: smooth; }
+    body { margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; color: #1a2332; -webkit-font-smoothing: antialiased; }
+    a { color: #0B1D3A; text-decoration: none; }
+    a:hover { color: #D4A017; }
+    @keyframes fadeInUp { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(212,160,23,0.4); } 50% { box-shadow: 0 0 0 12px rgba(212,160,23,0); } }
+    @keyframes float1 { 0%, 100% { transform: translate(0, 0) rotate(0deg); } 50% { transform: translate(30px, -20px) rotate(5deg); } }
+    @keyframes float2 { 0%, 100% { transform: translate(0, 0) rotate(0deg); } 50% { transform: translate(-20px, 15px) rotate(-3deg); } }
+    @keyframes float3 { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(15px, 25px); } }
+    @keyframes gradientShift { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+    @keyframes driftLines { 0% { background-position: 0 0; } 100% { background-position: 113px 113px; } }
+    @keyframes pulseOpacity { 0%, 100% { opacity: 0.03; } 50% { opacity: 0.06; } }
+  </style>
+</helmet>
+
+<!-- NAV -->
+<nav style="position: sticky; top: 0; z-index: 100; background: rgba(255,255,255,0.97); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(11,29,58,0.06);">
+  <div style="max-width: 1200px; margin: 0 auto; padding: 0 32px; height: 72px; display: flex; align-items: center; justify-content: space-between;">
+    <img src="uploads/LOGO.jpg" style="height: 48px; object-fit: contain;" alt="Jupply Software">
+    <div style="display: flex; align-items: center; gap: 32px;">
+      <a href="#fonctionnalites" style="font-size: 15px; font-weight: 500; color: #3d4f63; letter-spacing: 0.01em; transition: color 0.2s;" style-hover="color: #D4A017;">{{ t_nav_features }}</a>
+      <a href="#tarifs" style="font-size: 15px; font-weight: 500; color: #3d4f63; letter-spacing: 0.01em; transition: color 0.2s;" style-hover="color: #D4A017;">{{ t_nav_pricing }}</a>
+      <a href="#aide" style="font-size: 15px; font-weight: 500; color: #3d4f63; letter-spacing: 0.01em; transition: color 0.2s;" style-hover="color: #D4A017;">{{ t_nav_help }}</a>
+      <div style="display: flex; align-items: center; background: #f0f2f5; border-radius: 8px; padding: 3px; gap: 2px;">
+        <button onClick="{{ setFR }}" style="font-size: 13px; font-weight: 700; padding: 6px 14px; border-radius: 6px; border: none; cursor: pointer; transition: all 0.25s; background: {{ frBg }}; color: {{ frColor }}; box-shadow: {{ frShadow }};">FR</button>
+        <button onClick="{{ setEN }}" style="font-size: 13px; font-weight: 700; padding: 6px 14px; border-radius: 6px; border: none; cursor: pointer; transition: all 0.25s; background: {{ enBg }}; color: {{ enColor }}; box-shadow: {{ enShadow }};">EN</button>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <a href="/connexion/" style="font-size: 15px; font-weight: 600; color: #0B1D3A; padding: 10px 20px; border-radius: 8px; border: 1.5px solid #0B1D3A; transition: all 0.25s;" style-hover="background: #0B1D3A; color: #ffffff;">{{ t_login }}</a>
+        <a href="/essai-gratuit/" style="font-size: 15px; font-weight: 600; color: #fff; background: linear-gradient(135deg, #D4A017, #c4910f); padding: 10px 22px; border-radius: 8px; box-shadow: 0 2px 8px rgba(212,160,23,0.3); transition: all 0.25s;" style-hover="box-shadow: 0 4px 16px rgba(212,160,23,0.45); transform: translateY(-1px);">{{ t_free_trial }}</a>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section style="background: linear-gradient(170deg, #0B1D3A 0%, #0f2847 40%, #122a4f 70%, #183561 100%); background-size: 200% 200%; animation: gradientShift 12s ease infinite; padding: 100px 32px 110px; position: relative; overflow: hidden;">
+  <div style="position: absolute; top: 60px; right: 10%; width: 180px; height: 180px; border-radius: 50%; background: radial-gradient(circle, rgba(212,160,23,0.15) 0%, transparent 70%); animation: float1 8s ease-in-out infinite;"></div>
+  <div style="position: absolute; top: 200px; left: 5%; width: 120px; height: 120px; border-radius: 50%; background: radial-gradient(circle, rgba(212,160,23,0.1) 0%, transparent 70%); animation: float2 10s ease-in-out infinite;"></div>
+  <div style="position: absolute; bottom: 80px; right: 20%; width: 90px; height: 90px; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,0.04) 0%, transparent 70%); animation: float3 7s ease-in-out infinite;"></div>
+  <div style="position: absolute; top: -60px; left: 30%; width: 400px; height: 400px; border-radius: 50%; background: radial-gradient(circle, rgba(24,53,97,0.6) 0%, transparent 70%); animation: float2 14s ease-in-out infinite;"></div>
+  <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-image: repeating-linear-gradient(45deg, transparent, transparent 80px, rgba(255,255,255,1) 80px, rgba(255,255,255,1) 81px); animation: driftLines 20s linear infinite, pulseOpacity 6s ease-in-out infinite;"></div>
+
+  <div style="max-width: 820px; margin: 0 auto; text-align: center; position: relative; z-index: 1;">
+    <div data-hero="0" style="display: inline-block; background: rgba(212,160,23,0.15); border: 1px solid rgba(212,160,23,0.3); border-radius: 100px; padding: 6px 20px; margin-bottom: 28px; opacity: 0; transform: translateY(30px); transition: opacity 0.7s ease, transform 0.7s ease;">
+      <span style="font-size: 13px; font-weight: 600; color: #D4A017; letter-spacing: 0.06em; text-transform: uppercase;">Smart Supply Chain Solutions</span>
+    </div>
+    <h1 data-hero="1" style="font-size: 52px; font-weight: 800; color: #ffffff; line-height: 1.12; margin: 0 0 20px; letter-spacing: -0.02em; text-wrap: balance; opacity: 0; transform: translateY(30px); transition: opacity 0.7s ease, transform 0.7s ease;">{{ t_hero_title }}</h1>
+    <p data-hero="2" style="font-size: 19px; color: rgba(255,255,255,0.7); line-height: 1.6; margin: 0 0 40px; max-width: 620px; margin-left: auto; margin-right: auto; opacity: 0; transform: translateY(30px); transition: opacity 0.7s ease, transform 0.7s ease;">{{ t_hero_subtitle }}</p>
+    <div data-hero="3" style="display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 32px; opacity: 0; transform: translateY(30px); transition: opacity 0.7s ease, transform 0.7s ease;">
+      <a href="/essai-gratuit/" style="display: inline-flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 700; color: #0B1D3A; background: linear-gradient(135deg, #D4A017, #e8b82e); padding: 16px 32px; border-radius: 10px; box-shadow: 0 4px 16px rgba(212,160,23,0.35); transition: all 0.3s; animation: pulse 2.5s ease-in-out infinite;" style-hover="transform: translateY(-3px); box-shadow: 0 8px 28px rgba(212,160,23,0.45);">
+        {{ t_hero_cta1 }}
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"></path></svg>
+      </a>
+      <a href="#" style="font-size: 16px; font-weight: 600; color: #ffffff; padding: 16px 28px; border-radius: 10px; border: 1.5px solid rgba(255,255,255,0.25); transition: all 0.3s;" style-hover="border-color: rgba(255,255,255,0.6); background: rgba(255,255,255,0.05);">{{ t_hero_cta2 }}</a>
+    </div>
+    <div data-hero="4" style="display: flex; align-items: baseline; justify-content: center; gap: 8px; opacity: 0; transform: translateY(30px); transition: opacity 0.7s ease, transform 0.7s ease;">
+      <span style="font-size: 40px; font-weight: 800; color: #D4A017;">{{ monthlyPrice }}</span>
+      <span style="font-size: 16px; color: rgba(255,255,255,0.5); font-weight: 500;">{{ t_per_month }}</span>
+      <span style="font-size: 14px; color: rgba(212,160,23,0.8); font-weight: 600; margin-left: 8px; background: rgba(212,160,23,0.12); padding: 4px 12px; border-radius: 100px;">{{ t_annual_discount }}</span>
+    </div>
+  </div>
+</section>
+
+<!-- STATS BAR -->
+<section data-stats-section style="background: #ffffff; border-bottom: 1px solid #edf0f4;">
+  <div style="max-width: 900px; margin: 0 auto; padding: 48px 32px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; text-align: center;">
+    {{ statsEl }}
+  </div>
+</section>
+
+<!-- MODULES -->
+<section id="fonctionnalites" style="padding: 100px 32px; background: #ffffff;">
+  <div style="max-width: 1100px; margin: 0 auto;">
+    <div style="text-align: center; margin-bottom: 64px;">
+      <span style="font-size: 13px; font-weight: 700; color: #D4A017; text-transform: uppercase; letter-spacing: 0.1em;">{{ t_modules_label }}</span>
+      <h2 style="font-size: 40px; font-weight: 800; color: #0B1D3A; margin: 12px 0 0; letter-spacing: -0.02em;">{{ t_modules_title }}</h2>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px;">
+      {{ modulesEl }}
+    </div>
+  </div>
+</section>
+
+<!-- POURQUOI JUPPLY -->
+<section style="padding: 100px 32px; background: #f5f6f8;">
+  <div style="max-width: 1100px; margin: 0 auto;">
+    <div style="text-align: center; margin-bottom: 64px;">
+      <span style="font-size: 13px; font-weight: 700; color: #D4A017; text-transform: uppercase; letter-spacing: 0.1em;">{{ t_why_label }}</span>
+      <h2 style="font-size: 40px; font-weight: 800; color: #0B1D3A; margin: 12px 0 0; letter-spacing: -0.02em;">{{ t_why_title }}</h2>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px;">
+      {{ whyCards }}
+    </div>
+  </div>
+</section>
+
+<!-- TARIFS -->
+<section id="tarifs" style="padding: 100px 32px; background: #ffffff;">
+  <div style="max-width: 860px; margin: 0 auto;">
+    <div style="text-align: center; margin-bottom: 64px;">
+      <span style="font-size: 13px; font-weight: 700; color: #D4A017; text-transform: uppercase; letter-spacing: 0.1em;">{{ t_pricing_label }}</span>
+      <h2 style="font-size: 40px; font-weight: 800; color: #0B1D3A; margin: 12px 0 0; letter-spacing: -0.02em;">{{ t_pricing_title }}</h2>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 28px;">
+      <div style="background: #f8f9fb; border: 2px solid #e8ecf1; border-radius: 18px; padding: 44px 36px; text-align: center; transition: all 0.35s;" style-hover="border-color: #0B1D3A; box-shadow: 0 12px 40px rgba(11,29,58,0.08); transform: translateY(-4px);">
+        <span style="font-size: 14px; font-weight: 700; color: #5a6a7e; text-transform: uppercase; letter-spacing: 0.08em;">{{ t_monthly }}</span>
+        <div style="margin: 20px 0 8px; display: flex; align-items: baseline; justify-content: center; gap: 4px;">
+          <span style="font-size: 48px; font-weight: 800; color: #0B1D3A;">{{ monthlyPrice }}</span>
+        </div>
+        <p style="font-size: 14px; color: #8a96a6; margin: 0 0 28px;">{{ t_monthly_sub }}</p>
+        <div style="display: flex; flex-direction: column; gap: 12px; text-align: left; margin-bottom: 32px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D4A017" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            <span style="font-size: 14.5px; color: #3d4f63;">{{ t_plan_feat1 }}</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D4A017" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            <span style="font-size: 14.5px; color: #3d4f63;">{{ t_plan_feat2 }}</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D4A017" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            <span style="font-size: 14.5px; color: #3d4f63;">{{ t_plan_feat3 }}</span>
+          </div>
+        </div>
+        <a href="/essai-gratuit/" style="display: block; font-size: 15px; font-weight: 700; color: #0B1D3A; padding: 14px 28px; border-radius: 10px; border: 2px solid #0B1D3A; text-align: center; transition: all 0.25s;" style-hover="background: #0B1D3A; color: #ffffff;">{{ t_start_trial }}</a>
+      </div>
+      <div style="background: #0B1D3A; border: 2px solid #0B1D3A; border-radius: 18px; padding: 44px 36px; text-align: center; position: relative; overflow: hidden; transition: all 0.35s;" style-hover="box-shadow: 0 16px 48px rgba(11,29,58,0.25); transform: translateY(-4px);">
+        <div style="position: absolute; top: 16px; right: 16px; background: linear-gradient(135deg, #D4A017, #e8b82e); color: #0B1D3A; font-size: 12px; font-weight: 800; padding: 5px 14px; border-radius: 100px;">-15 %</div>
+        <span style="font-size: 14px; font-weight: 700; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.08em;">{{ t_annual }}</span>
+        <div style="margin: 20px 0 8px; display: flex; align-items: baseline; justify-content: center; gap: 4px;">
+          <span style="font-size: 48px; font-weight: 800; color: #D4A017;">{{ annualPrice }}</span>
+        </div>
+        <p style="font-size: 14px; color: rgba(255,255,255,0.4); margin: 0 0 28px;">{{ t_annual_sub }}</p>
+        <div style="display: flex; flex-direction: column; gap: 12px; text-align: left; margin-bottom: 32px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D4A017" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            <span style="font-size: 14.5px; color: rgba(255,255,255,0.8);">{{ t_plan_feat1 }}</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D4A017" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            <span style="font-size: 14.5px; color: rgba(255,255,255,0.8);">{{ t_plan_feat2 }}</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D4A017" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            <span style="font-size: 14.5px; color: rgba(255,255,255,0.8);">{{ t_plan_feat3_priority }}</span>
+          </div>
+        </div>
+        <a href="/essai-gratuit/" style="display: block; font-size: 15px; font-weight: 700; color: #0B1D3A; background: linear-gradient(135deg, #D4A017, #e8b82e); padding: 14px 28px; border-radius: 10px; text-align: center; box-shadow: 0 4px 16px rgba(212,160,23,0.3); transition: all 0.25s; animation: pulse 3s ease-in-out infinite;" style-hover="transform: translateY(-1px);">{{ t_start_trial }}</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA FINAL -->
+<section style="padding: 80px 32px; background: linear-gradient(135deg, #0B1D3A 0%, #122a4f 100%); text-align: center; position: relative; overflow: hidden;">
+  <div style="position: absolute; top: -40px; right: -60px; width: 250px; height: 250px; border-radius: 50%; background: radial-gradient(circle, rgba(212,160,23,0.1) 0%, transparent 70%); animation: float1 9s ease-in-out infinite;"></div>
+  <div style="max-width: 640px; margin: 0 auto; position: relative; z-index: 1;">
+    <h2 style="font-size: 34px; font-weight: 800; color: #ffffff; margin: 0 0 16px; letter-spacing: -0.01em;">{{ t_cta_title }}</h2>
+    <p style="font-size: 17px; color: rgba(255,255,255,0.6); margin: 0 0 36px; line-height: 1.6;">{{ t_cta_subtitle }}</p>
+    <a href="/essai-gratuit/" style="display: inline-flex; align-items: center; gap: 8px; font-size: 17px; font-weight: 700; color: #0B1D3A; background: linear-gradient(135deg, #D4A017, #e8b82e); padding: 18px 40px; border-radius: 12px; box-shadow: 0 4px 20px rgba(212,160,23,0.35); transition: all 0.3s; animation: pulse 2.5s ease-in-out infinite;" style-hover="transform: translateY(-3px); box-shadow: 0 8px 32px rgba(212,160,23,0.5);">
+      {{ t_cta_button }}
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"></path></svg>
+    </a>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer id="aide" style="padding: 48px 32px; background: #080f1c; border-top: 1px solid rgba(255,255,255,0.06);">
+  <div style="max-width: 1100px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between;">
+    <div style="display: flex; align-items: center; gap: 24px;">
+      <img src="uploads/LOGO.jpg" style="height: 36px; object-fit: contain; opacity: 0.85; border-radius: 4px;" alt="Jupply">
+      <span style="font-size: 13px; color: rgba(255,255,255,0.35);">© 2026 Jupply Software. {{ t_footer_rights }}</span>
+    </div>
+    <div style="display: flex; gap: 28px;">
+      <a href="#" style="font-size: 13.5px; color: rgba(255,255,255,0.5); font-weight: 500; transition: color 0.2s;" style-hover="color: #D4A017;">{{ t_footer_about }}</a>
+      <a href="#" style="font-size: 13.5px; color: rgba(255,255,255,0.5); font-weight: 500; transition: color 0.2s;" style-hover="color: #D4A017;">{{ t_footer_help }}</a>
+      <a href="#" style="font-size: 13.5px; color: rgba(255,255,255,0.5); font-weight: 500; transition: color 0.2s;" style-hover="color: #D4A017;">{{ t_footer_contact }}</a>
+    </div>
+  </div>
+</footer>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;monthlyPrice&quot;: { &quot;editor&quot;: &quot;int&quot;, &quot;default&quot;: 29, &quot;min&quot;: 1, &quot;max&quot;: 999, &quot;unit&quot;: &quot;€&quot;, &quot;section&quot;: &quot;Tarifs&quot; }
+}">
+class Component extends DCLogic {
+  state = { lang: 'fr', countersStarted: false, counterVals: [0, 0, 0], hoveredModule: -1 };
+
+  translations = {
+    fr: {
+      nav_features: 'Fonctionnalités', nav_pricing: 'Tarifs', nav_help: 'Aide',
+      login: 'Se connecter', free_trial: 'Essai gratuit',
+      hero_title: 'Gérez vos stocks et approvisionnements sans la complexité d\'un ERP',
+      hero_subtitle: 'La solution SaaS pensée pour les PME et commerces qui veulent un outil puissant, simple et accessible — sans le coût ni la lourdeur des systèmes traditionnels.',
+      hero_cta1: 'Lancez-vous — Essai gratuit', hero_cta2: 'Rencontrer un conseiller',
+      per_month: '/ mois', annual_discount: '-15 % en annuel',
+      stat1_label: 'PME utilisatrices', stat2_label: 'de gain de temps moyen', stat3_label: 'de disponibilité',
+      modules_label: 'Modules disponibles', modules_title: 'Trois modules pour piloter votre activité',
+      mod1_title: 'Ventes', mod1_desc: 'Gestion des commandes clients, facturation proforma et suivi complet jusqu\'à la livraison.',
+      mod2_title: 'Magasins / Stocks', mod2_desc: 'Suivi des stocks en temps réel, emplacements configurables, préparation de commandes et traçabilité par lot.',
+      mod3_title: 'Approvisionnement', mod3_desc: 'Demandes de prix (RFQ), commandes fournisseurs, réception et contrôle qualité des marchandises.',
+      why_label: 'Pourquoi Jupply', why_title: 'Conçu pour les entreprises qui avancent vite',
+      why1_title: 'Coût réduit vs. ERP classiques', why1_desc: 'Une fraction du prix d\'Odoo, SAP ou Microsoft Dynamics — sans compromis sur l\'essentiel.',
+      why2_title: 'Multi-entreprises', why2_desc: 'Chaque entreprise garde ses données séparées, avec son propre logo et identité.',
+      why3_title: 'Web et mobile', why3_desc: 'Accessible depuis un ordinateur, une tablette ou un téléphone — partout, à tout moment.',
+      why4_title: 'Pensé pour le terrain', why4_desc: 'Traçabilité par lot, emplacements de stockage configurables et flux adaptés aux réalités opérationnelles.',
+      pricing_label: 'Tarifs simples', pricing_title: 'Un seul plan, tout inclus',
+      monthly: 'Mensuel', monthly_sub: 'par mois · sans engagement',
+      annual: 'Annuel', annual_sub: 'par mois · facturé annuellement',
+      plan_feat1: 'Ventes, Stocks, Approvisionnement', plan_feat2: 'Multi-entreprises',
+      plan_feat3: 'Support inclus', plan_feat3_priority: 'Support prioritaire',
+      start_trial: 'Commencer l\'essai gratuit',
+      cta_title: 'Prêt à simplifier votre gestion ?',
+      cta_subtitle: 'Rejoignez les PME qui ont choisi Jupply pour piloter leurs ventes, stocks et approvisionnements.',
+      cta_button: 'Lancez votre essai gratuit',
+      footer_rights: 'Tous droits réservés.', footer_about: 'À propos', footer_help: 'Aide', footer_contact: 'Contact'
+    },
+    en: {
+      nav_features: 'Features', nav_pricing: 'Pricing', nav_help: 'Help',
+      login: 'Sign in', free_trial: 'Free trial',
+      hero_title: 'Manage your inventory and procurement without the complexity of an ERP',
+      hero_subtitle: 'The SaaS solution designed for SMBs and retailers who want a powerful, simple and affordable tool — without the cost or complexity of legacy systems.',
+      hero_cta1: 'Get started — Free trial', hero_cta2: 'Talk to an advisor',
+      per_month: '/ month', annual_discount: '-15% yearly',
+      stat1_label: 'SMBs using Jupply', stat2_label: 'average time saved', stat3_label: 'uptime',
+      modules_label: 'Available modules', modules_title: 'Three modules to run your business',
+      mod1_title: 'Sales', mod1_desc: 'Customer order management, proforma invoicing and full tracking through delivery.',
+      mod2_title: 'Warehouses / Inventory', mod2_desc: 'Real-time stock tracking, configurable locations, order picking and batch traceability.',
+      mod3_title: 'Procurement', mod3_desc: 'RFQs, supplier orders, goods reception and quality control.',
+      why_label: 'Why Jupply', why_title: 'Built for fast-moving businesses',
+      why1_title: 'Lower cost vs. legacy ERPs', why1_desc: 'A fraction of the price of Odoo, SAP or Microsoft Dynamics — no compromise on essentials.',
+      why2_title: 'Multi-company', why2_desc: 'Each company keeps its data separate, with its own logo and branding.',
+      why3_title: 'Web and mobile', why3_desc: 'Accessible from desktop, tablet or phone — anywhere, anytime.',
+      why4_title: 'Built for the field', why4_desc: 'Batch traceability, configurable storage locations and workflows adapted to real operations.',
+      pricing_label: 'Simple pricing', pricing_title: 'One plan, everything included',
+      monthly: 'Monthly', monthly_sub: 'per month · no commitment',
+      annual: 'Annual', annual_sub: 'per month · billed annually',
+      plan_feat1: 'Sales, Inventory, Procurement', plan_feat2: 'Multi-company',
+      plan_feat3: 'Support included', plan_feat3_priority: 'Priority support',
+      start_trial: 'Start free trial',
+      cta_title: 'Ready to simplify your management?',
+      cta_subtitle: 'Join the SMBs that chose Jupply to manage their sales, inventory and procurement.',
+      cta_button: 'Start your free trial',
+      footer_rights: 'All rights reserved.', footer_about: 'About', footer_help: 'Help', footer_contact: 'Contact'
+    }
+  };
+
+  componentDidMount() {
+    this._animateHero();
+    this._setupStatsObserver();
+  }
+
+  _animateHero() {
+    const root = this._rootEl || document;
+    for (let i = 0; i <= 4; i++) {
+      const el = root.querySelector('[data-hero="' + i + '"]');
+      if (el) {
+        setTimeout(() => {
+          el.style.opacity = '1';
+          el.style.transform = 'translateY(0)';
+        }, 200 + i * 250);
+      }
+    }
+  }
+
+  _setupStatsObserver() {
+    const root = this._rootEl || document;
+    const section = root.querySelector('[data-stats-section]');
+    if (!section) return;
+    const obs = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting && !this.state.countersStarted) {
+          this.setState({ countersStarted: true });
+          this._animateCounters();
+          obs.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.3 });
+    obs.observe(section);
+  }
+
+  _animateCounters() {
+    const targets = [500, 40, 99.9];
+    const duration = 1800;
+    const start = performance.now();
+    const ease = (t) => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    const tick = () => {
+      const elapsed = performance.now() - start;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = ease(progress);
+      const vals = targets.map(t => Math.min(t, +(eased * t).toFixed(t === 99.9 ? 1 : 0)));
+      this.setState({ counterVals: vals });
+      if (progress < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }
+
+  renderVals() {
+    const h = React.createElement;
+    const lang = this.state.lang;
+    const t = this.translations[lang];
+    const isFR = lang === 'fr';
+    const mp = this.props.monthlyPrice ?? 29;
+    const annual = Math.round(mp * 0.85);
+    const cv = this.state.counterVals;
+    const countersStarted = this.state.countersStarted;
+    const hovIdx = this.state.hoveredModule;
+
+    // Stats with animated counters
+    const statLabels = [t.stat1_label, t.stat2_label, t.stat3_label];
+    const statSuffixes = ['+', isFR ? ' %' : '%', isFR ? ' %' : '%'];
+    const statDisplays = countersStarted
+      ? [Math.round(cv[0]) + statSuffixes[0], cv[1].toFixed(0) + statSuffixes[1], cv[2].toFixed(1) + statSuffixes[2]]
+      : ['0' + statSuffixes[0], '0' + statSuffixes[1], '0' + (isFR ? ',0' : '.0') + statSuffixes[2]];
+    const statsEl = statLabels.map((label, i) =>
+      h('div', { key: i, style: { padding: '8px 0' } },
+        h('div', { style: { fontSize: 36, fontWeight: 800, color: '#0B1D3A', marginBottom: 4, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' } }, statDisplays[i]),
+        h('div', { style: { fontSize: 14, color: '#6b7a8e', fontWeight: 500 } }, label)
+      )
+    );
+
+    // Module cards with glow hover
+    const modules = [
+      { title: t.mod1_title, desc: t.mod1_desc, gradient: 'linear-gradient(135deg, #1B6B3A, #2E9E5B)', glowColor: 'rgba(46,158,91,0.4)',
+        icon: h('svg', { width: 32, height: 32, viewBox: '0 0 24 24', fill: 'none', stroke: '#ffffff', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round' },
+          h('path', { d: 'M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z' }), h('line', { x1: 3, y1: 6, x2: 21, y2: 6 }), h('path', { d: 'M16 10a4 4 0 01-8 0' })) },
+      { title: t.mod2_title, desc: t.mod2_desc, gradient: 'linear-gradient(135deg, #7B2D8E, #A855C7)', glowColor: 'rgba(168,85,199,0.4)',
+        icon: h('svg', { width: 32, height: 32, viewBox: '0 0 24 24', fill: 'none', stroke: '#ffffff', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round' },
+          h('path', { d: 'M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z' }),
+          h('polyline', { points: '3.27 6.96 12 12.01 20.73 6.96' }), h('line', { x1: 12, y1: 22.08, x2: 12, y2: 12 })) },
+      { title: t.mod3_title, desc: t.mod3_desc, gradient: 'linear-gradient(135deg, #C4500A, #E8751F)', glowColor: 'rgba(232,117,31,0.4)',
+        icon: h('svg', { width: 32, height: 32, viewBox: '0 0 24 24', fill: 'none', stroke: '#ffffff', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round' },
+          h('path', { d: 'M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z' }), h('polyline', { points: '14 2 14 8 20 8' }),
+          h('line', { x1: 16, y1: 13, x2: 8, y2: 13 }), h('line', { x1: 16, y1: 17, x2: 8, y2: 17 })) }
+    ];
+
+    const modulesEl = modules.map((m, i) => {
+      const isHov = hovIdx === i;
+      return h('div', {
+        key: i,
+        onMouseEnter: () => this.setState({ hoveredModule: i }),
+        onMouseLeave: () => this.setState({ hoveredModule: -1 }),
+        style: {
+          background: '#ffffff', borderRadius: 20, padding: 0, overflow: 'hidden',
+          border: '1px solid ' + (isHov ? 'transparent' : '#e8ecf1'),
+          transition: 'all 0.4s cubic-bezier(0.4,0,0.2,1)', cursor: 'default',
+          boxShadow: isHov ? '0 8px 32px ' + m.glowColor + ', 0 0 0 2px ' + m.glowColor : '0 2px 12px rgba(0,0,0,0.04)',
+          transform: isHov ? 'translateY(-6px)' : 'translateY(0)'
+        }
+      },
+        h('div', { style: {
+          background: m.gradient, padding: '32px 28px 24px', display: 'flex', flexDirection: 'column', gap: 14,
+          position: 'relative', overflow: 'hidden'
+        }},
+          h('div', { style: { position: 'absolute', top: -20, right: -20, width: 100, height: 100, borderRadius: '50%', background: 'rgba(255,255,255,0.08)' } }),
+          h('div', { style: { position: 'absolute', bottom: -30, left: '40%', width: 80, height: 80, borderRadius: '50%', background: 'rgba(255,255,255,0.05)' } }),
+          h('div', { style: {
+            width: 64, height: 64, borderRadius: 16, background: 'rgba(255,255,255,0.2)',
+            backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            flexShrink: 0, position: 'relative', zIndex: 1
+          } }, m.icon),
+          h('h3', { style: { fontSize: 20, fontWeight: 800, color: '#ffffff', margin: 0, position: 'relative', zIndex: 1, wordBreak: 'break-word' } }, m.title)
+        ),
+        h('div', { style: { padding: '24px 32px 32px' } },
+          h('p', { style: { fontSize: 15, color: '#5a6a7e', lineHeight: 1.7, margin: 0 } }, m.desc)
+        )
+      );
+    });
+
+    // Why cards
+    const whyIcons = [
+      h('svg', { width: 22, height: 22, viewBox: '0 0 24 24', fill: 'none', stroke: '#D4A017', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' },
+        h('line', { x1: 12, y1: 1, x2: 12, y2: 23 }), h('path', { d: 'M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6' })),
+      h('svg', { width: 22, height: 22, viewBox: '0 0 24 24', fill: 'none', stroke: '#D4A017', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' },
+        h('path', { d: 'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2' }), h('circle', { cx: 9, cy: 7, r: 4 }),
+        h('path', { d: 'M23 21v-2a4 4 0 00-3-3.87' }), h('path', { d: 'M16 3.13a4 4 0 010 7.75' })),
+      h('svg', { width: 22, height: 22, viewBox: '0 0 24 24', fill: 'none', stroke: '#D4A017', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' },
+        h('rect', { x: 5, y: 2, width: 14, height: 20, rx: 2, ry: 2 }), h('line', { x1: 12, y1: 18, x2: 12.01, y2: 18 })),
+      h('svg', { width: 22, height: 22, viewBox: '0 0 24 24', fill: 'none', stroke: '#D4A017', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' },
+        h('polyline', { points: '22 12 18 12 15 21 9 3 6 12 2 12' }))
+    ];
+    const whyData = [
+      { title: t.why1_title, desc: t.why1_desc }, { title: t.why2_title, desc: t.why2_desc },
+      { title: t.why3_title, desc: t.why3_desc }, { title: t.why4_title, desc: t.why4_desc }
+    ];
+    const whyCards = whyData.map((w, i) =>
+      h('div', { key: i, style: {
+        display: 'flex', gap: 20, background: '#ffffff', borderRadius: 14, padding: 32,
+        border: '1px solid #e8ecf1', transition: 'all 0.3s'
+      }},
+        h('div', { style: { flexShrink: 0, width: 48, height: 48, borderRadius: 12, background: 'rgba(212,160,23,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' } }, whyIcons[i]),
+        h('div', null,
+          h('h4', { style: { fontSize: 17, fontWeight: 700, color: '#0B1D3A', margin: '0 0 6px' } }, w.title),
+          h('p', { style: { fontSize: 14.5, color: '#5a6a7e', lineHeight: 1.6, margin: 0 } }, w.desc)
+        )
+      )
+    );
+
+    return {
+      setFR: () => this.setState({ lang: 'fr' }),
+      setEN: () => this.setState({ lang: 'en' }),
+      frBg: isFR ? '#0B1D3A' : 'transparent', frColor: isFR ? '#ffffff' : '#6b7a8e',
+      frShadow: isFR ? '0 1px 4px rgba(0,0,0,0.15)' : 'none',
+      enBg: !isFR ? '#0B1D3A' : 'transparent', enColor: !isFR ? '#ffffff' : '#6b7a8e',
+      enShadow: !isFR ? '0 1px 4px rgba(0,0,0,0.15)' : 'none',
+      monthlyPrice: mp + ' €', annualPrice: annual + ' €',
+      t_nav_features: t.nav_features, t_nav_pricing: t.nav_pricing, t_nav_help: t.nav_help,
+      t_login: t.login, t_free_trial: t.free_trial,
+      t_hero_title: t.hero_title, t_hero_subtitle: t.hero_subtitle,
+      t_hero_cta1: t.hero_cta1, t_hero_cta2: t.hero_cta2,
+      t_per_month: t.per_month, t_annual_discount: t.annual_discount,
+      t_modules_label: t.modules_label, t_modules_title: t.modules_title,
+      t_why_label: t.why_label, t_why_title: t.why_title,
+      t_pricing_label: t.pricing_label, t_pricing_title: t.pricing_title,
+      t_monthly: t.monthly, t_monthly_sub: t.monthly_sub,
+      t_annual: t.annual, t_annual_sub: t.annual_sub,
+      t_plan_feat1: t.plan_feat1, t_plan_feat2: t.plan_feat2,
+      t_plan_feat3: t.plan_feat3, t_plan_feat3_priority: t.plan_feat3_priority,
+      t_start_trial: t.start_trial,
+      t_cta_title: t.cta_title, t_cta_subtitle: t.cta_subtitle, t_cta_button: t.cta_button,
+      t_footer_rights: t.footer_rights, t_footer_about: t.footer_about,
+      t_footer_help: t.footer_help, t_footer_contact: t.footer_contact,
+      modulesEl, statsEl, whyCards
+    };
+  }
+}
+</script>
+</body>
+</html>

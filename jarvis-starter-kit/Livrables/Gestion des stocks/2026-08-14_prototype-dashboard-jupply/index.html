@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+@keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes countUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+@keyframes slideIn { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes barGrow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+body { margin: 0; font-family: 'DM Sans', system-ui, sans-serif; background: #F0F2F7; color: #1a1d2e; -webkit-font-smoothing: antialiased; }
+a { color: #635BFF; text-decoration: none; }
+a:hover { color: #4840e0; }
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); border-radius: 3px; }
+</style>
+</helmet>
+
+<div style="display: flex; height: 100vh; overflow: hidden;">
+  <!-- Icon Rail Sidebar -->
+  <aside style="width: 64px; flex-shrink: 0; background: #0B0F1E; display: flex; flex-direction: column; align-items: center; padding: 12px 0; z-index: 10;">
+    <!-- Logo -->
+    <div style="width: 40px; height: 40px; background: linear-gradient(135deg, #635BFF 0%, #8B5CF6 100%); border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-bottom: 24px; cursor: pointer; box-shadow: 0 4px 12px rgba(99,91,255,0.35);">
+      <span style="color: white; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 18px;">J</span>
+    </div>
+    <!-- Nav icons -->
+    <nav style="display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 1;">
+      <div style="width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; cursor: pointer; background: rgba(99,91,255,0.15); position: relative;" title="Tableau de bord" onclick="{{ navTo }}" data-page="dashboard">
+        <svg width="20" height="20" fill="none" stroke="#635BFF" stroke-width="1.8" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg>
+        <div style="position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 3px; height: 20px; background: #635BFF; border-radius: 0 3px 3px 0;"></div>
+      </div>
+      <div style="width: 100%; padding: 8px 0; display: flex; justify-content: center;">
+        <div style="width: 24px; height: 1px; background: rgba(255,255,255,0.08);"></div>
+      </div>
+      <div style="width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; cursor: pointer;" title="Ventes" style-hover="background: rgba(255,255,255,0.06)" onclick="{{ navTo }}" data-page="commandes">
+        <svg width="20" height="20" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1.8" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14l2 2 4-4"/></svg>
+      </div>
+      <div style="width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; cursor: pointer;" title="Articles" style-hover="background: rgba(255,255,255,0.06)" onclick="{{ navTo }}" data-page="articles">
+        <svg width="20" height="20" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1.8" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><path d="M3.27 6.96L12 12.01l8.73-5.05M12 22.08V12"/></svg>
+      </div>
+      <div style="width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; cursor: pointer;" title="Mouvements" style-hover="background: rgba(255,255,255,0.06)">
+        <svg width="20" height="20" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1.8" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+      </div>
+      <div style="width: 100%; padding: 8px 0; display: flex; justify-content: center;">
+        <div style="width: 24px; height: 1px; background: rgba(255,255,255,0.08);"></div>
+      </div>
+      <div style="width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; cursor: pointer;" title="Achats" style-hover="background: rgba(255,255,255,0.06)">
+        <svg width="20" height="20" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1.8" viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 01-8 0"/></svg>
+      </div>
+      <div style="width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; cursor: pointer;" title="Fournisseurs" style-hover="background: rgba(255,255,255,0.06)">
+        <svg width="20" height="20" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1.8" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4-4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M20 8v6M23 11h-6"/></svg>
+      </div>
+    </nav>
+    <!-- Bottom icons -->
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 4px; padding-bottom: 4px;">
+      <div style="width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; cursor: pointer;" title="Configuration" style-hover="background: rgba(255,255,255,0.06)">
+        <svg width="20" height="20" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.32 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main content area -->
+  <div style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
+    <!-- Top Command Bar -->
+    <header style="height: 52px; flex-shrink: 0; background: white; border-bottom: 1px solid #E4E7EF; display: flex; align-items: center; justify-content: space-between; padding: 0 24px; gap: 16px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <!-- Company badge -->
+        <div style="display: flex; align-items: center; gap: 8px; padding: 5px 12px 5px 6px; background: #F5F5FF; border-radius: 8px; border: 1px solid #E8E6FF;">
+          <div style="width: 24px; height: 24px; background: #1a1d2e; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: white; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 10px;">U</div>
+          <span style="font-weight: 600; font-size: 13px; color: #1a1d2e;">ULTIUM</span>
+        </div>
+        <!-- Breadcrumb -->
+        <svg width="16" height="16" fill="none" stroke="#CBD0DD" stroke-width="1.5" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+        <span style="font-size: 13px; color: #64748B; font-weight: 500;">{{ pageTitle }}</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 4px;">
+        <!-- Search -->
+        <div style="display: flex; align-items: center; background: #F5F6FA; border-radius: 10px; padding: 7px 14px; gap: 8px; width: 220px; border: 1px solid transparent; cursor: text;" style-hover="border-color: #E4E7EF" style-focus="border-color: #635BFF; background: white">
+          <svg width="15" height="15" fill="none" stroke="#94A3B8" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+          <span style="font-size: 12px; color: #94A3B8;">Rechercher... <span style="color: #CBD0DD; font-size: 11px; background: #E9EBF0; padding: 1px 5px; border-radius: 3px; margin-left: 4px;">⌘K</span></span>
+        </div>
+        <!-- Notifications -->
+        <div style="width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 10px; cursor: pointer; position: relative;" style-hover="background: #F5F6FA">
+          <svg width="18" height="18" fill="none" stroke="#64748B" stroke-width="1.8" viewBox="0 0 24 24"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/></svg>
+          <div style="position: absolute; top: 7px; right: 7px; width: 7px; height: 7px; background: #EF4444; border-radius: 50%; border: 2px solid white; animation: pulse 2s infinite;"></div>
+        </div>
+        <!-- User -->
+        <div style="display: flex; align-items: center; gap: 8px; padding: 4px 10px 4px 4px; border-radius: 10px; cursor: pointer; margin-left: 2px;" style-hover="background: #F5F6FA">
+          <div style="width: 30px; height: 30px; background: linear-gradient(135deg, #635BFF, #8B5CF6); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 11px; color: white; font-family: 'Space Grotesk', sans-serif;">KM</div>
+          <div>
+            <div style="font-size: 12px; font-weight: 600; color: #1a1d2e; line-height: 1.2;">K. Mansouri</div>
+            <div style="font-size: 10px; color: #94A3B8; line-height: 1.2;">Admin</div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Page content -->
+    <main style="flex: 1; overflow-y: auto; padding: 24px 28px;">
+      <sc-if value="{{ showDashboard }}" hint-placeholder-val="{{ true }}">
+        <!-- Dashboard header -->
+        <div style="display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 24px; animation: fadeUp 0.4s ease;">
+          <div>
+            <div style="font-size: 11px; color: #94A3B8; font-weight: 500; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 4px;">Août 2026 — ULTIUM</div>
+            <div style="font-family: 'Space Grotesk', sans-serif; font-size: 24px; font-weight: 700; color: #0B0F1E; line-height: 1.2;">Bonjour, Karim 👋</div>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <div style="padding: 8px 16px; background: white; border: 1px solid #E4E7EF; border-radius: 8px; font-size: 12px; font-weight: 500; color: #64748B; cursor: pointer; display: flex; align-items: center; gap: 6px;" style-hover="border-color: #CBD0DD; color: #1a1d2e">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+              Exporter
+            </div>
+            <div style="padding: 8px 16px; background: #635BFF; border-radius: 8px; font-size: 12px; font-weight: 600; color: white; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 2px 8px rgba(99,91,255,0.3);" style-hover="background: #5248e0">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+              Nouvelle commande
+            </div>
+          </div>
+        </div>
+
+        <!-- Hero KPI Row -->
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 18px;">
+          <!-- CA -->
+          <div style="background: white; border-radius: 14px; padding: 20px; border: 1px solid #E4E7EF; animation: fadeUp 0.4s ease 0.05s both; position: relative; overflow: hidden;">
+            <div style="position: absolute; top: 0; right: 0; width: 80px; height: 80px; background: radial-gradient(circle at top right, rgba(99,91,255,0.06), transparent); pointer-events: none;"></div>
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 14px;">
+              <div style="width: 34px; height: 34px; background: linear-gradient(135deg, #635BFF 0%, #8B5CF6 100%); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                <svg width="16" height="16" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+              </div>
+              <span style="font-size: 12px; color: #8892A6; font-weight: 500;">Chiffre d'affaires</span>
+            </div>
+            <div style="font-family: 'Space Grotesk', sans-serif; font-size: 28px; font-weight: 700; color: #0B0F1E; line-height: 1; animation: countUp 0.5s ease 0.2s both;">24,8M <span style="font-size: 14px; color: #8892A6; font-weight: 500;">FCFA</span></div>
+            <div style="display: flex; align-items: center; gap: 6px; margin-top: 10px;">
+              <div style="display: flex; align-items: center; gap: 3px; background: #ECFDF5; padding: 3px 8px; border-radius: 6px;">
+                <svg width="12" height="12" fill="none" stroke="#059669" stroke-width="2.5" viewBox="0 0 24 24"><path d="M7 17l5-5 5 5M7 7l5 5 5-5"/></svg>
+                <span style="font-size: 11px; color: #059669; font-weight: 600;">+12,5%</span>
+              </div>
+              <span style="font-size: 11px; color: #B0B7C5;">vs juil.</span>
+            </div>
+            <!-- Mini sparkline -->
+            <div style="display: flex; align-items: flex-end; gap: 3px; margin-top: 14px; height: 28px;">
+              <div style="flex: 1; background: #EDE9FE; border-radius: 2px; height: 40%; animation: barGrow 0.6s ease 0.3s both; transform-origin: bottom;"></div>
+              <div style="flex: 1; background: #EDE9FE; border-radius: 2px; height: 55%; animation: barGrow 0.6s ease 0.35s both; transform-origin: bottom;"></div>
+              <div style="flex: 1; background: #EDE9FE; border-radius: 2px; height: 45%; animation: barGrow 0.6s ease 0.4s both; transform-origin: bottom;"></div>
+              <div style="flex: 1; background: #EDE9FE; border-radius: 2px; height: 65%; animation: barGrow 0.6s ease 0.45s both; transform-origin: bottom;"></div>
+              <div style="flex: 1; background: #EDE9FE; border-radius: 2px; height: 50%; animation: barGrow 0.6s ease 0.5s both; transform-origin: bottom;"></div>
+              <div style="flex: 1; background: #EDE9FE; border-radius: 2px; height: 72%; animation: barGrow 0.6s ease 0.55s both; transform-origin: bottom;"></div>
+              <div style="flex: 1; background: #EDE9FE; border-radius: 2px; height: 60%; animation: barGrow 0.6s ease 0.6s both; transform-origin: bottom;"></div>
+              <div style="flex: 1; background: #635BFF; border-radius: 2px; height: 90%; animation: barGrow 0.6s ease 0.65s both; transform-origin: bottom;"></div>
+            </div>
+          </div>
+
+          <!-- Valeur stock -->
+          <div style="background: white; border-radius: 14px; padding: 20px; border: 1px solid #E4E7EF; animation: fadeUp 0.4s ease 0.1s both; position: relative; overflow: hidden;">
+            <div style="position: absolute; top: 0; right: 0; width: 80px; height: 80px; background: radial-gradient(circle at top right, rgba(16,185,129,0.06), transparent); pointer-events: none;"></div>
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 14px;">
+              <div style="width: 34px; height: 34px; background: linear-gradient(135deg, #059669, #10B981); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                <svg width="16" height="16" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+              </div>
+              <span style="font-size: 12px; color: #8892A6; font-weight: 500;">Valeur du stock</span>
+            </div>
+            <div style="font-family: 'Space Grotesk', sans-serif; font-size: 28px; font-weight: 700; color: #0B0F1E; line-height: 1; animation: countUp 0.5s ease 0.25s both;">158,3M <span style="font-size: 14px; color: #8892A6; font-weight: 500;">FCFA</span></div>
+            <div style="display: flex; align-items: center; gap: 8px; margin-top: 10px;">
+              <span style="font-size: 12px; color: #059669; font-weight: 600;">1 247</span>
+              <span style="font-size: 11px; color: #B0B7C5;">articles · 5 dépôts</span>
+            </div>
+            <!-- Stock health bar -->
+            <div style="margin-top: 14px;">
+              <div style="display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: #F1F5F9;">
+                <div style="width: 72%; background: #10B981; animation: barGrow 0.8s ease 0.3s both; transform-origin: left;"></div>
+                <div style="width: 18%; background: #FBBF24; animation: barGrow 0.8s ease 0.5s both; transform-origin: left;"></div>
+                <div style="width: 10%; background: #EF4444; animation: barGrow 0.8s ease 0.7s both; transform-origin: left;"></div>
+              </div>
+              <div style="display: flex; gap: 12px; margin-top: 6px;">
+                <span style="font-size: 10px; color: #64748B; display: flex; align-items: center; gap: 3px;"><span style="width: 6px; height: 6px; background: #10B981; border-radius: 50%; display: inline-block;"></span> OK 72%</span>
+                <span style="font-size: 10px; color: #64748B; display: flex; align-items: center; gap: 3px;"><span style="width: 6px; height: 6px; background: #FBBF24; border-radius: 50%; display: inline-block;"></span> Bas 18%</span>
+                <span style="font-size: 10px; color: #64748B; display: flex; align-items: center; gap: 3px;"><span style="width: 6px; height: 6px; background: #EF4444; border-radius: 50%; display: inline-block;"></span> Rupture</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Commandes -->
+          <div style="background: white; border-radius: 14px; padding: 20px; border: 1px solid #E4E7EF; animation: fadeUp 0.4s ease 0.15s both; position: relative; overflow: hidden;">
+            <div style="position: absolute; top: 0; right: 0; width: 80px; height: 80px; background: radial-gradient(circle at top right, rgba(245,158,11,0.06), transparent); pointer-events: none;"></div>
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 14px;">
+              <div style="width: 34px; height: 34px; background: linear-gradient(135deg, #D97706, #F59E0B); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                <svg width="16" height="16" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/></svg>
+              </div>
+              <span style="font-size: 12px; color: #8892A6; font-weight: 500;">Commandes ventes</span>
+            </div>
+            <div style="font-family: 'Space Grotesk', sans-serif; font-size: 28px; font-weight: 700; color: #0B0F1E; line-height: 1; animation: countUp 0.5s ease 0.3s both;">34</div>
+            <div style="display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap;">
+              <span style="font-size: 10px; background: #FEF2F2; color: #DC2626; padding: 3px 8px; border-radius: 20px; font-weight: 600;">3 urgentes</span>
+              <span style="font-size: 10px; background: #FFF7ED; color: #D97706; padding: 3px 8px; border-radius: 20px; font-weight: 600;">12 en prép.</span>
+            </div>
+            <!-- Pipeline mini -->
+            <div style="display: flex; gap: 2px; margin-top: 14px; height: 28px; align-items: flex-end;">
+              <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px;">
+                <span style="font-size: 9px; font-weight: 700; color: #0B0F1E;">5</span>
+                <div style="width: 100%; height: 6px; background: #CBD5E1; border-radius: 3px;"></div>
+              </div>
+              <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px;">
+                <span style="font-size: 9px; font-weight: 700; color: #0B0F1E;">7</span>
+                <div style="width: 100%; height: 6px; background: #A78BFA; border-radius: 3px;"></div>
+              </div>
+              <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px;">
+                <span style="font-size: 9px; font-weight: 700; color: #0B0F1E;">4</span>
+                <div style="width: 100%; height: 6px; background: #FBBF24; border-radius: 3px;"></div>
+              </div>
+              <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px;">
+                <span style="font-size: 9px; font-weight: 700; color: #0B0F1E;">12</span>
+                <div style="width: 100%; height: 6px; background: #60A5FA; border-radius: 3px;"></div>
+              </div>
+              <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px;">
+                <span style="font-size: 9px; font-weight: 700; color: #0B0F1E;">3</span>
+                <div style="width: 100%; height: 6px; background: #34D399; border-radius: 3px;"></div>
+              </div>
+              <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px;">
+                <span style="font-size: 9px; font-weight: 700; color: #0B0F1E;">3</span>
+                <div style="width: 100%; height: 6px; background: #22C55E; border-radius: 3px;"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Ruptures / Alertes -->
+          <div style="background: linear-gradient(135deg, #1a1d2e 0%, #2d2145 100%); border-radius: 14px; padding: 20px; animation: fadeUp 0.4s ease 0.2s both; position: relative; overflow: hidden;">
+            <div style="position: absolute; top: -20px; right: -20px; width: 100px; height: 100px; background: radial-gradient(circle, rgba(239,68,68,0.15), transparent); pointer-events: none;"></div>
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 14px;">
+              <div style="width: 34px; height: 34px; background: rgba(239,68,68,0.2); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                <svg width="16" height="16" fill="none" stroke="#F87171" stroke-width="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0zM12 9v4M12 17h.01"/></svg>
+              </div>
+              <span style="font-size: 12px; color: rgba(255,255,255,0.6); font-weight: 500;">Alertes critiques</span>
+            </div>
+            <div style="font-family: 'Space Grotesk', sans-serif; font-size: 28px; font-weight: 700; color: white; line-height: 1; animation: countUp 0.5s ease 0.35s both;">8 <span style="font-size: 14px; color: rgba(255,255,255,0.5); font-weight: 500;">ruptures</span></div>
+            <div style="margin-top: 10px;">
+              <span style="font-size: 12px; color: #FBBF24; font-weight: 500;">23 stocks bas</span>
+              <span style="font-size: 11px; color: rgba(255,255,255,0.35);"> · </span>
+              <span style="font-size: 12px; color: #F87171; font-weight: 500;">3 péremptions</span>
+            </div>
+            <div style="margin-top: 14px; display: flex; flex-direction: column; gap: 6px;">
+              <div style="display: flex; align-items: center; gap: 6px; font-size: 11px; color: rgba(255,255,255,0.7);">
+                <div style="width: 5px; height: 5px; background: #F87171; border-radius: 50%; animation: pulse 1.5s infinite;"></div>
+                Filtre à huile REF-4521 — stock 0
+              </div>
+              <div style="display: flex; align-items: center; gap: 6px; font-size: 11px; color: rgba(255,255,255,0.7);">
+                <div style="width: 5px; height: 5px; background: #FBBF24; border-radius: 50%;"></div>
+                Lot #BT-2024-089 expire dans 28j
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Order Pipeline -->
+        <div style="background: white; border-radius: 14px; border: 1px solid #E4E7EF; padding: 20px 24px; margin-bottom: 18px; animation: fadeUp 0.4s ease 0.25s both;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span style="font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 700; color: #0B0F1E;">Pipeline des commandes</span>
+              <span style="font-size: 11px; color: #8892A6; background: #F5F6FA; padding: 3px 10px; border-radius: 20px;">34 actives</span>
+            </div>
+            <div style="display: flex; gap: 6px;">
+              <span style="font-size: 12px; padding: 5px 12px; border-radius: 6px; cursor: pointer; font-weight: 500; background: #0B0F1E; color: white;">Toutes</span>
+              <span style="font-size: 12px; padding: 5px 12px; border-radius: 6px; cursor: pointer; font-weight: 500; color: #64748B;" style-hover="background: #F5F6FA">Urgentes</span>
+              <span style="font-size: 12px; padding: 5px 12px; border-radius: 6px; cursor: pointer; font-weight: 500; color: #64748B;" style-hover="background: #F5F6FA">En retard</span>
+            </div>
+          </div>
+          <!-- Pipeline stages -->
+          <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 2px; margin-bottom: 20px;">
+            <div style="text-align: center; padding: 12px 8px; background: #F8FAFC; border-radius: 10px 0 0 10px;">
+              <div style="font-family: 'Space Grotesk', sans-serif; font-size: 22px; font-weight: 700; color: #64748B;">5</div>
+              <div style="font-size: 10px; color: #94A3B8; font-weight: 500; margin-top: 2px;">Brouillon</div>
+            </div>
+            <div style="text-align: center; padding: 12px 8px; background: #FAF5FF;">
+              <div style="font-family: 'Space Grotesk', sans-serif; font-size: 22px; font-weight: 700; color: #7C3AED;">7</div>
+              <div style="font-size: 10px; color: #A78BFA; font-weight: 500; margin-top: 2px;">Proforma</div>
+            </div>
+            <div style="text-align: center; padding: 12px 8px; background: #FFFBEB;">
+              <div style="font-family: 'Space Grotesk', sans-serif; font-size: 22px; font-weight: 700; color: #D97706;">4</div>
+              <div style="font-size: 10px; color: #F59E0B; font-weight: 500; margin-top: 2px;">BC reçu</div>
+            </div>
+            <div style="text-align: center; padding: 12px 8px; background: #EFF6FF;">
+              <div style="font-family: 'Space Grotesk', sans-serif; font-size: 22px; font-weight: 700; color: #2563EB;">12</div>
+              <div style="font-size: 10px; color: #60A5FA; font-weight: 500; margin-top: 2px;">En prép.</div>
+            </div>
+            <div style="text-align: center; padding: 12px 8px; background: #F0FDF4;">
+              <div style="font-family: 'Space Grotesk', sans-serif; font-size: 22px; font-weight: 700; color: #059669;">3</div>
+              <div style="font-size: 10px; color: #34D399; font-weight: 500; margin-top: 2px;">Validée</div>
+            </div>
+            <div style="text-align: center; padding: 12px 8px; background: #ECFDF5; border-radius: 0 10px 10px 0;">
+              <div style="font-family: 'Space Grotesk', sans-serif; font-size: 22px; font-weight: 700; color: #15803D;">3</div>
+              <div style="font-size: 10px; color: #22C55E; font-weight: 500; margin-top: 2px;">Livrée</div>
+            </div>
+          </div>
+
+          <!-- Orders table -->
+          <div style="overflow: hidden; border: 1px solid #EEF0F6; border-radius: 10px;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+              <thead>
+                <tr style="background: #F8F9FC;">
+                  <th style="text-align: left; padding: 10px 16px; font-weight: 600; color: #64748B; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px;">Commande</th>
+                  <th style="text-align: left; padding: 10px 12px; font-weight: 600; color: #64748B; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px;">Client</th>
+                  <th style="text-align: left; padding: 10px 12px; font-weight: 600; color: #64748B; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px;">Statut</th>
+                  <th style="text-align: left; padding: 10px 12px; font-weight: 600; color: #64748B; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px;">Criticité</th>
+                  <th style="text-align: left; padding: 10px 12px; font-weight: 600; color: #64748B; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px;">Livraison</th>
+                  <th style="text-align: right; padding: 10px 16px; font-weight: 600; color: #64748B; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px;">Montant</th>
+                  <th style="width: 40px;"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style="border-top: 1px solid #F1F3F9; cursor: pointer;" style-hover="background: #FAFBFF">
+                  <td style="padding: 12px 16px;">
+                    <span style="color: #635BFF; font-weight: 600; font-family: 'Space Grotesk', sans-serif; font-size: 12px;">CMD-0891</span>
+                  </td>
+                  <td style="padding: 12px 12px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                      <div style="width: 26px; height: 26px; background: #DBEAFE; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; color: #2563EB;">BP</div>
+                      <span style="font-weight: 500;">SARL Batiplus</span>
+                    </div>
+                  </td>
+                  <td style="padding: 12px 12px;"><span style="background: #DBEAFE; color: #1D4ED8; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;">En préparation</span></td>
+                  <td style="padding: 12px 12px;"><span style="background: #FEF2F2; color: #DC2626; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;">⚡ Urgent</span></td>
+                  <td style="padding: 12px 12px; font-size: 12px; color: #64748B;">16 août 2026</td>
+                  <td style="padding: 12px 16px; text-align: right; font-weight: 600; font-family: 'Space Grotesk', sans-serif; font-size: 13px;">4 250 000 F</td>
+                  <td style="padding: 12px 8px;">
+                    <svg width="16" height="16" fill="none" stroke="#CBD0DD" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+                  </td>
+                </tr>
+                <tr style="border-top: 1px solid #F1F3F9; cursor: pointer;" style-hover="background: #FAFBFF">
+                  <td style="padding: 12px 16px;">
+                    <span style="color: #635BFF; font-weight: 600; font-family: 'Space Grotesk', sans-serif; font-size: 12px;">CMD-0890</span>
+                  </td>
+                  <td style="padding: 12px 12px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                      <div style="width: 26px; height: 26px; background: #FEF3C7; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; color: #92400E;">KF</div>
+                      <span style="font-weight: 500;">ETS Konaté & Fils</span>
+                    </div>
+                  </td>
+                  <td style="padding: 12px 12px;"><span style="background: #FEF3C7; color: #92400E; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;">BC reçu</span></td>
+                  <td style="padding: 12px 12px;"><span style="background: #F5F6FA; color: #64748B; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 500;">Normal</span></td>
+                  <td style="padding: 12px 12px; font-size: 12px; color: #64748B;">20 août 2026</td>
+                  <td style="padding: 12px 16px; text-align: right; font-weight: 600; font-family: 'Space Grotesk', sans-serif; font-size: 13px;">1 780 000 F</td>
+                  <td style="padding: 12px 8px;">
+                    <svg width="16" height="16" fill="none" stroke="#CBD0DD" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+                  </td>
+                </tr>
+                <tr style="border-top: 1px solid #F1F3F9; cursor: pointer;" style-hover="background: #FAFBFF">
+                  <td style="padding: 12px 16px;">
+                    <span style="color: #635BFF; font-weight: 600; font-family: 'Space Grotesk', sans-serif; font-size: 12px;">CMD-0889</span>
+                  </td>
+                  <td style="padding: 12px 12px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                      <div style="width: 26px; height: 26px; background: #E0E7FF; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; color: #4338CA;">ME</div>
+                      <span style="font-weight: 500;">Min. de l'Équipement</span>
+                    </div>
+                  </td>
+                  <td style="padding: 12px 12px;"><span style="background: #F0FDF4; color: #15803D; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;">Validée</span></td>
+                  <td style="padding: 12px 12px;"><span style="background: #FEF2F2; color: #DC2626; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;">🔴 Critique</span></td>
+                  <td style="padding: 12px 12px; font-size: 12px; color: #EF4444; font-weight: 500;">14 août 2026</td>
+                  <td style="padding: 12px 16px; text-align: right; font-weight: 600; font-family: 'Space Grotesk', sans-serif; font-size: 13px;">12 400 000 F</td>
+                  <td style="padding: 12px 8px;">
+                    <svg width="16" height="16" fill="none" stroke="#CBD0DD" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+                  </td>
+                </tr>
+                <tr style="border-top: 1px solid #F1F3F9; cursor: pointer;" style-hover="background: #FAFBFF">
+                  <td style="padding: 12px 16px;">
+                    <span style="color: #635BFF; font-weight: 600; font-family: 'Space Grotesk', sans-serif; font-size: 12px;">CMD-0888</span>
+                  </td>
+                  <td style="padding: 12px 12px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                      <div style="width: 26px; height: 26px; background: #FEE2E2; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; color: #B91C1C;">SI</div>
+                      <span style="font-weight: 500;">Groupe Salam Industries</span>
+                    </div>
+                  </td>
+                  <td style="padding: 12px 12px;"><span style="background: #F3E8FF; color: #7C3AED; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;">Proforma</span></td>
+                  <td style="padding: 12px 12px;"><span style="background: #FFF7ED; color: #C2410C; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;">Réappro</span></td>
+                  <td style="padding: 12px 12px; font-size: 12px; color: #64748B;">25 août 2026</td>
+                  <td style="padding: 12px 16px; text-align: right; font-weight: 600; font-family: 'Space Grotesk', sans-serif; font-size: 13px;">8 920 000 F</td>
+                  <td style="padding: 12px 8px;">
+                    <svg width="16" height="16" fill="none" stroke="#CBD0DD" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Bottom row -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; animation: fadeUp 0.4s ease 0.35s both;">
+          <!-- Achats en cours -->
+          <div style="background: white; border-radius: 14px; border: 1px solid #E4E7EF; padding: 20px 24px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+              <span style="font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 700; color: #0B0F1E;">Achats fournisseurs</span>
+              <span style="font-size: 12px; color: #635BFF; cursor: pointer; font-weight: 500;" style-hover="text-decoration: underline">Voir tout →</span>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
+              <div style="padding: 14px; background: #F8F9FC; border-radius: 10px;">
+                <div style="font-family: 'Space Grotesk', sans-serif; font-size: 24px; font-weight: 700; color: #F59E0B;">4</div>
+                <div style="font-size: 12px; color: #64748B; margin-top: 2px;">RFQ en attente</div>
+              </div>
+              <div style="padding: 14px; background: #F8F9FC; border-radius: 10px;">
+                <div style="font-family: 'Space Grotesk', sans-serif; font-size: 24px; font-weight: 700; color: #3B82F6;">5</div>
+                <div style="font-size: 12px; color: #64748B; margin-top: 2px;">En livraison</div>
+              </div>
+              <div style="padding: 14px; background: #F8F9FC; border-radius: 10px;">
+                <div style="font-family: 'Space Grotesk', sans-serif; font-size: 24px; font-weight: 700; color: #22C55E;">3</div>
+                <div style="font-size: 12px; color: #64748B; margin-top: 2px;">À réceptionner</div>
+              </div>
+              <div style="padding: 14px; background: #FEF2F2; border-radius: 10px;">
+                <div style="font-family: 'Space Grotesk', sans-serif; font-size: 24px; font-weight: 700; color: #EF4444;">2</div>
+                <div style="font-size: 12px; color: #DC2626; font-weight: 500; margin-top: 2px;">En retard !</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Activité récente (Timeline) -->
+          <div style="background: white; border-radius: 14px; border: 1px solid #E4E7EF; padding: 20px 24px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+              <span style="font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 700; color: #0B0F1E;">Activité récente</span>
+              <span style="font-size: 11px; color: #8892A6; background: #FEF2F2; padding: 3px 10px; border-radius: 20px; font-weight: 600; color: #DC2626;">7 alertes</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 0; position: relative;">
+              <!-- Timeline line -->
+              <div style="position: absolute; left: 11px; top: 16px; bottom: 16px; width: 2px; background: #EEF0F6;"></div>
+              <!-- Items -->
+              <div style="display: flex; gap: 12px; padding: 8px 0; position: relative; animation: slideIn 0.3s ease 0.4s both;">
+                <div style="width: 24px; height: 24px; background: #FEF2F2; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; z-index: 1; border: 2px solid white;">
+                  <div style="width: 8px; height: 8px; background: #EF4444; border-radius: 50%;"></div>
+                </div>
+                <div style="flex: 1; min-width: 0;">
+                  <div style="font-size: 12px; font-weight: 500; color: #0B0F1E; line-height: 1.4;">Rupture stock — <span style="color: #635BFF;">Filtre à huile REF-4521</span></div>
+                  <div style="font-size: 11px; color: #94A3B8; margin-top: 1px;">Il y a 2 heures · Dépôt Principal</div>
+                </div>
+              </div>
+              <div style="display: flex; gap: 12px; padding: 8px 0; position: relative; animation: slideIn 0.3s ease 0.5s both;">
+                <div style="width: 24px; height: 24px; background: #FFFBEB; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; z-index: 1; border: 2px solid white;">
+                  <div style="width: 8px; height: 8px; background: #F59E0B; border-radius: 50%;"></div>
+                </div>
+                <div style="flex: 1; min-width: 0;">
+                  <div style="font-size: 12px; font-weight: 500; color: #0B0F1E; line-height: 1.4;">Péremption < 30j — <span style="color: #635BFF;">Lot #BT-2024-089</span></div>
+                  <div style="font-size: 11px; color: #94A3B8; margin-top: 1px;">Il y a 4 heures · Expire le 11/09</div>
+                </div>
+              </div>
+              <div style="display: flex; gap: 12px; padding: 8px 0; position: relative; animation: slideIn 0.3s ease 0.6s both;">
+                <div style="width: 24px; height: 24px; background: #EFF6FF; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; z-index: 1; border: 2px solid white;">
+                  <div style="width: 8px; height: 8px; background: #3B82F6; border-radius: 50%;"></div>
+                </div>
+                <div style="flex: 1; min-width: 0;">
+                  <div style="font-size: 12px; font-weight: 500; color: #0B0F1E; line-height: 1.4;">Approbation requise — <span style="color: #635BFF;">CMD-0891</span> sans BC</div>
+                  <div style="font-size: 11px; color: #94A3B8; margin-top: 1px;">Il y a 6 heures · Validation dérogatoire</div>
+                </div>
+              </div>
+              <div style="display: flex; gap: 12px; padding: 8px 0; position: relative; animation: slideIn 0.3s ease 0.7s both;">
+                <div style="width: 24px; height: 24px; background: #FEF2F2; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; z-index: 1; border: 2px solid white;">
+                  <div style="width: 8px; height: 8px; background: #EF4444; border-radius: 50%;"></div>
+                </div>
+                <div style="flex: 1; min-width: 0;">
+                  <div style="font-size: 12px; font-weight: 500; color: #0B0F1E; line-height: 1.4;">Relance fournisseur — <span style="color: #635BFF;">ACH-0156</span> J+5</div>
+                  <div style="font-size: 11px; color: #94A3B8; margin-top: 1px;">Hier · SARL MécaPro</div>
+                </div>
+              </div>
+              <div style="display: flex; gap: 12px; padding: 8px 0; position: relative; animation: slideIn 0.3s ease 0.8s both;">
+                <div style="width: 24px; height: 24px; background: #F0FDF4; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; z-index: 1; border: 2px solid white;">
+                  <div style="width: 8px; height: 8px; background: #22C55E; border-radius: 50%;"></div>
+                </div>
+                <div style="flex: 1; min-width: 0;">
+                  <div style="font-size: 12px; font-weight: 500; color: #0B0F1E; line-height: 1.4;">Réception validée — <span style="color: #635BFF;">ACH-0149</span> conforme</div>
+                  <div style="font-size: 11px; color: #94A3B8; margin-top: 1px;">Hier · 45 articles reçus</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Performance row -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-top: 18px; animation: fadeUp 0.4s ease 0.45s both;">
+          <!-- Rotation stocks -->
+          <div style="background: white; border-radius: 14px; border: 1px solid #E4E7EF; padding: 20px 24px;">
+            <div style="font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 700; color: #0B0F1E; margin-bottom: 14px;">Rotation des stocks</div>
+            <div style="display: flex; align-items: baseline; gap: 4px; margin-bottom: 4px;">
+              <span style="font-family: 'Space Grotesk', sans-serif; font-size: 36px; font-weight: 700; color: #0B0F1E;">4,2</span>
+              <span style="font-size: 16px; color: #8892A6; font-weight: 500;">×</span>
+            </div>
+            <div style="font-size: 12px; color: #8892A6; margin-bottom: 16px;">rotation moyenne annualisée</div>
+            <div style="display: flex; gap: 8px;">
+              <div style="flex: 1; padding: 10px; background: #F8F9FC; border-radius: 8px; text-align: center;">
+                <div style="font-family: 'Space Grotesk', sans-serif; font-size: 16px; font-weight: 700; color: #059669;">6,8×</div>
+                <div style="font-size: 10px; color: #64748B; margin-top: 2px;">Meilleure</div>
+              </div>
+              <div style="flex: 1; padding: 10px; background: #F8F9FC; border-radius: 8px; text-align: center;">
+                <div style="font-family: 'Space Grotesk', sans-serif; font-size: 16px; font-weight: 700; color: #EF4444;">1,2×</div>
+                <div style="font-size: 10px; color: #64748B; margin-top: 2px;">Plus basse</div>
+              </div>
+            </div>
+          </div>
+          <!-- Péremptions -->
+          <div style="background: white; border-radius: 14px; border: 1px solid #E4E7EF; padding: 20px 24px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
+              <span style="font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 700; color: #0B0F1E;">Péremptions proches</span>
+              <span style="font-size: 11px; background: #FEF3C7; color: #92400E; padding: 3px 10px; border-radius: 20px; font-weight: 600;">3 lots</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: #FEF2F2; border-radius: 8px; border-left: 3px solid #EF4444;">
+                <div>
+                  <div style="font-size: 12px; font-weight: 600; color: #0B0F1E;">Lot #LB-2024-201</div>
+                  <div style="font-size: 11px; color: #64748B;">Lubrifiant 5W-30</div>
+                </div>
+                <span style="font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 700; color: #EF4444;">5j</span>
+              </div>
+              <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: #FFFBEB; border-radius: 8px; border-left: 3px solid #F59E0B;">
+                <div>
+                  <div style="font-size: 12px; font-weight: 600; color: #0B0F1E;">Lot #CH-2024-145</div>
+                  <div style="font-size: 11px; color: #64748B;">Compound chimique</div>
+                </div>
+                <span style="font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 700; color: #D97706;">12j</span>
+              </div>
+              <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: #FFFBEB; border-radius: 8px; border-left: 3px solid #FBBF24;">
+                <div>
+                  <div style="font-size: 12px; font-weight: 600; color: #0B0F1E;">Lot #BT-2024-089</div>
+                  <div style="font-size: 11px; color: #64748B;">Batterie 12V</div>
+                </div>
+                <span style="font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 700; color: #D97706;">28j</span>
+              </div>
+            </div>
+          </div>
+          <!-- Performance commerciale -->
+          <div style="background: white; border-radius: 14px; border: 1px solid #E4E7EF; padding: 20px 24px;">
+            <div style="font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 700; color: #0B0F1E; margin-bottom: 14px;">Top commerciaux</div>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <div style="width: 28px; height: 28px; background: linear-gradient(135deg, #635BFF, #8B5CF6); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: white;">AM</div>
+                <div style="flex: 1;">
+                  <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                    <span style="font-size: 12px; font-weight: 600; color: #0B0F1E;">A. Mbaye</span>
+                    <span style="font-size: 12px; font-weight: 600; color: #0B0F1E; font-family: 'Space Grotesk', sans-serif;">8,2M F</span>
+                  </div>
+                  <div style="height: 5px; background: #F1F5F9; border-radius: 3px; overflow: hidden;">
+                    <div style="width: 85%; height: 100%; background: linear-gradient(90deg, #635BFF, #8B5CF6); border-radius: 3px; animation: barGrow 0.8s ease 0.5s both; transform-origin: left;"></div>
+                  </div>
+                </div>
+              </div>
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <div style="width: 28px; height: 28px; background: #DBEAFE; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: #2563EB;">FD</div>
+                <div style="flex: 1;">
+                  <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                    <span style="font-size: 12px; font-weight: 600; color: #0B0F1E;">F. Diallo</span>
+                    <span style="font-size: 12px; font-weight: 600; color: #0B0F1E; font-family: 'Space Grotesk', sans-serif;">6,7M F</span>
+                  </div>
+                  <div style="height: 5px; background: #F1F5F9; border-radius: 3px; overflow: hidden;">
+                    <div style="width: 68%; height: 100%; background: #3B82F6; border-radius: 3px; animation: barGrow 0.8s ease 0.6s both; transform-origin: left;"></div>
+                  </div>
+                </div>
+              </div>
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <div style="width: 28px; height: 28px; background: #F0FDF4; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: #15803D;">ST</div>
+                <div style="flex: 1;">
+                  <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                    <span style="font-size: 12px; font-weight: 600; color: #0B0F1E;">S. Touré</span>
+                    <span style="font-size: 12px; font-weight: 600; color: #0B0F1E; font-family: 'Space Grotesk', sans-serif;">5,1M F</span>
+                  </div>
+                  <div style="height: 5px; background: #F1F5F9; border-radius: 3px; overflow: hidden;">
+                    <div style="width: 52%; height: 100%; background: #22C55E; border-radius: 3px; animation: barGrow 0.8s ease 0.7s both; transform-origin: left;"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+    </main>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: &quot;100%&quot;, &quot;height&quot;: &quot;100%&quot;}, &quot;companyName&quot;: {&quot;editor&quot;: &quot;text&quot;, &quot;default&quot;: &quot;ULTIUM&quot;, &quot;section&quot;: &quot;Entreprise&quot;}, &quot;userName&quot;: {&quot;editor&quot;: &quot;text&quot;, &quot;default&quot;: &quot;Karim&quot;, &quot;section&quot;: &quot;Entreprise&quot;}, &quot;accentColor&quot;: {&quot;editor&quot;: &quot;color&quot;, &quot;default&quot;: &quot;#635BFF&quot;, &quot;options&quot;: [&quot;#635BFF&quot;, &quot;#3B82F6&quot;, &quot;#059669&quot;, &quot;#0B0F1E&quot;], &quot;section&quot;: &quot;Thème&quot;}}">
+
+class Component extends DCLogic {
+  state = { page: 'dashboard' };
+  renderVals() {
+    const page = this.state.page;
+    const titles = { dashboard: 'Tableau de bord', commandes: 'Commandes clients', articles: 'Articles & Stock' };
+    return {
+      showDashboard: page === 'dashboard',
+      pageTitle: titles[page] || 'Tableau de bord',
+      navTo: (e) => {
+        const target = e.currentTarget.dataset.page;
+        if (target) this.setState({ page: target });
+      }
+    };
+  }
+}
+
+</script>
+</body>
+</html>

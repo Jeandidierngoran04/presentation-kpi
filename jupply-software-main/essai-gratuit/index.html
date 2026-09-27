@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; color: #1a2332; -webkit-font-smoothing: antialiased; background: #f7f8fa; }
+    a { color: #0B1D3A; text-decoration: none; }
+    a:hover { color: #D4A017; }
+    input { font-family: inherit; }
+    input::placeholder { color: #a3aeba; }
+    @keyframes cardIn { from { opacity: 0; transform: translateY(28px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes colIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes softDrift { 0%, 100% { transform: translate(0, 0) scale(1); } 50% { transform: translate(24px, -20px) scale(1.05); } }
+    @keyframes softDrift2 { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(-18px, 22px); } }
+  </style>
+</helmet>
+
+<div style="min-height: 100vh; display: flex; flex-direction: column; background: linear-gradient(170deg, #f8f9fb 0%, #eef1f6 50%, #e7ebf2 100%);">
+
+  <main style="flex: 1; padding: 72px 32px 88px; position: relative; overflow: hidden;">
+    <div style="position: absolute; top: -100px; right: 6%; width: 420px; height: 420px; border-radius: 50%; background: radial-gradient(circle, rgba(11,29,58,0.06) 0%, transparent 70%); filter: blur(20px); animation: softDrift 16s ease-in-out infinite;"></div>
+    <div style="position: absolute; bottom: -80px; left: 4%; width: 340px; height: 340px; border-radius: 50%; background: radial-gradient(circle, rgba(212,160,23,0.08) 0%, transparent 70%); filter: blur(24px); animation: softDrift2 20s ease-in-out infinite;"></div>
+    <div style="position: absolute; inset: 0; opacity: 0.022; background-image: repeating-linear-gradient(45deg, transparent, transparent 70px, #0B1D3A 70px, #0B1D3A 71px);"></div>
+
+    <div style="max-width: 1140px; margin: 0 auto; display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 72px; align-items: start; position: relative; z-index: 1;">
+
+      <!-- LEFT: argumentaire -->
+      <div style="animation: colIn 0.7s cubic-bezier(0.16,1,0.3,1) both; padding-top: 8px;">
+        <div style="display: flex; align-items: center; gap: 11px; margin-bottom: 32px;">
+          <a href="/"><img src="uploads/Symbole-6d86a454.jpg" alt="Jupply" style="height: 38px; width: 38px; object-fit: contain; mix-blend-mode: multiply;"></a>
+          <div style="display: flex; flex-direction: column; gap: 2px;">
+            <span style="font-size: 13px; font-weight: 800; color: #0B1D3A; letter-spacing: 0.12em; text-transform: uppercase;">Jupply Software</span>
+            <span style="font-size: 10px; font-weight: 500; color: #9aa5b3; letter-spacing: 0.06em;">Smart Supply Chain Solutions</span>
+          </div>
+        </div>
+
+        <h1 style="font-size: 44px; font-weight: 800; color: #0B1D3A; line-height: 1.14; letter-spacing: -0.025em; margin: 0 0 28px; max-width: 560px; text-wrap: balance;">{{ t_title }}</h1>
+        <div style="width: 72px; height: 3px; background: #D4A017; border-radius: 2px; margin-bottom: 28px;"></div>
+        <p style="font-size: 17.5px; color: #4a5b70; line-height: 1.65; margin: 0 0 36px; max-width: 520px;">{{ t_subtitle }}</p>
+
+        <div style="display: flex; flex-direction: column; gap: 16px; margin-bottom: 36px; max-width: 520px;">
+          {{ bulletsEl }}
+        </div>
+
+        <div style="display: flex; gap: 13px; align-items: flex-start; background: rgba(11,29,58,0.035); border-left: 3px solid #D4A017; border-radius: 0 10px 10px 0; padding: 18px 22px; max-width: 500px;">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#D4A017" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 1px;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><polyline points="9 12 11 14 15 10"></polyline></svg>
+          <p style="font-size: 14px; color: #4a5b70; line-height: 1.6; margin: 0; font-weight: 500;">{{ t_reassurance }}</p>
+        </div>
+      </div>
+
+      <!-- RIGHT: signup card -->
+      <div style="background: #ffffff; border-radius: 20px; padding: 40px 38px 36px; box-shadow: 0 4px 12px rgba(11,29,58,0.04), 0 20px 60px rgba(11,29,58,0.1); border: 1px solid rgba(11,29,58,0.05); animation: cardIn 0.75s cubic-bezier(0.16,1,0.3,1) 0.1s both;">
+
+        <div style="display: inline-flex; align-items: center; gap: 9px; background: #f5f7fa; border: 1px solid #e8ecf1; border-radius: 100px; padding: 6px 14px 6px 8px; margin-bottom: 26px;">
+          <img src="uploads/Symbole-6d86a454.jpg" alt="" style="height: 22px; width: 22px; object-fit: contain; mix-blend-mode: multiply;">
+          <span style="font-size: 12px; font-weight: 700; color: #0B1D3A; letter-spacing: 0.08em; text-transform: uppercase;">Jupply Software</span>
+        </div>
+
+        <h2 style="font-size: 30px; font-weight: 800; color: #0B1D3A; margin: 0 0 12px; letter-spacing: -0.02em;">{{ t_card_title }}</h2>
+        <p style="font-size: 14.5px; color: #6b7a8e; line-height: 1.6; margin: 0 0 28px;">{{ t_card_instruction }}</p>
+
+        <form onSubmit="{{ onSubmit }}" style="display: flex; flex-direction: column; gap: 22px;">
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <label for="jp-trial-email" style="font-size: 13px; font-weight: 600; color: #3d4f63;">{{ t_email_label }}</label>
+            <input id="jp-trial-email" type="email" required placeholder="{{ t_email_ph }}" style="width: 100%; box-sizing: border-box; padding: 13px 16px; font-size: 14.5px; color: #1a2332; background: #fafbfc; border: 1.5px solid #e2e7ee; border-radius: 10px; outline: none; transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;" style-focus="border-color: #0B1D3A; background: #ffffff; box-shadow: 0 0 0 3px rgba(11,29,58,0.07);">
+          </div>
+
+          <div style="display: flex; gap: 12px; align-items: flex-start;">
+            <input id="jp-terms" type="checkbox" checked="{{ accepted }}" onChange="{{ toggleAccept }}" style="width: 18px; height: 18px; margin: 2px 0 0; accent-color: #D4A017; cursor: pointer; flex-shrink: 0;">
+            <label for="jp-terms" style="font-size: 13px; color: #5a6a7e; line-height: 1.6; cursor: pointer;">{{ termsEl }}</label>
+          </div>
+
+          <button type="submit" disabled="{{ notAccepted }}" style="width: 100%; margin-top: 2px; padding: 16px; font-size: 15.5px; font-weight: 700; font-family: inherit; border: none; border-radius: 10px; letter-spacing: 0.01em; transition: all 0.28s; background: {{ btnBg }}; color: {{ btnColor }}; cursor: {{ btnCursor }}; box-shadow: {{ btnShadow }};" style-hover="{{ btnHover }}">{{ t_cta }}</button>
+        </form>
+
+        <p style="font-size: 12.5px; color: #9aa5b3; text-align: center; margin: 22px 0 0;">{{ t_have_account }} <a href="/connexion/" style="font-weight: 700; color: #D4A017;">{{ t_signin }}</a></p>
+      </div>
+    </div>
+  </main>
+
+  <!-- FOOTER -->
+  <footer style="background: #0B1D3A; padding: 56px 32px 0;">
+    <div style="max-width: 1100px; margin: 0 auto;">
+      <div style="display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 48px; padding-bottom: 44px;">
+
+        <div style="display: flex; flex-direction: column; gap: 18px;">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <div style="width: 44px; height: 44px; border-radius: 11px; background: #ffffff; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+              <img src="uploads/Symbole-6d86a454.jpg" alt="Jupply" style="height: 34px; width: 34px; object-fit: contain; mix-blend-mode: multiply;">
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 3px;">
+              <span style="font-size: 14px; font-weight: 800; color: #ffffff; letter-spacing: 0.1em; text-transform: uppercase;">Jupply Software</span>
+              <span style="font-size: 10.5px; font-weight: 500; color: rgba(255,255,255,0.4); letter-spacing: 0.06em;">Smart Supply Chain Solutions</span>
+            </div>
+          </div>
+          <p style="font-size: 13.5px; color: rgba(255,255,255,0.45); line-height: 1.65; margin: 0; max-width: 260px;">{{ t_footer_blurb }}</p>
+          <div style="display: flex; gap: 10px;">
+            {{ socialIcons }}
+          </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 14px;">
+          <span style="font-size: 12px; font-weight: 700; color: #D4A017; text-transform: uppercase; letter-spacing: 0.1em;">{{ t_col_product }}</span>
+          <a href="#" style="font-size: 14px; color: rgba(255,255,255,0.6); font-weight: 500; transition: color 0.2s;" style-hover="color: #ffffff;">{{ t_nav_features }}</a>
+          <a href="#" style="font-size: 14px; color: rgba(255,255,255,0.6); font-weight: 500; transition: color 0.2s;" style-hover="color: #ffffff;">{{ t_nav_pricing }}</a>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 14px;">
+          <span style="font-size: 12px; font-weight: 700; color: #D4A017; text-transform: uppercase; letter-spacing: 0.1em;">{{ t_col_resources }}</span>
+          <a href="#" style="font-size: 14px; color: rgba(255,255,255,0.6); font-weight: 500; transition: color 0.2s;" style-hover="color: #ffffff;">{{ t_nav_help }}</a>
+          <a href="#" style="font-size: 14px; color: rgba(255,255,255,0.6); font-weight: 500; transition: color 0.2s;" style-hover="color: #ffffff;">{{ t_nav_docs }}</a>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 14px;">
+          <span style="font-size: 12px; font-weight: 700; color: #D4A017; text-transform: uppercase; letter-spacing: 0.1em;">{{ t_col_company }}</span>
+          <a href="#" style="font-size: 14px; color: rgba(255,255,255,0.6); font-weight: 500; transition: color 0.2s;" style-hover="color: #ffffff;">{{ t_nav_about }}</a>
+          <a href="#" style="font-size: 14px; color: rgba(255,255,255,0.6); font-weight: 500; transition: color 0.2s;" style-hover="color: #ffffff;">{{ t_nav_contact }}</a>
+        </div>
+      </div>
+
+      <div style="border-top: 1px solid rgba(255,255,255,0.09); padding: 24px 0 28px; display: flex; align-items: center; justify-content: space-between; gap: 24px;">
+        <span style="font-size: 12.5px; color: rgba(255,255,255,0.35);">{{ t_copyright }}</span>
+        <div style="display: flex; align-items: center; background: rgba(255,255,255,0.07); border-radius: 8px; padding: 3px; gap: 2px;">
+          <button onClick="{{ setFR }}" style="font-size: 12.5px; font-weight: 700; padding: 6px 14px; border-radius: 6px; border: none; cursor: pointer; transition: all 0.25s; background: {{ frBg }}; color: {{ frColor }};">FR</button>
+          <button onClick="{{ setEN }}" style="font-size: 12.5px; font-weight: 700; padding: 6px 14px; border-radius: 6px; border: none; cursor: pointer; transition: all 0.25s; background: {{ enBg }}; color: {{ enColor }};">EN</button>
+        </div>
+      </div>
+    </div>
+  </footer>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;$preview&quot;: { &quot;width&quot;: 1280, &quot;height&quot;: 900 }
+}">
+class Component extends DCLogic {
+  state = { accepted: false, lang: 'fr' };
+
+  translations = {
+    fr: {
+      title: 'Essayez Jupply Software gratuitement pendant 60 jours',
+      subtitle: 'Découvrez comment piloter vos ventes, vos stocks et vos approvisionnements dans un seul outil — sans engagement et sans installation.',
+      b1: 'Gérer vos ventes et facturer vos clients en quelques clics',
+      b2: 'Suivre votre stock en temps réel, à chaque emplacement',
+      b3: 'Passer vos commandes fournisseurs et gérer vos réceptions',
+      b4: 'Accéder à tout depuis un ordinateur ou un téléphone',
+      reassurance: 'Utilisez des exemples de données ou les vôtres. Aucune carte bancaire requise, aucun logiciel à installer.',
+      card_title: 'C\'est parti !',
+      card_instruction: 'Saisissez votre adresse e-mail pour démarrer votre essai gratuit.',
+      email_label: 'Adresse e-mail professionnelle',
+      email_ph: 'Entrez votre adresse e-mail',
+      terms_pre: 'En vous inscrivant, vous acceptez les ',
+      terms_link: 'Conditions d\'utilisation',
+      terms_mid: ' et la ',
+      privacy_link: 'Politique de confidentialité',
+      terms_post: ' de Jupply Software.',
+      cta: 'Commencer votre essai gratuit',
+      have_account: 'Vous avez déjà un compte ?', signin: 'Se connecter',
+      footer_blurb: 'La gestion des ventes, stocks et approvisionnements pour les PME et commerces.',
+      col_product: 'Produit', col_resources: 'Ressources', col_company: 'Entreprise',
+      nav_features: 'Fonctionnalités', nav_pricing: 'Tarifs',
+      nav_help: 'Aide', nav_docs: 'Documentation',
+      nav_about: 'À propos', nav_contact: 'Contact',
+      copyright: '© 2026 Jupply Software. Tous droits réservés.'
+    },
+    en: {
+      title: 'Try Jupply Software free for 60 days',
+      subtitle: 'See how to run your sales, inventory and procurement in a single tool — no commitment, no installation.',
+      b1: 'Manage sales and invoice your customers in a few clicks',
+      b2: 'Track your stock in real time, at every location',
+      b3: 'Place supplier orders and handle goods reception',
+      b4: 'Access everything from a computer or a phone',
+      reassurance: 'Use sample data or your own. No credit card required, no software to install.',
+      card_title: 'Let\'s go!',
+      card_instruction: 'Enter your email address to start your free trial.',
+      email_label: 'Work email address',
+      email_ph: 'Enter your email address',
+      terms_pre: 'By signing up, you agree to Jupply Software\'s ',
+      terms_link: 'Terms of Use',
+      terms_mid: ' and ',
+      privacy_link: 'Privacy Policy',
+      terms_post: '.',
+      cta: 'Start your free trial',
+      have_account: 'Already have an account?', signin: 'Sign in',
+      footer_blurb: 'Sales, inventory and procurement management for SMBs and retailers.',
+      col_product: 'Product', col_resources: 'Resources', col_company: 'Company',
+      nav_features: 'Features', nav_pricing: 'Pricing',
+      nav_help: 'Help', nav_docs: 'Documentation',
+      nav_about: 'About', nav_contact: 'Contact',
+      copyright: '© 2026 Jupply Software. All rights reserved.'
+    }
+  };
+
+  renderVals() {
+    const h = React.createElement;
+    const t = this.translations[this.state.lang];
+    const isFR = this.state.lang === 'fr';
+    const ok = this.state.accepted;
+
+    const check = () => h('svg', { width: 15, height: 15, viewBox: '0 0 24 24', fill: 'none', stroke: '#ffffff', strokeWidth: 3.2, strokeLinecap: 'round', strokeLinejoin: 'round' }, h('polyline', { points: '20 6 9 17 4 12' }));
+    const bulletsEl = [t.b1, t.b2, t.b3, t.b4].map((b, i) =>
+      h('div', { key: i, style: { display: 'flex', gap: 14, alignItems: 'flex-start' } },
+        h('div', { style: { width: 24, height: 24, borderRadius: '50%', background: '#D4A017', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 } }, check()),
+        h('span', { style: { fontSize: 15.5, color: '#3d4f63', lineHeight: 1.55, fontWeight: 500 } }, b)
+      )
+    );
+
+    const linkStyle = { color: '#0B1D3A', fontWeight: 600, textDecoration: 'underline', textUnderlineOffset: '2px' };
+    const termsEl = h(React.Fragment, null,
+      t.terms_pre,
+      h('a', { href: '#', style: linkStyle, onClick: (e) => e.stopPropagation() }, t.terms_link),
+      t.terms_mid,
+      h('a', { href: '#', style: linkStyle, onClick: (e) => e.stopPropagation() }, t.privacy_link),
+      t.terms_post
+    );
+
+    const socialPaths = [
+      'M18 2h-3a5 5 0 00-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 011-1h3z',
+      'M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-4 0v7h-4v-7a6 6 0 016-6zM6 9H2v12h4z',
+      'M23 3a10.9 10.9 0 01-3.14 1.53 4.48 4.48 0 00-7.86 3v1A10.66 10.66 0 013 4s-4 9 5 13a11.64 11.64 0 01-7 2c9 5 20 0 20-11.5a4.5 4.5 0 00-.08-.83A7.72 7.72 0 0023 3z'
+    ];
+    const socialIcons = socialPaths.map((d, i) =>
+      h('a', { key: i, href: '#', style: {
+        width: 34, height: 34, borderRadius: 8, background: 'rgba(255,255,255,0.07)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        color: 'rgba(255,255,255,0.55)', transition: 'all 0.25s'
+      },
+        onMouseEnter: (e) => { e.currentTarget.style.background = 'rgba(212,160,23,0.2)'; e.currentTarget.style.color = '#D4A017'; },
+        onMouseLeave: (e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.07)'; e.currentTarget.style.color = 'rgba(255,255,255,0.55)'; }
+      },
+        h('svg', { width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.9, strokeLinecap: 'round', strokeLinejoin: 'round' },
+          h('path', { d }), i === 1 ? h('circle', { cx: 4, cy: 4, r: 2 }) : null)
+      )
+    );
+
+    return {
+      accepted: ok,
+      notAccepted: !ok,
+      toggleAccept: () => this.setState({ accepted: !ok }),
+      onSubmit: (e) => e.preventDefault(),
+      btnBg: ok ? 'linear-gradient(135deg, #D4A017, #e8b82e)' : '#e6e9ee',
+      btnColor: ok ? '#0B1D3A' : '#a3aeba',
+      btnCursor: ok ? 'pointer' : 'not-allowed',
+      btnShadow: ok ? '0 4px 16px rgba(212,160,23,0.32)' : 'none',
+      btnHover: ok ? 'transform: translateY(-2px); box-shadow: 0 8px 26px rgba(212,160,23,0.45);' : '',
+      bulletsEl, termsEl, socialIcons,
+      setFR: () => this.setState({ lang: 'fr' }),
+      setEN: () => this.setState({ lang: 'en' }),
+      frBg: isFR ? '#D4A017' : 'transparent', frColor: isFR ? '#0B1D3A' : 'rgba(255,255,255,0.5)',
+      enBg: !isFR ? '#D4A017' : 'transparent', enColor: !isFR ? '#0B1D3A' : 'rgba(255,255,255,0.5)',
+      t_title: t.title, t_subtitle: t.subtitle, t_reassurance: t.reassurance,
+      t_card_title: t.card_title, t_card_instruction: t.card_instruction,
+      t_email_label: t.email_label, t_email_ph: t.email_ph, t_cta: t.cta,
+      t_have_account: t.have_account, t_signin: t.signin,
+      t_footer_blurb: t.footer_blurb,
+      t_col_product: t.col_product, t_col_resources: t.col_resources, t_col_company: t.col_company,
+      t_nav_features: t.nav_features, t_nav_pricing: t.nav_pricing,
+      t_nav_help: t.nav_help, t_nav_docs: t.nav_docs,
+      t_nav_about: t.nav_about, t_nav_contact: t.nav_contact,
+      t_copyright: t.copyright
+    };
+  }
+}
+</script>
+</body>
+</html>

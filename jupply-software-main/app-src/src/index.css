@@ -1,0 +1,134 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ============================================================
+   Charte graphique Jupply - tokens de couleur par theme
+   docs/charte-graphique/CHARTE_GRAPHIQUE.md
+   ============================================================ */
+
+:root {
+  color-scheme: light;
+
+  --canvas: #ECEFE6;
+  --card: #FFFFFF;
+  --muted: #F4F6F0;
+
+  --accent: #22C55E;
+  --accent-strong: #84CC16;
+  --accent-soft: #DCFCE7;
+  --accent-contrast: #14311F;
+
+  --warn: #F59E0B;
+  --warn-soft: #FEF3C7;
+  --danger: #DC2626;
+  --danger-soft: #FEE2E2;
+
+  /* Teintes "profondes" : texte/icone lisible sur les fonds -soft */
+  --accent-deep: #15803D;
+  --warn-deep: #B45309;
+  --danger-deep: #B91C1C;
+
+  --text: #18181B;
+  --text-muted: #6B7280;
+  --border: #E5E7EB;
+
+  /* Top Bar : sombre dans les deux themes */
+  --topbar: #111827;
+  --topbar-text: #F9FAFB;
+  --topbar-muted: #9CA3AF;
+  --topbar-hover: #1F2937;
+}
+
+.dark {
+  color-scheme: dark;
+
+  --canvas: #090D16;
+  --card: #111827;
+  --muted: #161F30;
+
+  --accent: #4ADE80;
+  --accent-strong: #A3E635;
+  --accent-soft: #14311F;
+  --accent-contrast: #052E16;
+
+  --warn: #FBBF24;
+  --warn-soft: #3A2A08;
+  --danger: #F87171;
+  --danger-soft: #3A1414;
+
+  --accent-deep: #4ADE80;
+  --warn-deep: #FBBF24;
+  --danger-deep: #FCA5A5;
+
+  --text: #F9FAFB;
+  --text-muted: #9CA3AF;
+  --border: #1F2937;
+
+  --topbar: #0B1120;
+  --topbar-text: #F9FAFB;
+  --topbar-muted: #9CA3AF;
+  --topbar-hover: #1F2937;
+}
+
+@theme inline {
+  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  --font-heading: var(--font-sans);
+
+  --color-canvas: var(--canvas);
+  --color-card: var(--card);
+  --color-muted: var(--muted);
+
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-contrast: var(--accent-contrast);
+
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-warn-deep: var(--warn-deep);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-danger-deep: var(--danger-deep);
+  --color-accent-deep: var(--accent-deep);
+
+  --color-text: var(--text);
+  --color-text-muted: var(--text-muted);
+  --color-border: var(--border);
+
+  --color-topbar: var(--topbar);
+  --color-topbar-text: var(--topbar-text);
+  --color-topbar-muted: var(--topbar-muted);
+  --color-topbar-hover: var(--topbar-hover);
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background: var(--color-canvas);
+  color: var(--color-text);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ============================================================
+   Onglet actif (Level 3) : "inverted border radius" - l'onglet
+   actif se fond dans la zone de contenu (--card) via deux
+   raccords concaves a sa base.
+   ============================================================ */
+.onglet-actif::before,
+.onglet-actif::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  width: 10px;
+  height: 10px;
+  pointer-events: none;
+}
+.onglet-actif::before {
+  left: -10px;
+  background: radial-gradient(circle at top right, transparent 10px, var(--card) 10.5px);
+}
+.onglet-actif::after {
+  right: -10px;
+  background: radial-gradient(circle at top left, transparent 10px, var(--card) 10.5px);
+}

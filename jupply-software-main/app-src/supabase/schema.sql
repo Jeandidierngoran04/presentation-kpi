@@ -1,0 +1,1716 @@
+-- Schema Jupply Software - V1 complete, aligne sur le cahier des charges
+-- (docs/CAHIER_DES_CHARGES.md et docs/GLOSSAIRE.md a la racine du depot).
+-- A coller dans Supabase : Project > SQL Editor > New query > Run.
+--
+-- ATTENTION : ce script repart d'une base propre. Si un schema precedent
+-- existe deja (version minimale avec la table "articles"), supprime-le
+-- d'abord :
+--   drop schema public cascade;
+--   create schema public;
+-- (cela efface aussi les donnees de demo - sans impact ici, il n'y a pas
+-- encore d'utilisateur reel sur l'application).
+
+-- ============================================================
+-- 1. TABLES
+-- ============================================================
+
+-- 1.1 Entreprises, utilisateurs, roles et droits
+-- ------------------------------------------------------------
+
+create table entreprises (
+  id uuid primary key default gen_random_uuid(),
+  nom text not null,
+  cree_le timestamptz not null default now()
+);
+
+-- Un profil par utilisateur connecte, lie a auth.users et a une entreprise.
+-- 4 roles officiels (voir docs/GLOSSAIRE.md, section 11) : un utilisateur
+-- n'a qu'un seul role, correspondant a son poste reel.
+create table profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+  entreprise_id uuid not null references entreprises(id) on delete cascade,
+  nom_complet text not null,
+  role text not null default 'magasinier'
+    check (role in ('administrateur', 'superviseur_entrepot', 'gestionnaire_entrepot', 'magasinier')),
+  cree_le timestamptz not null default now()
+);
+
+create table entrepots (
+  id uuid primary key default gen_random_uuid(),
+  entreprise_id uuid not null references entreprises(id) on delete cascade,
+  nom text not null,
+  adresse text,
+  cree_le timestamptz not null default now()
+);
+
+-- Entrepots assignes a un Gestionnaire ou un Magasinier (droit standard de
+-- son role). L'Administrateur et le Superviseur Entrepot voient tout sans
+-- avoir besoin d'etre assignes.
+create table profils_entrepots (
+  profile_id uuid not null references profiles(id) on delete cascade,
+  entrepot_id uuid not null references entrepots(id) on delete cascade,
+  primary key (profile_id, entrepot_id)
+);
+
+-- Droit supplementaire accorde ponctuellement a un utilisateur, au-dela de
+-- son role standard (ex. acces temporaire a un second entrepot), avec date
+-- d'expiration optionnelle.
+create table privileges (
+  id uuid primary key default gen_random_uuid(),
+  profile_id uuid not null references profiles(id) on delete cascade,
+  entrepot_id uuid not null references entrepots(id) on delete cascade,
+  accorde_par uuid not null references profiles(id),
+  motif text,
+  date_expiration timestamptz,
+  cree_le timestamptz not null default now()
+);
+
+-- Historique de toute attribution/retrait de droit ou de privilege.
+create table journal_droits (
+  id uuid primary key default gen_random_uuid(),
+  entreprise_id uuid not null references entreprises(id) on delete cascade,
+  profile_id uuid not null references profiles(id) on delete cascade,
+  entrepot_id uuid references entrepots(id) on delete set null,
+  type_action text not null check (type_action in ('attribution', 'retrait')),
+  accorde_par uuid not null references profiles(id),
+  motif text,
+  cree_le timestamptz not null default now()
+);
+
+-- 1.2 Localisation
+-- ------------------------------------------------------------
+-- Localisation complete = Entrepot + Zone + Rayon + Etagere + Emplacement.
+-- Zone/rayon/etagere sont des colonnes texte libres sur l'emplacement
+-- plutot que des tables separees, pour rester simple en V1 (voir PLAN.md,
+-- "Points de vigilance"). Chaque entrepot recoit automatiquement un
+-- emplacement Quarantaine a sa creation (voir section 2, trigger).
+create table emplacements (
+  id uuid primary key default gen_random_uuid(),
+  entrepot_id uuid not null references entrepots(id) on delete cascade,
+  zone text,
+  rayon text,
+  etagere text,
+  code text not null,
+  est_quarantaine boolean not null default false,
+  cree_le timestamptz not null default now()
+);
+
+-- 1.3 Produits
+-- ------------------------------------------------------------
+
+create table categories (
+  id uuid primary key default gen_random_uuid(),
+  entreprise_id uuid not null references entreprises(id) on delete cascade,
+  nom text not null
+);
+
+create table fournisseurs (
+  id uuid primary key default gen_random_uuid(),
+  entreprise_id uuid not null references entreprises(id) on delete cascade,
+  nom text not null,
+  contact text,
+  cree_le timestamptz not null default now()
+);
+
+-- Regroupe des produits a reference distincte qui sont des variantes d'un
+-- meme modele (ex. T-shirt en tailles S/M/L/XL, chacune suivie separement).
+create table groupes_variantes (
+  id uuid primary key default gen_random_uuid(),
+  entreprise_id uuid not null references entreprises(id) on delete cascade,
+  nom text not null
+);
+
+create table produits (
+  id uuid primary key default gen_random_uuid(),
+  entreprise_id uuid not null references entreprises(id) on delete cascade,
+  reference text not null,
+  designation text not null,
+  categorie_id uuid references categories(id) on delete set null,
+  -- Consommable : sortie definitive. Outillage : prete a une personne/service
+  -- puis retourne (voir affectations_outillage). Rotable : piece reparable,
+  -- envoyee en reparation puis remise en stock (workflow de reparation pas
+  -- encore construit).
+  type text not null default 'consommable' check (type in ('consommable', 'outillage', 'rotable')),
+  unite_mesure text not null default 'piece',
+  -- Recalcule a chaque reception validee (Prix Moyen Pondere, methode
+  -- SYSCOHADA retenue pour JUPPLY). A 0 tant qu'aucune reception n'existe.
+  prix_moyen_pondere numeric(14, 2) not null default 0,
+  stock_min integer not null default 0,
+  stock_max integer,
+  seuil_reappro integer,
+  gere_lot boolean not null default false,
+  gere_numero_serie boolean not null default false,
+  gere_expiration boolean not null default false,
+  groupe_variante_id uuid references groupes_variantes(id) on delete set null,
+  valeur_variante text,
+  cree_le timestamptz not null default now(),
+  unique (entreprise_id, reference)
+);
+
+create table produits_fournisseurs (
+  produit_id uuid not null references produits(id) on delete cascade,
+  fournisseur_id uuid not null references fournisseurs(id) on delete cascade,
+  reference_fournisseur text,
+  primary key (produit_id, fournisseur_id)
+);
+
+-- Produits consideres comme repondant au meme besoin, sans addition des
+-- quantites (ex. deux references de filtre interchangeables).
+create table produits_equivalents (
+  produit_id uuid not null references produits(id) on delete cascade,
+  produit_equivalent_id uuid not null references produits(id) on delete cascade,
+  primary key (produit_id, produit_equivalent_id),
+  check (produit_id <> produit_equivalent_id)
+);
+
+-- 1.4 Stock et mouvements
+-- ------------------------------------------------------------
+
+-- Quantite d'un produit a un emplacement precis. Un meme produit peut
+-- avoir plusieurs lignes dans un meme entrepot (plusieurs emplacements).
+create table stock_produits (
+  id uuid primary key default gen_random_uuid(),
+  produit_id uuid not null references produits(id) on delete cascade,
+  entrepot_id uuid not null references entrepots(id) on delete cascade,
+  emplacement_id uuid not null references emplacements(id) on delete cascade,
+  quantite integer not null default 0,
+  unique (produit_id, entrepot_id, emplacement_id)
+);
+
+create table mouvements_stock (
+  id uuid primary key default gen_random_uuid(),
+  entreprise_id uuid not null references entreprises(id) on delete cascade,
+  produit_id uuid not null references produits(id) on delete cascade,
+  entrepot_id uuid not null references entrepots(id) on delete cascade,
+  emplacement_id uuid references emplacements(id) on delete set null,
+  -- Renseigne uniquement pour type = 'deplacement' : emplacement de depart,
+  -- emplacement_id ci-dessus jouant alors le role de destination.
+  emplacement_origine_id uuid references emplacements(id) on delete set null,
+  type text not null check (type in ('entree', 'sortie', 'transfert', 'ajustement', 'inventaire', 'deplacement', 'reintegration')),
+  quantite integer not null check (quantite > 0),
+  stock_avant integer not null,
+  stock_apres integer not null,
+  utilisateur_id uuid not null references profiles(id),
+  reference text not null,
+  motif text,
+  lot text,
+  numero_serie text,
+  prix_unitaire numeric(14, 2),
+  cree_le timestamptz not null default now()
+);
+
+-- 1.5 Receptions (entrees)
+-- ------------------------------------------------------------
+
+create table receptions (
+  id uuid primary key default gen_random_uuid(),
+  entreprise_id uuid not null references entreprises(id) on delete cascade,
+  numero text not null,
+  entrepot_id uuid not null references entrepots(id) on delete cascade,
+  fournisseur_id uuid references fournisseurs(id) on delete set null,
+  numero_po text,
+  statut text not null default 'en_attente'
+    check (statut in ('en_attente', 'validee', 'partielle', 'anomalie')),
+  cree_par uuid not null references profiles(id),
+  valide_par uuid references profiles(id),
+  valide_le timestamptz,
+  cree_le timestamptz not null default now(),
+  unique (entreprise_id, numero)
+);
+
+create table receptions_lignes (
+  id uuid primary key default gen_random_uuid(),
+  reception_id uuid not null references receptions(id) on delete cascade,
+  produit_id uuid not null references produits(id) on delete cascade,
+  emplacement_id uuid references emplacements(id) on delete set null,
+  quantite_attendue integer not null default 0,
+  quantite_recue integer not null default 0,
+  lot text,
+  numero_serie text,
+  date_expiration date,
+  prix_unitaire numeric(14, 2) not null default 0,
+  anomalie boolean not null default false,
+  cree_le timestamptz not null default now()
+);
+
+-- Numerotation des receptions (REC-<annee>-<sequence>), atomique meme en
+-- cas de creations simultanees.
+create sequence receptions_numero_seq;
+
+-- 1.6 Sorties
+-- ------------------------------------------------------------
+
+create table bons_sortie (
+  id uuid primary key default gen_random_uuid(),
+  entreprise_id uuid not null references entreprises(id) on delete cascade,
+  numero text not null,
+  entrepot_id uuid not null references entrepots(id) on delete cascade,
+  demande_par uuid not null references profiles(id),
+  statut text not null default 'demandee' check (statut in ('demandee', 'confirmee', 'annulee')),
+  motif text,
+  cree_le timestamptz not null default now(),
+  unique (entreprise_id, numero)
+);
+
+create table bons_sortie_lignes (
+  id uuid primary key default gen_random_uuid(),
+  bon_sortie_id uuid not null references bons_sortie(id) on delete cascade,
+  produit_id uuid not null references produits(id) on delete cascade,
+  emplacement_id uuid references emplacements(id) on delete set null,
+  quantite integer not null check (quantite > 0)
+);
+
+-- Reintegration : annule tout ou partie d'une sortie deja confirmee, ligne
+-- de sortie par ligne de sortie (une reintegration cible precisement une
+-- bons_sortie_lignes et ne peut pas depasser son solde restant), voir vue
+-- v_sorties_a_reintegrer.
+create table reintegrations (
+  id uuid primary key default gen_random_uuid(),
+  entreprise_id uuid not null references entreprises(id) on delete cascade,
+  numero text not null,
+  entrepot_id uuid not null references entrepots(id) on delete cascade,
+  demande_par uuid not null references profiles(id),
+  notes text,
+  cree_le timestamptz not null default now(),
+  unique (entreprise_id, numero)
+);
+
+create table reintegrations_lignes (
+  id uuid primary key default gen_random_uuid(),
+  reintegration_id uuid not null references reintegrations(id) on delete cascade,
+  bon_sortie_ligne_id uuid not null references bons_sortie_lignes(id) on delete cascade,
+  produit_id uuid not null references produits(id) on delete cascade,
+  emplacement_id uuid not null references emplacements(id) on delete cascade,
+  quantite integer not null check (quantite > 0),
+  notes text
+);
+
+create sequence bons_sortie_numero_seq;
+create sequence reintegrations_numero_seq;
+
+-- 1.7 Transferts entre entrepots
+-- ------------------------------------------------------------
+
+create table transferts (
+  id uuid primary key default gen_random_uuid(),
+  entreprise_id uuid not null references entreprises(id) on delete cascade,
+  numero_suivi text not null,
+  entrepot_source_id uuid not null references entrepots(id),
+  entrepot_destination_id uuid not null references entrepots(id),
+  statut text not null default 'demande'
+    check (statut in ('demande', 'valide', 'expedie', 'en_transit', 'recu')),
+  demande_par uuid not null references profiles(id),
+  valide_par uuid references profiles(id),
+  cree_le timestamptz not null default now(),
+  expedie_le timestamptz,
+  recu_le timestamptz,
+  unique (entreprise_id, numero_suivi),
+  check (entrepot_source_id <> entrepot_destination_id)
+);
+
+create table transferts_lignes (
+  id uuid primary key default gen_random_uuid(),
+  transfert_id uuid not null references transferts(id) on delete cascade,
+  produit_id uuid not null references produits(id) on delete cascade,
+  quantite_expediee integer not null check (quantite_expediee > 0),
+  quantite_recue integer,
+  emplacement_source_id uuid references emplacements(id),
+  emplacement_destination_id uuid references emplacements(id)
+);
+
+create sequence transferts_numero_seq;
+
+-- 1.8 Inventaires
+-- ------------------------------------------------------------
+
+create table inventaires (
+  id uuid primary key default gen_random_uuid(),
+  entreprise_id uuid not null references entreprises(id) on delete cascade,
+  entrepot_id uuid not null references entrepots(id) on delete cascade,
+  type text not null check (type in ('global', 'partiel')),
+  statut text not null default 'en_cours' check (statut in ('en_cours', 'verifie')),
+  demarre_par uuid not null references profiles(id),
+  verifie_par uuid references profiles(id),
+  cree_le timestamptz not null default now(),
+  verifie_le timestamptz
+);
+
+create table inventaires_lignes (
+  id uuid primary key default gen_random_uuid(),
+  inventaire_id uuid not null references inventaires(id) on delete cascade,
+  produit_id uuid not null references produits(id) on delete cascade,
+  emplacement_id uuid references emplacements(id) on delete set null,
+  stock_theorique integer not null default 0,
+  stock_physique integer,
+  ecart integer generated always as (stock_physique - stock_theorique) stored
+);
+
+-- 1.9 Outillage
+-- ------------------------------------------------------------
+
+create table affectations_outillage (
+  id uuid primary key default gen_random_uuid(),
+  entreprise_id uuid not null references entreprises(id) on delete cascade,
+  produit_id uuid not null references produits(id) on delete cascade,
+  entrepot_id uuid not null references entrepots(id) on delete cascade,
+  beneficiaire text not null,
+  date_affectation date not null default current_date,
+  date_retour date,
+  statut text not null default 'affecte' check (statut in ('affecte', 'en_stock')),
+  affecte_par uuid not null references profiles(id),
+  cree_le timestamptz not null default now()
+);
+
+-- 1.10 Index
+-- ------------------------------------------------------------
+
+create index on produits (entreprise_id);
+create index on mouvements_stock (entreprise_id, cree_le desc);
+create index on stock_produits (entrepot_id);
+create index on emplacements (entrepot_id);
+create unique index emplacements_quarantaine_unique on emplacements (entrepot_id) where est_quarantaine;
+create index on receptions (entreprise_id, statut);
+create index on bons_sortie (entreprise_id, statut);
+create index on transferts (entreprise_id, statut);
+create index on inventaires (entreprise_id, statut);
+create index on affectations_outillage (entreprise_id, statut);
+create index on profils_entrepots (entrepot_id);
+create index on privileges (profile_id);
+
+-- ============================================================
+-- 2. TRIGGER : quarantaine automatique
+-- ============================================================
+-- Chaque entrepot doit disposer d'un emplacement reserve "Quarantaine"
+-- (cahier des charges, section 5). Cree automatiquement a la creation de
+-- l'entrepot pour ne jamais l'oublier.
+
+create function creer_emplacement_quarantaine()
+returns trigger
+language plpgsql
+as $$
+begin
+  insert into emplacements (entrepot_id, code, est_quarantaine)
+  values (new.id, 'Quarantaine', true);
+  return new;
+end;
+$$;
+
+create trigger trg_creer_quarantaine
+after insert on entrepots
+for each row execute function creer_emplacement_quarantaine();
+
+-- ============================================================
+-- 3. ISOLATION MULTI-ENTREPRISES ET MULTI-ENTREPOTS (RLS)
+-- ============================================================
+-- Chaque utilisateur ne voit que les donnees de sa propre entreprise, et
+-- au sein de celle-ci, uniquement les entrepots auxquels son role lui
+-- donne acces (Administrateur et Superviseur Entrepot : tous ; Gestionnaire
+-- et Magasinier : ceux assignes via profils_entrepots, ou accordes via un
+-- privilege actif).
+--
+-- Note : uniquement des policies de LECTURE pour l'instant, sur le meme
+-- principe que le schema precedent. Les policies d'ECRITURE (qui peut
+-- creer/valider une reception, une sortie, un transfert...) seront
+-- ajoutees au fur et a mesure de la construction de chaque ecran.
+
+create function current_entreprise_id()
+returns uuid
+language sql security definer stable
+set search_path = public
+as $$
+  select entreprise_id from profiles where id = auth.uid()
+$$;
+
+create function role_courant()
+returns text
+language sql security definer stable
+set search_path = public
+as $$
+  select role from profiles where id = auth.uid()
+$$;
+
+create function entrepots_visibles()
+returns setof uuid
+language sql security definer stable
+set search_path = public
+as $$
+  select id from entrepots
+  where entreprise_id = current_entreprise_id()
+    and (
+      role_courant() in ('administrateur', 'superviseur_entrepot')
+      or id in (select entrepot_id from profils_entrepots where profile_id = auth.uid())
+      or id in (
+        select entrepot_id from privileges
+        where profile_id = auth.uid() and (date_expiration is null or date_expiration > now())
+      )
+    )
+$$;
+
+alter table entreprises enable row level security;
+create policy "lecture entreprise" on entreprises
+  for select using (id = current_entreprise_id());
+
+alter table profiles enable row level security;
+create policy "lecture profils entreprise" on profiles
+  for select using (entreprise_id = current_entreprise_id());
+
+alter table entrepots enable row level security;
+create policy "lecture entrepots visibles" on entrepots
+  for select using (entreprise_id = current_entreprise_id() and id in (select entrepots_visibles()));
+
+-- Creation/modification : Administrateur, Superviseur Entrepot. Suppression : Administrateur seul.
+create policy "creation entrepots" on entrepots
+  for insert with check (
+    entreprise_id = current_entreprise_id()
+    and role_courant() in ('administrateur', 'superviseur_entrepot')
+  );
+
+create policy "modification entrepots" on entrepots
+  for update using (
+    entreprise_id = current_entreprise_id()
+    and role_courant() in ('administrateur', 'superviseur_entrepot')
+  )
+  with check (
+    entreprise_id = current_entreprise_id()
+    and role_courant() in ('administrateur', 'superviseur_entrepot')
+  );
+
+create policy "suppression entrepots" on entrepots
+  for delete using (
+    entreprise_id = current_entreprise_id()
+    and role_courant() = 'administrateur'
+  );
+
+alter table profils_entrepots enable row level security;
+create policy "lecture assignations entreprise" on profils_entrepots
+  for select using (profile_id in (select id from profiles where entreprise_id = current_entreprise_id()));
+
+alter table privileges enable row level security;
+create policy "lecture privileges entreprise" on privileges
+  for select using (profile_id in (select id from profiles where entreprise_id = current_entreprise_id()));
+
+alter table journal_droits enable row level security;
+create policy "lecture journal droits entreprise" on journal_droits
+  for select using (entreprise_id = current_entreprise_id());
+
+alter table emplacements enable row level security;
+create policy "lecture emplacements visibles" on emplacements
+  for select using (entrepot_id in (select entrepots_visibles()));
+
+-- Ajout/modification/suppression d'un emplacement : Administrateur, Superviseur Entrepot,
+-- ou Gestionnaire assigne a cet entrepot. Jamais sur l'emplacement Quarantaine (cree par trigger).
+create policy "creation emplacements" on emplacements
+  for insert with check (
+    not est_quarantaine
+    and entrepot_id in (
+      select id from entrepots
+      where entreprise_id = current_entreprise_id()
+        and (
+          role_courant() in ('administrateur', 'superviseur_entrepot')
+          or (
+            role_courant() = 'gestionnaire_entrepot'
+            and id in (select entrepot_id from profils_entrepots where profile_id = auth.uid())
+          )
+        )
+    )
+  );
+
+create policy "modification emplacements" on emplacements
+  for update using (
+    not est_quarantaine
+    and entrepot_id in (
+      select id from entrepots
+      where entreprise_id = current_entreprise_id()
+        and (
+          role_courant() in ('administrateur', 'superviseur_entrepot')
+          or (
+            role_courant() = 'gestionnaire_entrepot'
+            and id in (select entrepot_id from profils_entrepots where profile_id = auth.uid())
+          )
+        )
+    )
+  );
+
+create policy "suppression emplacements" on emplacements
+  for delete using (
+    not est_quarantaine
+    and entrepot_id in (
+      select id from entrepots
+      where entreprise_id = current_entreprise_id()
+        and (
+          role_courant() in ('administrateur', 'superviseur_entrepot')
+          or (
+            role_courant() = 'gestionnaire_entrepot'
+            and id in (select entrepot_id from profils_entrepots where profile_id = auth.uid())
+          )
+        )
+    )
+  );
+
+alter table categories enable row level security;
+create policy "lecture categories entreprise" on categories
+  for select using (entreprise_id = current_entreprise_id());
+
+-- Catalogue partage par toute l'entreprise (pas propre a un entrepot) :
+-- Administrateur, Superviseur Entrepot, Gestionnaire d'entrepot (n'importe lequel).
+create policy "creation categories" on categories
+  for insert with check (
+    entreprise_id = current_entreprise_id()
+    and role_courant() in ('administrateur', 'superviseur_entrepot', 'gestionnaire_entrepot')
+  );
+
+alter table fournisseurs enable row level security;
+create policy "lecture fournisseurs entreprise" on fournisseurs
+  for select using (entreprise_id = current_entreprise_id());
+
+create policy "creation fournisseurs" on fournisseurs
+  for insert with check (
+    entreprise_id = current_entreprise_id()
+    and role_courant() in ('administrateur', 'superviseur_entrepot', 'gestionnaire_entrepot')
+  );
+
+alter table groupes_variantes enable row level security;
+create policy "lecture groupes variantes entreprise" on groupes_variantes
+  for select using (entreprise_id = current_entreprise_id());
+
+alter table produits enable row level security;
+create policy "lecture produits entreprise" on produits
+  for select using (entreprise_id = current_entreprise_id());
+
+create policy "creation produits" on produits
+  for insert with check (
+    entreprise_id = current_entreprise_id()
+    and role_courant() in ('administrateur', 'superviseur_entrepot', 'gestionnaire_entrepot')
+  );
+
+create policy "modification produits" on produits
+  for update using (
+    entreprise_id = current_entreprise_id()
+    and role_courant() in ('administrateur', 'superviseur_entrepot', 'gestionnaire_entrepot')
+  )
+  with check (
+    entreprise_id = current_entreprise_id()
+    and role_courant() in ('administrateur', 'superviseur_entrepot', 'gestionnaire_entrepot')
+  );
+
+create policy "suppression produits" on produits
+  for delete using (
+    entreprise_id = current_entreprise_id()
+    and role_courant() = 'administrateur'
+  );
+
+alter table produits_fournisseurs enable row level security;
+create policy "lecture produits fournisseurs" on produits_fournisseurs
+  for select using (produit_id in (select id from produits where entreprise_id = current_entreprise_id()));
+
+create policy "creation produits fournisseurs" on produits_fournisseurs
+  for insert with check (
+    produit_id in (
+      select id from produits
+      where entreprise_id = current_entreprise_id()
+        and role_courant() in ('administrateur', 'superviseur_entrepot', 'gestionnaire_entrepot')
+    )
+  );
+
+create policy "suppression produits fournisseurs" on produits_fournisseurs
+  for delete using (
+    produit_id in (
+      select id from produits
+      where entreprise_id = current_entreprise_id()
+        and role_courant() in ('administrateur', 'superviseur_entrepot', 'gestionnaire_entrepot')
+    )
+  );
+
+alter table produits_equivalents enable row level security;
+create policy "lecture produits equivalents" on produits_equivalents
+  for select using (produit_id in (select id from produits where entreprise_id = current_entreprise_id()));
+
+create policy "creation produits equivalents" on produits_equivalents
+  for insert with check (
+    produit_id in (
+      select id from produits
+      where entreprise_id = current_entreprise_id()
+        and role_courant() in ('administrateur', 'superviseur_entrepot', 'gestionnaire_entrepot')
+    )
+  );
+
+create policy "suppression produits equivalents" on produits_equivalents
+  for delete using (
+    produit_id in (
+      select id from produits
+      where entreprise_id = current_entreprise_id()
+        and role_courant() in ('administrateur', 'superviseur_entrepot', 'gestionnaire_entrepot')
+    )
+  );
+
+alter table stock_produits enable row level security;
+create policy "lecture stock visible" on stock_produits
+  for select using (entrepot_id in (select entrepots_visibles()));
+
+-- Ecriture du stock (placement/deplacement) : quiconque voit l'entrepot
+-- peut y agir, y compris le Magasinier (saisie quotidienne fait partie de
+-- son role standard, a la difference de la gestion des emplacements eux-memes).
+create policy "creation stock" on stock_produits
+  for insert with check (entrepot_id in (select entrepots_visibles()));
+
+create policy "modification stock" on stock_produits
+  for update using (entrepot_id in (select entrepots_visibles()))
+  with check (entrepot_id in (select entrepots_visibles()));
+
+create policy "suppression stock" on stock_produits
+  for delete using (entrepot_id in (select entrepots_visibles()));
+
+alter table mouvements_stock enable row level security;
+create policy "lecture mouvements visibles" on mouvements_stock
+  for select using (entrepot_id in (select entrepots_visibles()));
+
+-- Un utilisateur ne peut journaliser un mouvement qu'en son propre nom.
+create policy "creation mouvements" on mouvements_stock
+  for insert with check (
+    entrepot_id in (select entrepots_visibles())
+    and utilisateur_id = auth.uid()
+  );
+
+alter table receptions enable row level security;
+create policy "lecture receptions visibles" on receptions
+  for select using (entrepot_id in (select entrepots_visibles()));
+
+-- Saisie : tous les roles operationnels (y compris Magasinier) sur leurs
+-- entrepots visibles. Validation (update) : Administrateur, Superviseur
+-- Entrepot, Gestionnaire d'entrepot uniquement (pas le Magasinier).
+create policy "creation receptions" on receptions
+  for insert with check (entrepot_id in (select entrepots_visibles()));
+
+create policy "validation receptions" on receptions
+  for update using (
+    entrepot_id in (select entrepots_visibles())
+    and role_courant() in ('administrateur', 'superviseur_entrepot', 'gestionnaire_entrepot')
+  )
+  with check (
+    entrepot_id in (select entrepots_visibles())
+    and role_courant() in ('administrateur', 'superviseur_entrepot', 'gestionnaire_entrepot')
+  );
+
+alter table receptions_lignes enable row level security;
+create policy "lecture receptions lignes visibles" on receptions_lignes
+  for select using (reception_id in (select id from receptions where entrepot_id in (select entrepots_visibles())));
+
+create policy "creation receptions lignes" on receptions_lignes
+  for insert with check (
+    reception_id in (select id from receptions where entrepot_id in (select entrepots_visibles()))
+  );
+
+alter table bons_sortie enable row level security;
+create policy "lecture bons sortie visibles" on bons_sortie
+  for select using (entrepot_id in (select entrepots_visibles()));
+
+-- Sortie : tous les roles operationnels (y compris Magasinier), meme regle que la saisie d'une reception.
+create policy "creation bons sortie" on bons_sortie
+  for insert with check (entrepot_id in (select entrepots_visibles()));
+
+alter table bons_sortie_lignes enable row level security;
+create policy "lecture bons sortie lignes visibles" on bons_sortie_lignes
+  for select using (bon_sortie_id in (select id from bons_sortie where entrepot_id in (select entrepots_visibles())));
+
+create policy "creation bons sortie lignes" on bons_sortie_lignes
+  for insert with check (
+    bon_sortie_id in (select id from bons_sortie where entrepot_id in (select entrepots_visibles()))
+  );
+
+-- Necessaire pour que "for update" fonctionne dans creer_reintegration (Postgres
+-- exige une policy UPDATE, pas seulement SELECT, pour autoriser le verrou d'une
+-- ligne). Aucune mise a jour reelle n'est faite sur cette table par ailleurs.
+create policy "verrou bons sortie lignes pour reintegration" on bons_sortie_lignes
+  for update using (
+    bon_sortie_id in (select id from bons_sortie where entrepot_id in (select entrepots_visibles()))
+    and role_courant() in ('administrateur', 'superviseur_entrepot', 'gestionnaire_entrepot')
+  );
+
+-- Reintegration : reservee a Administrateur/Superviseur/Gestionnaire, pas le Magasinier (meme regle que la validation d'une reception).
+alter table reintegrations enable row level security;
+create policy "lecture reintegrations visibles" on reintegrations
+  for select using (entrepot_id in (select entrepots_visibles()));
+
+create policy "creation reintegrations" on reintegrations
+  for insert with check (
+    entrepot_id in (select entrepots_visibles())
+    and role_courant() in ('administrateur', 'superviseur_entrepot', 'gestionnaire_entrepot')
+  );
+
+alter table reintegrations_lignes enable row level security;
+create policy "lecture reintegrations lignes visibles" on reintegrations_lignes
+  for select using (reintegration_id in (select id from reintegrations where entrepot_id in (select entrepots_visibles())));
+
+create policy "creation reintegrations lignes" on reintegrations_lignes
+  for insert with check (
+    reintegration_id in (
+      select id from reintegrations
+      where entrepot_id in (select entrepots_visibles())
+        and role_courant() in ('administrateur', 'superviseur_entrepot', 'gestionnaire_entrepot')
+    )
+  );
+
+alter table transferts enable row level security;
+create policy "lecture transferts visibles" on transferts
+  for select using (
+    entrepot_source_id in (select entrepots_visibles())
+    or entrepot_destination_id in (select entrepots_visibles())
+  );
+
+-- Demande : Administrateur ou Superviseur Entrepot (cahier des charges).
+create policy "creation transferts" on transferts
+  for insert with check (
+    role_courant() in ('administrateur', 'superviseur_entrepot')
+    and entrepot_source_id in (select entrepots_visibles())
+    and entrepot_destination_id in (select entrepots_visibles())
+  );
+
+-- Validation (demande -> valide) : Administrateur ou Superviseur Entrepot.
+-- Expedition (valide -> en_transit) : + Gestionnaire/Magasinier de la source.
+-- Reception (en_transit -> recu) : + Gestionnaire/Magasinier de la destination.
+-- Une seule policy UPDATE couvrant les trois transitions ; le detail de qui
+-- peut faire quoi est verifie dans les fonctions RPC elles-memes.
+create policy "maj transferts" on transferts
+  for update using (
+    role_courant() in ('administrateur', 'superviseur_entrepot')
+    or entrepot_source_id in (select entrepots_visibles())
+    or entrepot_destination_id in (select entrepots_visibles())
+  );
+
+alter table transferts_lignes enable row level security;
+create policy "lecture transferts lignes visibles" on transferts_lignes
+  for select using (
+    transfert_id in (
+      select id from transferts
+      where entrepot_source_id in (select entrepots_visibles())
+         or entrepot_destination_id in (select entrepots_visibles())
+    )
+  );
+
+create policy "creation transferts lignes" on transferts_lignes
+  for insert with check (
+    transfert_id in (
+      select id from transferts
+      where role_courant() in ('administrateur', 'superviseur_entrepot')
+        and entrepot_source_id in (select entrepots_visibles())
+        and entrepot_destination_id in (select entrepots_visibles())
+    )
+  );
+
+-- Necessaire pour que "for update" fonctionne dans les fonctions RPC de
+-- transfert (meme piege que sur bons_sortie_lignes : Postgres exige une
+-- policy UPDATE, pas seulement SELECT, pour autoriser le verrou d'une ligne).
+create policy "maj transferts lignes" on transferts_lignes
+  for update using (
+    transfert_id in (
+      select id from transferts
+      where entrepot_source_id in (select entrepots_visibles())
+         or entrepot_destination_id in (select entrepots_visibles())
+    )
+  );
+
+alter table inventaires enable row level security;
+create policy "lecture inventaires visibles" on inventaires
+  for select using (entrepot_id in (select entrepots_visibles()));
+
+alter table inventaires_lignes enable row level security;
+create policy "lecture inventaires lignes visibles" on inventaires_lignes
+  for select using (inventaire_id in (select id from inventaires where entrepot_id in (select entrepots_visibles())));
+
+alter table affectations_outillage enable row level security;
+create policy "lecture affectations visibles" on affectations_outillage
+  for select using (entrepot_id in (select entrepots_visibles()));
+
+-- ============================================================
+-- 3.5 FONCTIONS D'ECRITURE DU STOCK (RPC)
+-- ============================================================
+-- "security invoker" : la fonction s'execute avec les privileges de
+-- l'appelant, donc les policies RLS ci-dessus continuent de s'appliquer.
+-- Executees comme une transaction unique (garantie native de PL/pgSQL),
+-- avec verrou sur la ligne source pour deplacer_stock, pour rester
+-- coherent en cas d'acces concurrents (cahier des charges, section 19).
+
+create function affecter_localisation(
+  p_produit_id uuid,
+  p_entrepot_id uuid,
+  p_emplacement_id uuid,
+  p_quantite integer,
+  p_reference text,
+  p_motif text default 'Affectation manuelle de localisation'
+)
+returns void
+language plpgsql
+security invoker
+as $$
+declare
+  v_entreprise_id uuid;
+  v_stock_avant integer;
+  v_stock_apres integer;
+begin
+  if p_quantite <= 0 then
+    raise exception 'La quantite doit etre positive.';
+  end if;
+
+  select entreprise_id into v_entreprise_id from produits where id = p_produit_id;
+
+  select quantite into v_stock_avant from stock_produits
+    where produit_id = p_produit_id and entrepot_id = p_entrepot_id and emplacement_id = p_emplacement_id;
+  v_stock_avant := coalesce(v_stock_avant, 0);
+  v_stock_apres := v_stock_avant + p_quantite;
+
+  insert into stock_produits (produit_id, entrepot_id, emplacement_id, quantite)
+  values (p_produit_id, p_entrepot_id, p_emplacement_id, p_quantite)
+  on conflict (produit_id, entrepot_id, emplacement_id)
+  do update set quantite = stock_produits.quantite + excluded.quantite;
+
+  insert into mouvements_stock (
+    entreprise_id, produit_id, entrepot_id, emplacement_id,
+    type, quantite, stock_avant, stock_apres, utilisateur_id, reference, motif
+  )
+  values (
+    v_entreprise_id, p_produit_id, p_entrepot_id, p_emplacement_id,
+    'entree', p_quantite, v_stock_avant, v_stock_apres, auth.uid(), p_reference, p_motif
+  );
+end;
+$$;
+
+grant execute on function affecter_localisation to authenticated;
+
+create function deplacer_stock(
+  p_produit_id uuid,
+  p_entrepot_id uuid,
+  p_emplacement_source_id uuid,
+  p_emplacement_destination_id uuid,
+  p_quantite integer,
+  p_reference text,
+  p_motif text default 'Deplacement interne'
+)
+returns void
+language plpgsql
+security invoker
+as $$
+declare
+  v_entreprise_id uuid;
+  v_stock_source integer;
+  v_stock_avant_dest integer;
+  v_stock_apres_dest integer;
+begin
+  if p_quantite <= 0 then
+    raise exception 'La quantite doit etre positive.';
+  end if;
+  if p_emplacement_source_id = p_emplacement_destination_id then
+    raise exception 'L''emplacement de destination doit etre different de l''origine.';
+  end if;
+
+  select entreprise_id into v_entreprise_id from produits where id = p_produit_id;
+
+  select quantite into v_stock_source from stock_produits
+    where produit_id = p_produit_id and entrepot_id = p_entrepot_id and emplacement_id = p_emplacement_source_id
+    for update;
+
+  if v_stock_source is null or v_stock_source < p_quantite then
+    raise exception 'Quantite insuffisante a l''emplacement source.';
+  end if;
+
+  if v_stock_source = p_quantite then
+    delete from stock_produits
+      where produit_id = p_produit_id and entrepot_id = p_entrepot_id and emplacement_id = p_emplacement_source_id;
+  else
+    update stock_produits set quantite = quantite - p_quantite
+      where produit_id = p_produit_id and entrepot_id = p_entrepot_id and emplacement_id = p_emplacement_source_id;
+  end if;
+
+  select quantite into v_stock_avant_dest from stock_produits
+    where produit_id = p_produit_id and entrepot_id = p_entrepot_id and emplacement_id = p_emplacement_destination_id;
+  v_stock_avant_dest := coalesce(v_stock_avant_dest, 0);
+  v_stock_apres_dest := v_stock_avant_dest + p_quantite;
+
+  insert into stock_produits (produit_id, entrepot_id, emplacement_id, quantite)
+  values (p_produit_id, p_entrepot_id, p_emplacement_destination_id, p_quantite)
+  on conflict (produit_id, entrepot_id, emplacement_id)
+  do update set quantite = stock_produits.quantite + excluded.quantite;
+
+  insert into mouvements_stock (
+    entreprise_id, produit_id, entrepot_id, emplacement_id, emplacement_origine_id,
+    type, quantite, stock_avant, stock_apres, utilisateur_id, reference, motif
+  )
+  values (
+    v_entreprise_id, p_produit_id, p_entrepot_id, p_emplacement_destination_id, p_emplacement_source_id,
+    'deplacement', p_quantite, v_stock_avant_dest, v_stock_apres_dest, auth.uid(), p_reference, p_motif
+  );
+end;
+$$;
+
+grant execute on function deplacer_stock to authenticated;
+
+-- Cree une reception (en-tete + lignes) en une seule transaction, statut
+-- 'en_attente'. p_lignes : tableau JSON, un objet par ligne avec les cles
+-- produit_id, emplacement_id, quantite_attendue, quantite_recue, lot,
+-- numero_serie, date_expiration, prix_unitaire, anomalie.
+create function creer_reception(
+  p_entrepot_id uuid,
+  p_fournisseur_id uuid,
+  p_numero_po text,
+  p_lignes jsonb
+)
+returns uuid
+language plpgsql
+security invoker
+as $$
+declare
+  v_entreprise_id uuid;
+  v_reception_id uuid;
+  v_numero text;
+  v_ligne jsonb;
+begin
+  select entreprise_id into v_entreprise_id from entrepots where id = p_entrepot_id;
+  if v_entreprise_id is null then
+    raise exception 'Entrepot introuvable.';
+  end if;
+  if jsonb_array_length(p_lignes) = 0 then
+    raise exception 'Une reception doit contenir au moins une ligne.';
+  end if;
+
+  v_numero := 'REC-' || to_char(now(), 'YYYY') || '-' || lpad(nextval('receptions_numero_seq')::text, 5, '0');
+
+  insert into receptions (entreprise_id, numero, entrepot_id, fournisseur_id, numero_po, statut, cree_par)
+  values (v_entreprise_id, v_numero, p_entrepot_id, p_fournisseur_id, nullif(p_numero_po, ''), 'en_attente', auth.uid())
+  returning id into v_reception_id;
+
+  for v_ligne in select * from jsonb_array_elements(p_lignes)
+  loop
+    insert into receptions_lignes (
+      reception_id, produit_id, emplacement_id, quantite_attendue, quantite_recue,
+      lot, numero_serie, date_expiration, prix_unitaire, anomalie
+    )
+    values (
+      v_reception_id,
+      (v_ligne->>'produit_id')::uuid,
+      (v_ligne->>'emplacement_id')::uuid,
+      coalesce((v_ligne->>'quantite_attendue')::integer, 0),
+      coalesce((v_ligne->>'quantite_recue')::integer, 0),
+      nullif(v_ligne->>'lot', ''),
+      nullif(v_ligne->>'numero_serie', ''),
+      nullif(v_ligne->>'date_expiration', '')::date,
+      coalesce((v_ligne->>'prix_unitaire')::numeric, 0),
+      coalesce((v_ligne->>'anomalie')::boolean, false)
+    );
+  end loop;
+
+  return v_reception_id;
+end;
+$$;
+
+grant execute on function creer_reception to authenticated;
+
+-- Valide une reception : ventile chaque ligne entre emplacement normal et
+-- Quarantaine (anomalie -> tout en Quarantaine ; surplus recu > attendu ->
+-- la part en trop en Quarantaine), met a jour le stock et l'historique,
+-- recalcule le Prix Moyen Pondere du produit (sur son stock total, tous
+-- entrepots confondus), et fixe le statut final de la reception.
+create function valider_reception(p_reception_id uuid)
+returns void
+language plpgsql
+security invoker
+as $$
+declare
+  v_entreprise_id uuid;
+  v_entrepot_id uuid;
+  v_numero text;
+  v_ligne record;
+  v_quarantaine_id uuid;
+  v_qte_normale integer;
+  v_qte_quarantaine integer;
+  v_stock_avant integer;
+  v_stock_apres integer;
+  v_stock_total_avant integer;
+  v_pmp_avant numeric;
+  v_pmp_apres numeric;
+  v_une_ligne_incomplete boolean := false;
+  v_une_ligne_anomalie boolean := false;
+  v_statut text;
+begin
+  select entreprise_id, entrepot_id, numero into v_entreprise_id, v_entrepot_id, v_numero
+    from receptions where id = p_reception_id;
+
+  if v_entrepot_id is null then
+    raise exception 'Reception introuvable.';
+  end if;
+
+  select id into v_quarantaine_id from emplacements where entrepot_id = v_entrepot_id and est_quarantaine;
+
+  for v_ligne in select * from receptions_lignes where reception_id = p_reception_id
+  loop
+    if v_ligne.quantite_recue < v_ligne.quantite_attendue then
+      v_une_ligne_incomplete := true;
+    end if;
+
+    if v_ligne.anomalie then
+      v_une_ligne_anomalie := true;
+      v_qte_normale := 0;
+      v_qte_quarantaine := v_ligne.quantite_recue;
+    elsif v_ligne.quantite_recue > v_ligne.quantite_attendue then
+      v_qte_normale := v_ligne.quantite_attendue;
+      v_qte_quarantaine := v_ligne.quantite_recue - v_ligne.quantite_attendue;
+    else
+      v_qte_normale := v_ligne.quantite_recue;
+      v_qte_quarantaine := 0;
+    end if;
+
+    -- PMP : capturer le stock total du produit (tous entrepots) et le PMP
+    -- courant AVANT d'ajouter quoi que ce soit pour cette ligne.
+    select coalesce(sum(sp.quantite), 0) into v_stock_total_avant
+      from stock_produits sp where sp.produit_id = v_ligne.produit_id;
+    select prix_moyen_pondere into v_pmp_avant from produits where id = v_ligne.produit_id;
+
+    if v_qte_normale > 0 then
+      select quantite into v_stock_avant from stock_produits
+        where produit_id = v_ligne.produit_id and entrepot_id = v_entrepot_id and emplacement_id = v_ligne.emplacement_id;
+      v_stock_avant := coalesce(v_stock_avant, 0);
+      v_stock_apres := v_stock_avant + v_qte_normale;
+
+      insert into stock_produits (produit_id, entrepot_id, emplacement_id, quantite)
+      values (v_ligne.produit_id, v_entrepot_id, v_ligne.emplacement_id, v_qte_normale)
+      on conflict (produit_id, entrepot_id, emplacement_id)
+      do update set quantite = stock_produits.quantite + excluded.quantite;
+
+      insert into mouvements_stock (
+        entreprise_id, produit_id, entrepot_id, emplacement_id, type, quantite,
+        stock_avant, stock_apres, utilisateur_id, reference, motif, lot, numero_serie, prix_unitaire
+      )
+      values (
+        v_entreprise_id, v_ligne.produit_id, v_entrepot_id, v_ligne.emplacement_id, 'entree', v_qte_normale,
+        v_stock_avant, v_stock_apres, auth.uid(), v_numero, 'Réception validée',
+        v_ligne.lot, v_ligne.numero_serie, v_ligne.prix_unitaire
+      );
+    end if;
+
+    if v_qte_quarantaine > 0 then
+      select quantite into v_stock_avant from stock_produits
+        where produit_id = v_ligne.produit_id and entrepot_id = v_entrepot_id and emplacement_id = v_quarantaine_id;
+      v_stock_avant := coalesce(v_stock_avant, 0);
+      v_stock_apres := v_stock_avant + v_qte_quarantaine;
+
+      insert into stock_produits (produit_id, entrepot_id, emplacement_id, quantite)
+      values (v_ligne.produit_id, v_entrepot_id, v_quarantaine_id, v_qte_quarantaine)
+      on conflict (produit_id, entrepot_id, emplacement_id)
+      do update set quantite = stock_produits.quantite + excluded.quantite;
+
+      insert into mouvements_stock (
+        entreprise_id, produit_id, entrepot_id, emplacement_id, type, quantite,
+        stock_avant, stock_apres, utilisateur_id, reference, motif, lot, numero_serie, prix_unitaire
+      )
+      values (
+        v_entreprise_id, v_ligne.produit_id, v_entrepot_id, v_quarantaine_id, 'entree', v_qte_quarantaine,
+        v_stock_avant, v_stock_apres, auth.uid(), v_numero,
+        case when v_ligne.anomalie then 'Anomalie à réception - Quarantaine' else 'Surplus à réception - Quarantaine' end,
+        v_ligne.lot, v_ligne.numero_serie, v_ligne.prix_unitaire
+      );
+    end if;
+
+    if v_ligne.quantite_recue > 0 then
+      v_pmp_apres := (v_stock_total_avant * v_pmp_avant + v_ligne.quantite_recue * v_ligne.prix_unitaire)
+                      / (v_stock_total_avant + v_ligne.quantite_recue);
+      update produits set prix_moyen_pondere = round(v_pmp_apres, 2) where id = v_ligne.produit_id;
+    end if;
+  end loop;
+
+  if v_une_ligne_anomalie then
+    v_statut := 'anomalie';
+  elsif v_une_ligne_incomplete then
+    v_statut := 'partielle';
+  else
+    v_statut := 'validee';
+  end if;
+
+  update receptions set statut = v_statut, valide_par = auth.uid(), valide_le = now() where id = p_reception_id;
+end;
+$$;
+
+grant execute on function valider_reception to authenticated;
+
+-- Cree une sortie (panier de plusieurs produits) en une seule transaction :
+-- verifie et decremente le stock de chaque ligne (verrou sur la ligne de
+-- stock concernee), insere les mouvements 'sortie', cree le bon au statut
+-- 'confirmee' directement (pas d'etape de validation separee, contrairement
+-- aux receptions).
+create function creer_sortie(
+  p_entrepot_id uuid,
+  p_motif text,
+  p_lignes jsonb,
+  p_date_mouvement timestamptz default null
+)
+returns uuid
+language plpgsql
+security invoker
+as $$
+declare
+  v_entreprise_id uuid;
+  v_bon_id uuid;
+  v_numero text;
+  v_date timestamptz;
+  v_ligne jsonb;
+  v_produit_id uuid;
+  v_emplacement_id uuid;
+  v_quantite integer;
+  v_stock_avant integer;
+  v_stock_apres integer;
+begin
+  select entreprise_id into v_entreprise_id from entrepots where id = p_entrepot_id;
+  if v_entreprise_id is null then
+    raise exception 'Entrepot introuvable.';
+  end if;
+  if jsonb_array_length(p_lignes) = 0 then
+    raise exception 'Une sortie doit contenir au moins une ligne.';
+  end if;
+
+  v_date := coalesce(p_date_mouvement, now());
+  v_numero := 'SOR-' || to_char(v_date, 'YYYY') || '-' || lpad(nextval('bons_sortie_numero_seq')::text, 5, '0');
+
+  insert into bons_sortie (entreprise_id, numero, entrepot_id, demande_par, statut, motif, cree_le)
+  values (v_entreprise_id, v_numero, p_entrepot_id, auth.uid(), 'confirmee', nullif(p_motif, ''), v_date)
+  returning id into v_bon_id;
+
+  for v_ligne in select * from jsonb_array_elements(p_lignes)
+  loop
+    v_produit_id := (v_ligne->>'produit_id')::uuid;
+    v_emplacement_id := (v_ligne->>'emplacement_id')::uuid;
+    v_quantite := (v_ligne->>'quantite')::integer;
+
+    if v_produit_id is null or v_emplacement_id is null or v_quantite is null or v_quantite <= 0 then
+      raise exception 'Ligne de sortie invalide (produit, emplacement et quantite requis).';
+    end if;
+
+    select quantite into v_stock_avant from stock_produits
+      where produit_id = v_produit_id and entrepot_id = p_entrepot_id and emplacement_id = v_emplacement_id
+      for update;
+
+    if v_stock_avant is null or v_stock_avant < v_quantite then
+      raise exception 'Stock insuffisant pour ce produit a cet emplacement.';
+    end if;
+
+    v_stock_apres := v_stock_avant - v_quantite;
+    if v_stock_apres = 0 then
+      delete from stock_produits
+        where produit_id = v_produit_id and entrepot_id = p_entrepot_id and emplacement_id = v_emplacement_id;
+    else
+      update stock_produits set quantite = v_stock_apres
+        where produit_id = v_produit_id and entrepot_id = p_entrepot_id and emplacement_id = v_emplacement_id;
+    end if;
+
+    insert into bons_sortie_lignes (bon_sortie_id, produit_id, emplacement_id, quantite)
+    values (v_bon_id, v_produit_id, v_emplacement_id, v_quantite);
+
+    insert into mouvements_stock (
+      entreprise_id, produit_id, entrepot_id, emplacement_id,
+      type, quantite, stock_avant, stock_apres, utilisateur_id, reference, motif, cree_le
+    )
+    values (
+      v_entreprise_id, v_produit_id, p_entrepot_id, v_emplacement_id,
+      'sortie', v_quantite, v_stock_avant, v_stock_apres, auth.uid(), v_numero, p_motif, v_date
+    );
+  end loop;
+
+  return v_bon_id;
+end;
+$$;
+
+grant execute on function creer_sortie to authenticated;
+
+-- Cree une reintegration (panier) : chaque ligne cible une bons_sortie_lignes
+-- precise (verrouillee via for update le temps de la transaction), verifie
+-- que la quantite demandee ne depasse pas son solde "sorti - deja
+-- reintegre sur cette ligne", incremente le stock, insere un mouvement
+-- 'reintegration'. L'operation de sortie d'origine n'est jamais modifiee
+-- ni supprimee, seule une nouvelle ecriture compense.
+create function creer_reintegration(
+  p_entrepot_id uuid,
+  p_notes text,
+  p_lignes jsonb,
+  p_date_mouvement timestamptz default null
+)
+returns uuid
+language plpgsql
+security invoker
+as $$
+declare
+  v_entreprise_id uuid;
+  v_reintegration_id uuid;
+  v_numero text;
+  v_date timestamptz;
+  v_ligne jsonb;
+  v_bon_sortie_ligne_id uuid;
+  v_emplacement_id uuid;
+  v_quantite integer;
+  v_notes_ligne text;
+  v_ligne_produit_id uuid;
+  v_ligne_entrepot_id uuid;
+  v_ligne_quantite_sortie integer;
+  v_total_reintegre integer;
+  v_disponible integer;
+  v_stock_avant integer;
+  v_stock_apres integer;
+begin
+  select entreprise_id into v_entreprise_id from entrepots where id = p_entrepot_id;
+  if v_entreprise_id is null then
+    raise exception 'Entrepot introuvable.';
+  end if;
+  if jsonb_array_length(p_lignes) = 0 then
+    raise exception 'Une reintegration doit contenir au moins une ligne.';
+  end if;
+
+  v_date := coalesce(p_date_mouvement, now());
+  v_numero := 'REINT-' || to_char(v_date, 'YYYY') || '-' || lpad(nextval('reintegrations_numero_seq')::text, 5, '0');
+
+  insert into reintegrations (entreprise_id, numero, entrepot_id, demande_par, notes, cree_le)
+  values (v_entreprise_id, v_numero, p_entrepot_id, auth.uid(), nullif(p_notes, ''), v_date)
+  returning id into v_reintegration_id;
+
+  for v_ligne in select * from jsonb_array_elements(p_lignes)
+  loop
+    v_bon_sortie_ligne_id := (v_ligne->>'bon_sortie_ligne_id')::uuid;
+    v_emplacement_id := (v_ligne->>'emplacement_id')::uuid;
+    v_quantite := (v_ligne->>'quantite')::integer;
+    v_notes_ligne := nullif(v_ligne->>'notes', '');
+
+    if v_bon_sortie_ligne_id is null or v_emplacement_id is null or v_quantite is null or v_quantite <= 0 then
+      raise exception 'Ligne de reintegration invalide (ligne de sortie, emplacement et quantite requis).';
+    end if;
+
+    select bsl.produit_id, bs.entrepot_id, bsl.quantite
+      into v_ligne_produit_id, v_ligne_entrepot_id, v_ligne_quantite_sortie
+      from bons_sortie_lignes bsl
+      join bons_sortie bs on bs.id = bsl.bon_sortie_id
+      where bsl.id = v_bon_sortie_ligne_id and bs.statut = 'confirmee'
+      for update of bsl;
+
+    if v_ligne_produit_id is null then
+      raise exception 'Ligne de sortie introuvable ou non confirmee.';
+    end if;
+    if v_ligne_entrepot_id <> p_entrepot_id then
+      raise exception 'Cette ligne de sortie appartient a un autre entrepot.';
+    end if;
+
+    select coalesce(sum(rl.quantite), 0) into v_total_reintegre
+      from reintegrations_lignes rl
+      where rl.bon_sortie_ligne_id = v_bon_sortie_ligne_id;
+
+    v_disponible := v_ligne_quantite_sortie - v_total_reintegre;
+    if v_quantite > v_disponible then
+      raise exception 'Quantite a reintegrer superieure au solde disponible pour cette ligne de sortie.';
+    end if;
+
+    select quantite into v_stock_avant from stock_produits
+      where produit_id = v_ligne_produit_id and entrepot_id = p_entrepot_id and emplacement_id = v_emplacement_id;
+    v_stock_avant := coalesce(v_stock_avant, 0);
+    v_stock_apres := v_stock_avant + v_quantite;
+
+    insert into stock_produits (produit_id, entrepot_id, emplacement_id, quantite)
+    values (v_ligne_produit_id, p_entrepot_id, v_emplacement_id, v_quantite)
+    on conflict (produit_id, entrepot_id, emplacement_id)
+    do update set quantite = stock_produits.quantite + excluded.quantite;
+
+    insert into reintegrations_lignes (reintegration_id, bon_sortie_ligne_id, produit_id, emplacement_id, quantite, notes)
+    values (v_reintegration_id, v_bon_sortie_ligne_id, v_ligne_produit_id, v_emplacement_id, v_quantite, v_notes_ligne);
+
+    insert into mouvements_stock (
+      entreprise_id, produit_id, entrepot_id, emplacement_id,
+      type, quantite, stock_avant, stock_apres, utilisateur_id, reference, motif, cree_le
+    )
+    values (
+      v_entreprise_id, v_ligne_produit_id, p_entrepot_id, v_emplacement_id,
+      'reintegration', v_quantite, v_stock_avant, v_stock_apres, auth.uid(), v_numero, v_notes_ligne, v_date
+    );
+  end loop;
+
+  return v_reintegration_id;
+end;
+$$;
+
+grant execute on function creer_reintegration to authenticated;
+
+-- Transferts entre entrepots : cycle de vie en 4 etapes RPC distinctes
+-- (demande -> validation -> expedition -> reception), chacune verifiant
+-- le statut courant du transfert (verrouille via for update) avant de
+-- l'avancer. Le stock ne bouge qu'a l'expedition (decrement source) et a
+-- la reception (increment destination) ; demande et validation ne sont
+-- que des changements de statut.
+
+create function demander_transfert(
+  p_entrepot_source_id uuid,
+  p_entrepot_destination_id uuid,
+  p_lignes jsonb
+)
+returns uuid
+language plpgsql
+security invoker
+as $$
+declare
+  v_entreprise_id uuid;
+  v_transfert_id uuid;
+  v_numero text;
+  v_ligne jsonb;
+  v_produit_id uuid;
+  v_quantite integer;
+begin
+  if p_entrepot_source_id = p_entrepot_destination_id then
+    raise exception 'L''entrepot source et destination doivent etre differents.';
+  end if;
+  select entreprise_id into v_entreprise_id from entrepots where id = p_entrepot_source_id;
+  if v_entreprise_id is null then
+    raise exception 'Entrepot source introuvable.';
+  end if;
+  if jsonb_array_length(p_lignes) = 0 then
+    raise exception 'Un transfert doit contenir au moins une ligne.';
+  end if;
+
+  v_numero := 'TRF-' || to_char(now(), 'YYYY') || '-' || lpad(nextval('transferts_numero_seq')::text, 5, '0');
+
+  insert into transferts (entreprise_id, numero_suivi, entrepot_source_id, entrepot_destination_id, demande_par, statut)
+  values (v_entreprise_id, v_numero, p_entrepot_source_id, p_entrepot_destination_id, auth.uid(), 'demande')
+  returning id into v_transfert_id;
+
+  for v_ligne in select * from jsonb_array_elements(p_lignes)
+  loop
+    v_produit_id := (v_ligne->>'produit_id')::uuid;
+    v_quantite := (v_ligne->>'quantite')::integer;
+
+    if v_produit_id is null or v_quantite is null or v_quantite <= 0 then
+      raise exception 'Ligne de transfert invalide (produit et quantite requis).';
+    end if;
+
+    insert into transferts_lignes (transfert_id, produit_id, quantite_expediee)
+    values (v_transfert_id, v_produit_id, v_quantite);
+  end loop;
+
+  return v_transfert_id;
+end;
+$$;
+
+grant execute on function demander_transfert to authenticated;
+
+create function valider_transfert(p_transfert_id uuid)
+returns void
+language plpgsql
+security invoker
+as $$
+declare
+  v_statut text;
+begin
+  select statut into v_statut from transferts where id = p_transfert_id for update;
+  if v_statut is null then
+    raise exception 'Transfert introuvable.';
+  end if;
+  if v_statut <> 'demande' then
+    raise exception 'Seul un transfert au statut "demande" peut etre valide.';
+  end if;
+
+  update transferts set statut = 'valide', valide_par = auth.uid() where id = p_transfert_id;
+end;
+$$;
+
+grant execute on function valider_transfert to authenticated;
+
+-- Expedie un transfert valide : pour chaque ligne, verifie et decremente le
+-- stock a l'emplacement source choisi (verrou), passe le transfert
+-- directement au statut 'en_transit' (l'etat 'expedie' est instantane, pas
+-- une etape separee dans ce MVP).
+create function expedier_transfert(
+  p_transfert_id uuid,
+  p_lignes jsonb,
+  p_date_mouvement timestamptz default null
+)
+returns void
+language plpgsql
+security invoker
+as $$
+declare
+  v_entreprise_id uuid;
+  v_entrepot_source_id uuid;
+  v_statut text;
+  v_numero text;
+  v_date timestamptz;
+  v_ligne jsonb;
+  v_transfert_ligne_id uuid;
+  v_emplacement_id uuid;
+  v_ligne_produit_id uuid;
+  v_ligne_quantite integer;
+  v_stock_avant integer;
+  v_stock_apres integer;
+begin
+  select entreprise_id, entrepot_source_id, statut, numero_suivi
+    into v_entreprise_id, v_entrepot_source_id, v_statut, v_numero
+    from transferts where id = p_transfert_id for update;
+  if v_statut is null then
+    raise exception 'Transfert introuvable.';
+  end if;
+  if v_statut <> 'valide' then
+    raise exception 'Seul un transfert au statut "valide" peut etre expedie.';
+  end if;
+  if jsonb_array_length(p_lignes) = 0 then
+    raise exception 'Aucune ligne a expedier.';
+  end if;
+
+  v_date := coalesce(p_date_mouvement, now());
+
+  for v_ligne in select * from jsonb_array_elements(p_lignes)
+  loop
+    v_transfert_ligne_id := (v_ligne->>'transfert_ligne_id')::uuid;
+    v_emplacement_id := (v_ligne->>'emplacement_source_id')::uuid;
+
+    if v_transfert_ligne_id is null or v_emplacement_id is null then
+      raise exception 'Ligne d''expedition invalide (ligne de transfert et emplacement requis).';
+    end if;
+
+    select produit_id, quantite_expediee into v_ligne_produit_id, v_ligne_quantite
+      from transferts_lignes where id = v_transfert_ligne_id and transfert_id = p_transfert_id;
+    if v_ligne_produit_id is null then
+      raise exception 'Ligne de transfert introuvable.';
+    end if;
+
+    select quantite into v_stock_avant from stock_produits
+      where produit_id = v_ligne_produit_id and entrepot_id = v_entrepot_source_id and emplacement_id = v_emplacement_id
+      for update;
+
+    if v_stock_avant is null or v_stock_avant < v_ligne_quantite then
+      raise exception 'Stock insuffisant pour ce produit a cet emplacement source.';
+    end if;
+
+    v_stock_apres := v_stock_avant - v_ligne_quantite;
+    if v_stock_apres = 0 then
+      delete from stock_produits
+        where produit_id = v_ligne_produit_id and entrepot_id = v_entrepot_source_id and emplacement_id = v_emplacement_id;
+    else
+      update stock_produits set quantite = v_stock_apres
+        where produit_id = v_ligne_produit_id and entrepot_id = v_entrepot_source_id and emplacement_id = v_emplacement_id;
+    end if;
+
+    update transferts_lignes set emplacement_source_id = v_emplacement_id where id = v_transfert_ligne_id;
+
+    insert into mouvements_stock (
+      entreprise_id, produit_id, entrepot_id, emplacement_id,
+      type, quantite, stock_avant, stock_apres, utilisateur_id, reference, motif, cree_le
+    )
+    values (
+      v_entreprise_id, v_ligne_produit_id, v_entrepot_source_id, v_emplacement_id,
+      'transfert', v_ligne_quantite, v_stock_avant, v_stock_apres, auth.uid(), v_numero, 'Expedition transfert', v_date
+    );
+  end loop;
+
+  update transferts set statut = 'en_transit', expedie_le = v_date where id = p_transfert_id;
+end;
+$$;
+
+grant execute on function expedier_transfert to authenticated;
+
+-- Receptionne un transfert en transit : pour chaque ligne, incremente le
+-- stock a l'emplacement destination choisi, enregistre la quantite
+-- reellement recue (l'ecart avec la quantite expediee reste visible par
+-- comparaison, aucun mouvement d'ajustement n'est genere automatiquement).
+create function receptionner_transfert(
+  p_transfert_id uuid,
+  p_lignes jsonb,
+  p_date_mouvement timestamptz default null
+)
+returns void
+language plpgsql
+security invoker
+as $$
+declare
+  v_entreprise_id uuid;
+  v_entrepot_destination_id uuid;
+  v_statut text;
+  v_numero text;
+  v_date timestamptz;
+  v_ligne jsonb;
+  v_transfert_ligne_id uuid;
+  v_emplacement_id uuid;
+  v_quantite_recue integer;
+  v_ligne_produit_id uuid;
+  v_stock_avant integer;
+  v_stock_apres integer;
+begin
+  select entreprise_id, entrepot_destination_id, statut, numero_suivi
+    into v_entreprise_id, v_entrepot_destination_id, v_statut, v_numero
+    from transferts where id = p_transfert_id for update;
+  if v_statut is null then
+    raise exception 'Transfert introuvable.';
+  end if;
+  if v_statut <> 'en_transit' then
+    raise exception 'Seul un transfert au statut "en_transit" peut etre receptionne.';
+  end if;
+  if jsonb_array_length(p_lignes) = 0 then
+    raise exception 'Aucune ligne a receptionner.';
+  end if;
+
+  v_date := coalesce(p_date_mouvement, now());
+
+  for v_ligne in select * from jsonb_array_elements(p_lignes)
+  loop
+    v_transfert_ligne_id := (v_ligne->>'transfert_ligne_id')::uuid;
+    v_emplacement_id := (v_ligne->>'emplacement_destination_id')::uuid;
+    v_quantite_recue := (v_ligne->>'quantite_recue')::integer;
+
+    if v_transfert_ligne_id is null or v_emplacement_id is null or v_quantite_recue is null or v_quantite_recue < 0 then
+      raise exception 'Ligne de reception invalide (ligne de transfert, emplacement et quantite recue requis).';
+    end if;
+
+    select produit_id into v_ligne_produit_id
+      from transferts_lignes where id = v_transfert_ligne_id and transfert_id = p_transfert_id;
+    if v_ligne_produit_id is null then
+      raise exception 'Ligne de transfert introuvable.';
+    end if;
+
+    select quantite into v_stock_avant from stock_produits
+      where produit_id = v_ligne_produit_id and entrepot_id = v_entrepot_destination_id and emplacement_id = v_emplacement_id;
+    v_stock_avant := coalesce(v_stock_avant, 0);
+    v_stock_apres := v_stock_avant + v_quantite_recue;
+
+    if v_quantite_recue > 0 then
+      insert into stock_produits (produit_id, entrepot_id, emplacement_id, quantite)
+      values (v_ligne_produit_id, v_entrepot_destination_id, v_emplacement_id, v_quantite_recue)
+      on conflict (produit_id, entrepot_id, emplacement_id)
+      do update set quantite = stock_produits.quantite + excluded.quantite;
+    end if;
+
+    update transferts_lignes
+      set emplacement_destination_id = v_emplacement_id, quantite_recue = v_quantite_recue
+      where id = v_transfert_ligne_id;
+
+    if v_quantite_recue > 0 then
+      insert into mouvements_stock (
+        entreprise_id, produit_id, entrepot_id, emplacement_id,
+        type, quantite, stock_avant, stock_apres, utilisateur_id, reference, motif, cree_le
+      )
+      values (
+        v_entreprise_id, v_ligne_produit_id, v_entrepot_destination_id, v_emplacement_id,
+        'transfert', v_quantite_recue, v_stock_avant, v_stock_apres, auth.uid(), v_numero, 'Reception transfert', v_date
+      );
+    end if;
+  end loop;
+
+  update transferts set statut = 'recu', recu_le = v_date where id = p_transfert_id;
+end;
+$$;
+
+grant execute on function receptionner_transfert to authenticated;
+
+-- ============================================================
+-- 4. VUES POUR LE DASHBOARD
+-- ============================================================
+-- security_invoker = true : la vue applique les policies RLS de
+-- l'utilisateur qui interroge, pas celles du createur de la vue.
+-- Le stock place en Quarantaine est exclu du stock disponible (cahier des
+-- charges, section 5).
+
+create view v_produits_stock with (security_invoker = true) as
+select
+  p.*,
+  c.nom as categorie_nom,
+  coalesce(sum(case when e.est_quarantaine then 0 else s.quantite end), 0)::int as stock_actuel,
+  case
+    when coalesce(sum(case when e.est_quarantaine then 0 else s.quantite end), 0) = 0 then 'rupture'
+    when coalesce(sum(case when e.est_quarantaine then 0 else s.quantite end), 0) <= p.stock_min then 'faible'
+    else 'normal'
+  end as statut
+from produits p
+left join categories c on c.id = p.categorie_id
+left join stock_produits s on s.produit_id = p.id
+left join emplacements e on e.id = s.emplacement_id
+group by p.id, c.nom;
+
+create view v_mouvements_recents with (security_invoker = true) as
+select
+  m.*,
+  p.designation as produit_designation,
+  pr.nom_complet as utilisateur_nom
+from mouvements_stock m
+join produits p on p.id = m.produit_id
+join profiles pr on pr.id = m.utilisateur_id;
+
+create view v_stock_par_entrepot with (security_invoker = true) as
+select
+  ent.id as entrepot_id,
+  ent.nom as entrepot_nom,
+  count(distinct case when not e.est_quarantaine then s.produit_id end)::int as nb_produits,
+  coalesce(sum(case when e.est_quarantaine then 0 else s.quantite end), 0)::int as quantite_totale,
+  count(distinct case when not e.est_quarantaine and s.quantite = 0 then s.produit_id end)::int as nb_rupture,
+  count(distinct case
+    when not e.est_quarantaine and s.quantite > 0 and s.quantite <= p.stock_min then s.produit_id
+  end)::int as nb_stock_faible
+from entrepots ent
+left join stock_produits s on s.entrepot_id = ent.id
+left join emplacements e on e.id = s.emplacement_id
+left join produits p on p.id = s.produit_id
+group by ent.id, ent.nom;
+
+-- Quantite restant attendue sur les receptions non encore validees, par
+-- produit (colonne "Commande" de l'ecran Produits).
+create view v_produits_commandes with (security_invoker = true) as
+select
+  rl.produit_id,
+  coalesce(sum(rl.quantite_attendue - rl.quantite_recue), 0)::int as quantite_commandee
+from receptions_lignes rl
+join receptions r on r.id = rl.reception_id
+where r.statut in ('en_attente', 'partielle')
+group by rl.produit_id;
+
+-- Lignes de sortie confirmees encore partiellement/totalement reintegrables
+-- (solde = quantite de la ligne moins deja reintegre sur cette ligne
+-- precise), ne montre que les lignes avec un solde positif. Alimente le
+-- "Detail des sorties" de la fenetre Reintegration (une ligne = une sortie
+-- precise, reintegrable independamment des autres lignes du meme bon).
+create view v_sorties_a_reintegrer with (security_invoker = true) as
+select
+  bsl.id as bon_sortie_ligne_id,
+  bsl.produit_id,
+  p.reference as produit_reference,
+  p.designation as produit_designation,
+  bs.entrepot_id,
+  bs.numero as bon_sortie_numero,
+  bs.motif,
+  bs.cree_le as sortie_le,
+  bsl.quantite as quantite_sortie,
+  coalesce(reint.quantite_reintegree, 0)::int as quantite_reintegree,
+  (bsl.quantite - coalesce(reint.quantite_reintegree, 0))::int as quantite_disponible
+from bons_sortie_lignes bsl
+join bons_sortie bs on bs.id = bsl.bon_sortie_id
+join produits p on p.id = bsl.produit_id
+left join (
+  select bon_sortie_ligne_id, sum(quantite) as quantite_reintegree
+  from reintegrations_lignes
+  group by bon_sortie_ligne_id
+) reint on reint.bon_sortie_ligne_id = bsl.id
+where bs.statut = 'confirmee'
+  and bsl.quantite - coalesce(reint.quantite_reintegree, 0) > 0;
+
+-- Transferts enrichis des noms d'entrepots, pour l'ecran Transferts.
+create view v_transferts with (security_invoker = true) as
+select
+  t.*,
+  es.nom as entrepot_source_nom,
+  ed.nom as entrepot_destination_nom
+from transferts t
+join entrepots es on es.id = t.entrepot_source_id
+join entrepots ed on ed.id = t.entrepot_destination_id;
+
+-- Lignes de transfert enrichies de la reference/designation produit.
+create view v_transferts_lignes with (security_invoker = true) as
+select
+  tl.*,
+  p.reference as produit_reference,
+  p.designation as produit_designation
+from transferts_lignes tl
+join produits p on p.id = tl.produit_id;
+
+-- ============================================================
+-- 5. COMPTE DE DEMARRAGE
+-- ============================================================
+-- Cree ton entreprise, puis un utilisateur (Authentication > Users > Add
+-- user dans le tableau de bord Supabase), note son UID, et lie-le a
+-- l'entreprise avec le role Administrateur :
+--
+-- insert into entreprises (nom) values ('Mon Entreprise') returning id;
+--
+-- insert into profiles (id, entreprise_id, nom_complet, role)
+-- values ('<uid-utilisateur>', '<id-entreprise>', 'Jean Didier', 'administrateur');

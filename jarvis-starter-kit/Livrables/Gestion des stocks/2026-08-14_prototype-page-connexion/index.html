@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; color: #1a2332; -webkit-font-smoothing: antialiased; background: #f7f8fa; }
+    a { color: #0B1D3A; text-decoration: none; }
+    a:hover { color: #D4A017; }
+    input { font-family: inherit; }
+    input::placeholder { color: #a3aeba; }
+    @keyframes cardIn { from { opacity: 0; transform: translateY(28px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes softDrift { 0%, 100% { transform: translate(0, 0) scale(1); } 50% { transform: translate(24px, -20px) scale(1.05); } }
+    @keyframes softDrift2 { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(-18px, 22px); } }
+  </style>
+</helmet>
+
+<div style="min-height: 100vh; display: flex; flex-direction: column; background: linear-gradient(170deg, #f8f9fb 0%, #eef1f6 50%, #e7ebf2 100%);">
+
+  <!-- MAIN -->
+  <main style="flex: 1; display: flex; align-items: center; justify-content: center; padding: 72px 24px 88px; position: relative; overflow: hidden;">
+    <div style="position: absolute; top: -100px; right: 8%; width: 420px; height: 420px; border-radius: 50%; background: radial-gradient(circle, rgba(11,29,58,0.06) 0%, transparent 70%); filter: blur(20px); animation: softDrift 16s ease-in-out infinite;"></div>
+    <div style="position: absolute; bottom: -80px; left: 6%; width: 340px; height: 340px; border-radius: 50%; background: radial-gradient(circle, rgba(212,160,23,0.08) 0%, transparent 70%); filter: blur(24px); animation: softDrift2 20s ease-in-out infinite;"></div>
+    <div style="position: absolute; top: 30%; left: 32%; width: 260px; height: 260px; border-radius: 50%; background: radial-gradient(circle, rgba(11,29,58,0.04) 0%, transparent 70%); filter: blur(30px); animation: softDrift2 24s ease-in-out infinite reverse;"></div>
+    <div style="position: absolute; inset: 0; opacity: 0.025; background-image: repeating-linear-gradient(45deg, transparent, transparent 70px, #0B1D3A 70px, #0B1D3A 71px);"></div>
+
+    <div style="width: 100%; max-width: 420px; background: #ffffff; border-radius: 20px; padding: 48px 44px 40px; box-shadow: 0 4px 12px rgba(11,29,58,0.04), 0 20px 60px rgba(11,29,58,0.1); border: 1px solid rgba(11,29,58,0.05); position: relative; z-index: 1; animation: cardIn 0.7s cubic-bezier(0.16,1,0.3,1) both;">
+
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 14px; margin-bottom: 38px;">
+        <a href="/"><img src="uploads/Symbole-6d86a454.jpg" alt="Jupply" style="height: 72px; width: 72px; object-fit: contain; mix-blend-mode: multiply;"></a>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 5px;">
+          <span style="font-size: 19px; font-weight: 800; color: #0B1D3A; letter-spacing: 0.14em; text-transform: uppercase;">Jupply Software</span>
+          <span style="font-size: 11.5px; font-weight: 500; color: #8a96a6; letter-spacing: 0.08em;">Smart Supply Chain Solutions</span>
+        </div>
+      </div>
+
+      <form onSubmit="{{ onSubmit }}" style="display: flex; flex-direction: column; gap: 22px;">
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <label for="jp-email" style="font-size: 13px; font-weight: 600; color: #3d4f63; letter-spacing: 0.01em;">{{ t_email }}</label>
+          <input id="jp-email" type="email" placeholder="{{ t_email_ph }}" style="width: 100%; box-sizing: border-box; padding: 13px 16px; font-size: 14.5px; color: #1a2332; background: #fafbfc; border: 1.5px solid #e2e7ee; border-radius: 10px; outline: none; transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;" style-focus="border-color: #0B1D3A; background: #ffffff; box-shadow: 0 0 0 3px rgba(11,29,58,0.07);">
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px;">
+            <label for="jp-password" style="font-size: 13px; font-weight: 600; color: #3d4f63; letter-spacing: 0.01em;">{{ t_password }}</label>
+            <a href="#" style="font-size: 12.5px; font-weight: 600; color: #D4A017; transition: color 0.2s;" style-hover="color: #b8890f;">{{ t_forgot }}</a>
+          </div>
+          <div style="position: relative; display: flex; align-items: center;">
+            <input id="jp-password" type="{{ pwType }}" placeholder="{{ t_password_ph }}" style="width: 100%; box-sizing: border-box; padding: 13px 46px 13px 16px; font-size: 14.5px; color: #1a2332; background: #fafbfc; border: 1.5px solid #e2e7ee; border-radius: 10px; outline: none; transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;" style-focus="border-color: #0B1D3A; background: #ffffff; box-shadow: 0 0 0 3px rgba(11,29,58,0.07);">
+            <button type="button" onClick="{{ toggleVisible }}" style="position: absolute; right: 6px; display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; background: transparent; border: none; border-radius: 8px; cursor: pointer; color: #8a96a6; transition: color 0.2s, background 0.2s;" style-hover="color: #0B1D3A; background: #f0f2f5;">
+              {{ eyeIcon }}
+            </button>
+          </div>
+        </div>
+
+        <button type="submit" style="width: 100%; margin-top: 4px; padding: 15px; font-size: 15px; font-weight: 700; font-family: inherit; color: #ffffff; background: #0B1D3A; border: none; border-radius: 10px; cursor: pointer; letter-spacing: 0.01em; box-shadow: 0 2px 10px rgba(11,29,58,0.18); transition: all 0.25s;" style-hover="background: #071427; box-shadow: 0 6px 22px rgba(11,29,58,0.28); transform: translateY(-1px);">{{ t_signin }}</button>
+      </form>
+
+      <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #edf0f4; text-align: center;">
+        <span style="font-size: 13.5px; color: #6b7a8e;">{{ t_no_account }}</span>
+        <a href="/essai-gratuit/" style="font-size: 13.5px; font-weight: 700; color: #D4A017; margin-left: 6px; transition: color 0.2s;" style-hover="color: #b8890f;">{{ t_create_account }}</a>
+      </div>
+    </div>
+  </main>
+
+  <!-- FOOTER -->
+  <footer style="background: #0B1D3A; padding: 56px 32px 0;">
+    <div style="max-width: 1100px; margin: 0 auto;">
+      <div style="display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 48px; padding-bottom: 44px;">
+
+        <div style="display: flex; flex-direction: column; gap: 18px;">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <div style="width: 44px; height: 44px; border-radius: 11px; background: #ffffff; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+              <img src="uploads/Symbole-6d86a454.jpg" alt="Jupply" style="height: 34px; width: 34px; object-fit: contain; mix-blend-mode: multiply;">
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 3px;">
+              <span style="font-size: 14px; font-weight: 800; color: #ffffff; letter-spacing: 0.1em; text-transform: uppercase;">Jupply Software</span>
+              <span style="font-size: 10.5px; font-weight: 500; color: rgba(255,255,255,0.4); letter-spacing: 0.06em;">Smart Supply Chain Solutions</span>
+            </div>
+          </div>
+          <p style="font-size: 13.5px; color: rgba(255,255,255,0.45); line-height: 1.65; margin: 0; max-width: 260px;">{{ t_footer_blurb }}</p>
+          <div style="display: flex; gap: 10px;">
+            {{ socialIcons }}
+          </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 14px;">
+          <span style="font-size: 12px; font-weight: 700; color: #D4A017; text-transform: uppercase; letter-spacing: 0.1em;">{{ t_col_product }}</span>
+          <a href="#" style="font-size: 14px; color: rgba(255,255,255,0.6); font-weight: 500; transition: color 0.2s;" style-hover="color: #ffffff;">{{ t_nav_features }}</a>
+          <a href="#" style="font-size: 14px; color: rgba(255,255,255,0.6); font-weight: 500; transition: color 0.2s;" style-hover="color: #ffffff;">{{ t_nav_pricing }}</a>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 14px;">
+          <span style="font-size: 12px; font-weight: 700; color: #D4A017; text-transform: uppercase; letter-spacing: 0.1em;">{{ t_col_resources }}</span>
+          <a href="#" style="font-size: 14px; color: rgba(255,255,255,0.6); font-weight: 500; transition: color 0.2s;" style-hover="color: #ffffff;">{{ t_nav_help }}</a>
+          <a href="#" style="font-size: 14px; color: rgba(255,255,255,0.6); font-weight: 500; transition: color 0.2s;" style-hover="color: #ffffff;">{{ t_nav_docs }}</a>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 14px;">
+          <span style="font-size: 12px; font-weight: 700; color: #D4A017; text-transform: uppercase; letter-spacing: 0.1em;">{{ t_col_company }}</span>
+          <a href="#" style="font-size: 14px; color: rgba(255,255,255,0.6); font-weight: 500; transition: color 0.2s;" style-hover="color: #ffffff;">{{ t_nav_about }}</a>
+          <a href="#" style="font-size: 14px; color: rgba(255,255,255,0.6); font-weight: 500; transition: color 0.2s;" style-hover="color: #ffffff;">{{ t_nav_contact }}</a>
+        </div>
+      </div>
+
+      <div style="border-top: 1px solid rgba(255,255,255,0.09); padding: 24px 0 28px; display: flex; align-items: center; justify-content: space-between; gap: 24px;">
+        <span style="font-size: 12.5px; color: rgba(255,255,255,0.35);">{{ t_copyright }}</span>
+        <div style="display: flex; align-items: center; background: rgba(255,255,255,0.07); border-radius: 8px; padding: 3px; gap: 2px;">
+          <button onClick="{{ setFR }}" style="font-size: 12.5px; font-weight: 700; padding: 6px 14px; border-radius: 6px; border: none; cursor: pointer; transition: all 0.25s; background: {{ frBg }}; color: {{ frColor }};">FR</button>
+          <button onClick="{{ setEN }}" style="font-size: 12.5px; font-weight: 700; padding: 6px 14px; border-radius: 6px; border: none; cursor: pointer; transition: all 0.25s; background: {{ enBg }}; color: {{ enColor }};">EN</button>
+        </div>
+      </div>
+    </div>
+  </footer>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;$preview&quot;: { &quot;width&quot;: 1280, &quot;height&quot;: 900 }
+}">
+class Component extends DCLogic {
+  state = { visible: false, lang: 'fr' };
+
+  translations = {
+    fr: {
+      email: 'E-mail', email_ph: 'Entrez votre adresse e-mail',
+      password: 'Mot de passe', password_ph: 'Entrez votre mot de passe',
+      forgot: 'Mot de passe oublié ?', signin: 'Se connecter',
+      no_account: 'Vous n\'avez pas de compte ?', create_account: 'Créer un compte',
+      footer_blurb: 'La gestion des ventes, stocks et approvisionnements pour les PME et commerces.',
+      col_product: 'Produit', col_resources: 'Ressources', col_company: 'Entreprise',
+      nav_features: 'Fonctionnalités', nav_pricing: 'Tarifs',
+      nav_help: 'Aide', nav_docs: 'Documentation',
+      nav_about: 'À propos', nav_contact: 'Contact',
+      copyright: '© 2026 Jupply Software. Tous droits réservés.'
+    },
+    en: {
+      email: 'Email', email_ph: 'Enter your email address',
+      password: 'Password', password_ph: 'Enter your password',
+      forgot: 'Forgot password?', signin: 'Sign in',
+      no_account: 'Don\'t have an account?', create_account: 'Create an account',
+      footer_blurb: 'Sales, inventory and procurement management for SMBs and retailers.',
+      col_product: 'Product', col_resources: 'Resources', col_company: 'Company',
+      nav_features: 'Features', nav_pricing: 'Pricing',
+      nav_help: 'Help', nav_docs: 'Documentation',
+      nav_about: 'About', nav_contact: 'Contact',
+      copyright: '© 2026 Jupply Software. All rights reserved.'
+    }
+  };
+
+  renderVals() {
+    const h = React.createElement;
+    const v = this.state.visible;
+    const isFR = this.state.lang === 'fr';
+    const t = this.translations[this.state.lang];
+
+    const eyeIcon = v
+      ? h('svg', { width: 19, height: 19, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.9, strokeLinecap: 'round', strokeLinejoin: 'round' },
+          h('path', { d: 'M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24' }),
+          h('line', { x1: 1, y1: 1, x2: 23, y2: 23 }))
+      : h('svg', { width: 19, height: 19, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.9, strokeLinecap: 'round', strokeLinejoin: 'round' },
+          h('path', { d: 'M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z' }),
+          h('circle', { cx: 12, cy: 12, r: 3 }));
+
+    const socialPaths = [
+      'M18 2h-3a5 5 0 00-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 011-1h3z',
+      'M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-4 0v7h-4v-7a6 6 0 016-6zM6 9H2v12h4z',
+      'M23 3a10.9 10.9 0 01-3.14 1.53 4.48 4.48 0 00-7.86 3v1A10.66 10.66 0 013 4s-4 9 5 13a11.64 11.64 0 01-7 2c9 5 20 0 20-11.5a4.5 4.5 0 00-.08-.83A7.72 7.72 0 0023 3z'
+    ];
+    const socialIcons = socialPaths.map((d, i) =>
+      h('a', { key: i, href: '#', style: {
+        width: 34, height: 34, borderRadius: 8, background: 'rgba(255,255,255,0.07)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        color: 'rgba(255,255,255,0.55)', transition: 'all 0.25s'
+      },
+        onMouseEnter: (e) => { e.currentTarget.style.background = 'rgba(212,160,23,0.2)'; e.currentTarget.style.color = '#D4A017'; },
+        onMouseLeave: (e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.07)'; e.currentTarget.style.color = 'rgba(255,255,255,0.55)'; }
+      },
+        h('svg', { width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.9, strokeLinecap: 'round', strokeLinejoin: 'round' },
+          h('path', { d }), i === 1 ? h('circle', { cx: 4, cy: 4, r: 2 }) : null)
+      )
+    );
+
+    return {
+      pwType: v ? 'text' : 'password',
+      toggleVisible: () => this.setState({ visible: !v }),
+      onSubmit: (e) => e.preventDefault(),
+      eyeIcon, socialIcons,
+      setFR: () => this.setState({ lang: 'fr' }),
+      setEN: () => this.setState({ lang: 'en' }),
+      frBg: isFR ? '#D4A017' : 'transparent', frColor: isFR ? '#0B1D3A' : 'rgba(255,255,255,0.5)',
+      enBg: !isFR ? '#D4A017' : 'transparent', enColor: !isFR ? '#0B1D3A' : 'rgba(255,255,255,0.5)',
+      t_email: t.email, t_email_ph: t.email_ph,
+      t_password: t.password, t_password_ph: t.password_ph,
+      t_forgot: t.forgot, t_signin: t.signin,
+      t_no_account: t.no_account, t_create_account: t.create_account,
+      t_footer_blurb: t.footer_blurb,
+      t_col_product: t.col_product, t_col_resources: t.col_resources, t_col_company: t.col_company,
+      t_nav_features: t.nav_features, t_nav_pricing: t.nav_pricing,
+      t_nav_help: t.nav_help, t_nav_docs: t.nav_docs,
+      t_nav_about: t.nav_about, t_nav_contact: t.nav_contact,
+      t_copyright: t.copyright
+    };
+  }
+}
+</script>
+</body>
+</html>
