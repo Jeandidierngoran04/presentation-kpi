@@ -1,9 +1,14 @@
 import type { StockParEntrepot as StockParEntrepotType } from '../../types/stock'
+import { useTabs } from '../../context/TabsContext'
 import { SectionCard } from './SectionCard'
 
 export function StockParEntrepot({ donnees }: { donnees: StockParEntrepotType[] }) {
+  const { ouvrirOnglet } = useTabs()
   return (
-    <SectionCard titre="Stock par entrepôt" lienTout={{ label: 'Voir les entrepôts', to: '/stocks/entrepots' }}>
+    <SectionCard
+      titre="Stock par entrepôt"
+      lienTout={{ label: 'Voir les entrepôts', onClick: () => ouvrirOnglet('entrepots', 'Entrepôts') }}
+    >
       {donnees.length === 0 ? (
         <p className="text-sm text-text-muted py-4 text-center">Aucun entrepôt enregistré.</p>
       ) : (
@@ -14,7 +19,7 @@ export function StockParEntrepot({ donnees }: { donnees: StockParEntrepotType[] 
               <th className="font-semibold pb-2">Produits</th>
               <th className="font-semibold pb-2">Quantité totale</th>
               <th className="font-semibold pb-2">En rupture</th>
-              <th className="font-semibold pb-2">Stock faible</th>
+              <th className="font-semibold pb-2">En alerte</th>
             </tr>
           </thead>
           <tbody>

@@ -309,7 +309,8 @@ sans perte de données.
 
 ### Alertes prévues
 
-- Référence en alerte sur la quantité (sous le seuil minimum).
+- Référence en alerte sur la quantité (stock inférieur ou égal au stock
+  d'alerte, c'est-à-dire au seuil de réapprovisionnement).
 - Référence en alerte sur la date de péremption.
 - Référence en commande chez les fournisseurs.
 - Référence en alerte sur la date de garantie (fournisseur), déclenchée 7
@@ -329,10 +330,12 @@ affiché dans le dashboard.
 
 ### Seuils par produit
 
-- Stock minimum : niveau en dessous duquel une alerte est déclenchée.
+- Stock minimum : niveau plancher du produit. Il sert de stock d'alerte
+  uniquement quand aucun seuil de réapprovisionnement n'est renseigné.
 - Stock maximum : niveau que l'entreprise ne souhaite normalement pas
   dépasser.
-- Seuil de réapprovisionnement : niveau à partir duquel une commande doit
+- Seuil de réapprovisionnement (stock d'alerte, point de commande) : niveau
+  à partir duquel l'alerte est déclenchée et une commande doit
   être envisagée.
 
 ### Notifications
@@ -349,7 +352,7 @@ catégorie et par entrepôt, avec possibilité de double-cliquer sur chaque
 ### Doit afficher notamment
 
 - Nombre total de produits en stock et valeur globale du stock.
-- Produits en rupture et produits sous le seuil minimum.
+- Produits en rupture et produits au niveau du stock d'alerte.
 - Transferts en cours et dernières opérations.
 - Toutes les alertes listées en section 12.
 - Entrepôts avec le plus de mouvements, produits qui sortent le plus,

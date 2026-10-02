@@ -13,6 +13,11 @@ export async function getProduitsAvecStock(): Promise<ProduitAvecStock[]> {
   return data as ProduitAvecStock[]
 }
 
+/** Stock d'alerte d'un produit : seuil de réapprovisionnement, à défaut stock minimum (même règle que `v_produits_stock`). */
+export function stockAlerte(produit: Pick<ProduitAvecStock, 'seuil_reappro' | 'stock_min'>): number {
+  return produit.seuil_reappro ?? produit.stock_min
+}
+
 export async function getMouvementsRecents(limite = 10): Promise<MouvementAffiche[]> {
   const { data, error } = await supabase
     .from('v_mouvements_recents')

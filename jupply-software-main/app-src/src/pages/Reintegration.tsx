@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Search } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
+import { messageErreur } from '../lib/erreurs'
 import { peutReintegrer } from '../lib/permissions'
 import { texteFiltre } from '../lib/filtreTexte'
 import { dateVersInput, dateSaisieVersISO } from '../lib/dates'
@@ -180,7 +181,7 @@ export function Reintegration() {
       setDateMouvement(dateVersInput(new Date()))
       chargerSorties()
     } catch (err) {
-      setErreur(err instanceof Error ? err.message : 'Erreur inconnue.')
+      setErreur(messageErreur(err))
     } finally {
       setEnvoi(false)
     }

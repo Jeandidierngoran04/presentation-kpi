@@ -46,7 +46,8 @@ comme faible.
 **Stock maximum** — La quantité que l'entreprise ne souhaite normalement
 pas dépasser.
 
-**Seuil de réapprovisionnement** — Le niveau de stock à partir duquel il
+**Seuil de réapprovisionnement (stock d'alerte, point de commande)** — Le
+niveau de stock qui déclenche l'alerte dans l'application, et à partir duquel il
 faut envisager de refaire une commande.
 
 **Stock dormant** — Un produit qui reste très longtemps en stock sans

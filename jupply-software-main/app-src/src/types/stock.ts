@@ -42,7 +42,13 @@ export interface Fournisseur {
   id: string
   entreprise_id: string
   nom: string
+  /** Personne à contacter chez le fournisseur. */
   contact: string | null
+  telephone: string | null
+  email: string | null
+  adresse: string | null
+  ville: string | null
+  pays: string | null
 }
 
 export interface Produit {
@@ -149,6 +155,7 @@ export interface Reception {
   cree_par: string
   valide_par: string | null
   valide_le: string | null
+  notes: string | null
   cree_le: string
 }
 

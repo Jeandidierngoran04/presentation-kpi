@@ -110,13 +110,13 @@ Une fois que je confirme, Claude met à jour le fichier en question et ajoute un
 
 **Objectif :** Démarrer ma journée avec une veille personnalisée en 30 secondes.
 
-Claude va effectuer une veille des actualités du jour, filtrée selon mon contexte personnel (mes objectifs, mes projets), et me proposer un focus pour la journée. Cette commande utilise la skill `recherche-actualites-contextualisees`.
+Claude va effectuer une veille des actualités du jour, filtrée selon mon contexte personnel (mes objectifs, mes projets), et me proposer un focus pour la journée. Cette commande utilise la skill `recherche-actualites`.
 
 ---
 
 ## Skills disponibles
 
-### recherche-actualites-contextualisees
+### recherche-actualites
 
 Skill de veille intelligente qui filtre les actualités selon mon contexte personnel. Activée automatiquement quand je demande "fais-moi un point sur les actualités", "donne-moi les news du jour", ou via la commande `/morning`.
 

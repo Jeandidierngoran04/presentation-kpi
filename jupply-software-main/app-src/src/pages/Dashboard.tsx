@@ -100,9 +100,9 @@ export function Dashboard() {
         />
         <KpiCard
           icone={AlertTriangle}
-          label="Stock faible"
+          label="En alerte"
           valeur={String(kpis.stockFaible)}
-          indication="Sous le seuil minimum"
+          indication="Au niveau du stock d'alerte"
           tonalite="alerte"
         />
         <KpiCard

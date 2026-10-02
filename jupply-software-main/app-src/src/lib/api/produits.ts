@@ -175,14 +175,20 @@ export async function creerCategorie(entrepriseId: string, nom: string): Promise
   return data as Categorie
 }
 
+export type CoordonneesFournisseur = Partial<
+  Pick<Fournisseur, 'contact' | 'telephone' | 'email' | 'adresse' | 'ville' | 'pays'>
+>
+
 export async function creerFournisseur(
   entrepriseId: string,
   nom: string,
-  contact?: string | null,
+  coordonnees: CoordonneesFournisseur = {},
 ): Promise<Fournisseur> {
+  // Seules les coordonnées renseignées sont envoyées (champs vides -> non transmis).
+  const renseignees = Object.fromEntries(Object.entries(coordonnees).filter(([, v]) => v != null && v !== ''))
   const { data, error } = await supabase
     .from('fournisseurs')
-    .insert({ entreprise_id: entrepriseId, nom, contact: contact ?? null })
+    .insert({ entreprise_id: entrepriseId, nom, ...renseignees })
     .select()
     .single()
   if (error) throw error

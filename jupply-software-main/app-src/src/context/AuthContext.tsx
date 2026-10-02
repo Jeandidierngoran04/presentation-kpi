@@ -46,18 +46,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => abonnement.subscription.unsubscribe()
   }, [])
 
+  // Supabase renvoie un nouvel objet session à chaque retour sur la fenêtre
+  // (revérification / renouvellement du jeton). On ne recharge le profil que
+  // si l'utilisateur change vraiment : sinon l'écran "Chargement..." démontait
+  // l'application et faisait perdre les onglets ouverts et la saisie en cours.
+  const utilisateurId = session?.user.id ?? null
+
   useEffect(() => {
-    if (!session) return
+    if (!utilisateurId) return
     setChargement(true)
     Promise.all([
-      supabase.from('profiles').select('id, entreprise_id, nom_complet, role').eq('id', session.user.id).single(),
-      supabase.from('profils_entrepots').select('entrepot_id').eq('profile_id', session.user.id),
+      supabase.from('profiles').select('id, entreprise_id, nom_complet, role').eq('id', utilisateurId).single(),
+      supabase.from('profils_entrepots').select('entrepot_id').eq('profile_id', utilisateurId),
     ]).then(([{ data: profilData }, { data: assignationsData }]) => {
       setProfil(profilData)
       setEntrepotsAssignes((assignationsData ?? []).map((a) => a.entrepot_id))
       setChargement(false)
     })
-  }, [session])
+  }, [utilisateurId])
 
   async function connexion(email: string, motDePasse: string) {
     const { error } = await supabase.auth.signInWithPassword({ email, password: motDePasse })

@@ -31,7 +31,27 @@
   Plus Jakarta Sans, iconographie outline, densité). Règle ajoutée dans
   `CLAUDE.md`. Plan de refonte de `app-src/` en 5 paliers (fondations →
   coquille → primitives → écrans un par un → passe finale) dans
-  `PLAN.md`, en attente du feu vert.
+  `PLAN.md` : feu vert donné, les 5 paliers sont codés (`tsc -b`, `oxlint`,
+  `vite build` OK), en attente de vérification locale Light + Dark
+  (checklist QA) et de la décision sur le favicon violet.
+
+- **[2026-10-01] Écran Alertes stock.** Récapitulatif des produits en
+  rupture ou au niveau du stock d'alerte, à la place de l'écran "à venir".
+  Décision : stock d'alerte = seuil de réapprovisionnement (point de
+  commande), à défaut stock minimum ; portée = entrepôt de l'utilisateur.
+  Code complet, en attente de l'exécution de la migration
+  `app-src/supabase/migrations/2026-10-01-stock-alerte.sql` dans Supabase
+  et de la vérification locale.
+
+- **[2026-10-02] Feuille "Nouvelle réception" en tableau.** Onglet dédié
+  façon AIRSTOCK (saisie conservée en changeant d'onglet), lignes saisies
+  comme dans un tableur, notes et date du mouvement sur la réception, fiche
+  complète de création de fournisseur, lot/série/expiration pour tous les
+  produits. Code complet, en attente de la
+  migration `app-src/supabase/migrations/2026-10-02-reception-fournisseurs.sql`
+  et de la vérification locale. Au passage : colonne "Enregistré par"
+  (heure + opérateur) dans Produits et Entrées de stock, bandeaux d'aide
+  retirés.
 
 ## Terminé
 

@@ -60,9 +60,15 @@ export const MODULES: Module[] = [
   },
 ]
 
-export const MODULE_PAR_ECRAN = Object.fromEntries(
-  MODULES.flatMap((m) => m.actions.map((a) => [a.ecran, m.id] as const)),
-) as Record<EcranId, string>
+/** Écrans ouverts depuis un autre écran (pas de bouton dans le Sub-Header), rattachés à leur module. */
+const ECRANS_SECONDAIRES: Partial<Record<EcranId, string>> = {
+  'nouvelle-reception': 'receptions-expeditions',
+}
+
+export const MODULE_PAR_ECRAN = {
+  ...Object.fromEntries(MODULES.flatMap((m) => m.actions.map((a) => [a.ecran, m.id] as const))),
+  ...ECRANS_SECONDAIRES,
+} as Record<EcranId, string>
 
 export function moduleParId(id: string): Module {
   return MODULES.find((m) => m.id === id) ?? MODULES[0]

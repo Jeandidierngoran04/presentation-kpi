@@ -161,7 +161,7 @@ de Sortie/Réintégration — structure proposée proche de `Receptions.tsx`
 
 # Refonte visuelle de l'application selon la charte graphique
 
-**Statut :** en cours de conception (en attente du feu vert de Jean Didier)
+**Statut :** validé, exécution en cours (paliers 0 à 4 codés, en attente vérif locale Light + Dark)
 **Démarré le :** 05/09/2026
 
 ## Objectif
@@ -480,6 +480,234 @@ Pourquoi ce découpage :
       favicon violet.
 - [ ] Vérification en local par Jean Didier (Light + Dark) — checklist QA
       ci-dessous.
+
+---
+
+# Écran Alertes stock
+
+**Statut :** validé, exécution en cours (code complet, en attente migration SQL + vérif locale)
+**Démarré le :** 01/10/2026
+
+## Objectif
+
+Remplacer l'écran "Fonctionnalité à venir" de l'onglet "Alertes stock"
+(module Magasin) par un récapitulatif de tous les produits en rupture de
+stock ou dont le stock est inférieur ou égal au stock d'alerte. Première
+brique de la section 12 du cahier des charges ("Référence en alerte sur la
+quantité"). Les autres alertes (péremption, garantie, temps de stock,
+outillage, transfert non réceptionné, réception non validée) restent hors
+périmètre.
+
+## Analyse de l'existant
+
+- **Le calcul existe déjà en base.** La vue `v_produits_stock` renvoie pour
+  chaque produit `stock_actuel` (somme de tous les entrepôts, hors
+  Quarantaine) et `statut` : `rupture` si stock = 0, `faible` si stock <=
+  `stock_min`, sinon `normal`. C'est exactement la règle demandée. Aucun
+  changement de schéma nécessaire.
+- `getProduitsAvecStock()` (`lib/api/stock.ts`) lit déjà cette vue, et
+  `getCommandesProduits()` / `getLocalisationsProduits()`
+  (`lib/api/produits.ts`) fournissent la quantité en commande et les
+  emplacements : tout est réutilisable tel quel.
+- Le Dashboard a déjà un bloc `AlertesStock` limité à 6 lignes, avec un lien
+  "Voir tous les produits en alerte".
+- **Défaut trouvé :** ce lien pointe vers `/stocks/alertes`, une adresse qui
+  n'existe pas (l'app n'a qu'une route `/stocks`, la navigation se fait par
+  onglets). Cliquer dessus renvoie sur `/stocks` et réinitialise les
+  onglets ouverts. Même défaut sur "Voir tous les mouvements" et "Voir les
+  entrepôts".
+- L'onglet `alertes` est déjà déclaré (`TabsContext`, `modules.ts`), il
+  affiche seulement `ComingSoon` dans `AppShell.tsx`.
+- Les onglets restent montés en arrière-plan : un écran qui charge ses
+  données une seule fois affiche des chiffres périmés après une sortie ou
+  une réception faite dans un autre onglet.
+- Convention visuelle des tableaux denses à reprendre de `Produits.tsx`
+  (en-tête `uppercase` 11px, lignes compactes, filtre par colonne au
+  clavier, `StatutBadge`).
+
+## Plan détaillé
+
+### 1. Décisions actées avec Jean Didier (01/10/2026)
+
+- **"Stock d'alerte" = seuil de réapprovisionnement (point de commande)**,
+  et non le stock minimum. Si le seuil n'est pas renseigné sur un produit,
+  on retombe sur son stock minimum (choix technique, pour qu'aucun produit
+  ne reste sans alerte). La règle est changée à la source, dans les vues
+  `v_produits_stock` et `v_stock_par_entrepot`, donc elle vaut partout
+  (Dashboard, Produits, Alertes stock). Libellé "Stock faible" remplacé par
+  "En alerte", champ "Seuil réappro" renommé "Stock d'alerte".
+- **Portée : l'entrepôt de l'utilisateur.** Hypothèse de travail : un seul
+  entrepôt. Aucun code à écrire : la sécurité de la base ne laisse voir à
+  un Gestionnaire/Magasinier que le stock de ses entrepôts assignés, donc
+  le stock comparé au seuil est déjà celui de son entrepôt. À revoir le
+  jour où un même utilisateur gère plusieurs entrepôts (le seuil est
+  aujourd'hui défini par produit, pas par entrepôt).
+- **Écran de consultation** : pas de création de commande depuis cet écran
+  (le module Achats n'existe pas encore).
+
+### 2. Schéma et couche API
+
+- Vues `v_produits_stock` et `v_stock_par_entrepot` : seuil comparé =
+  `coalesce(seuil_reappro, stock_min)`. `schema.sql` mis à jour +
+  `supabase/migrations/2026-10-01-stock-alerte.sql` à exécuter une fois.
+- Aucune nouvelle requête : réutilisation de `getProduitsAvecStock`,
+  `getCommandesProduits`, `getLocalisationsProduits`. Ajout du petit
+  utilitaire `stockAlerte(produit)` dans `lib/api/stock.ts`.
+
+### 3. UI
+
+- Nouveau `src/pages/AlertesStock.tsx` :
+  - En-tête : titre, puis trois pastilles cliquables servant de filtre
+    rapide avec leur compteur : Toutes / Rupture / Stock faible. Bouton
+    "Actualiser".
+  - Tableau dense : Référence, Désignation, Catégorie, Stock, Stock
+    d'alerte, Écart (stock moins stock d'alerte), Stock min, En commande,
+    Statut, Localisation.
+  - Tri par défaut : ruptures d'abord, puis stocks faibles du plus gros
+    écart au plus petit.
+  - Filtre par colonne au clavier comme dans Produits (Référence,
+    Désignation, Catégorie).
+  - Clic droit sur une ligne : "Voir dans Produits" (ouvre l'onglet
+    Produits avec ce produit sélectionné, via `SelectionContext`).
+  - État vide : "Aucune alerte, tous les produits sont à un niveau normal."
+  - Rechargement automatique des données à chaque fois que l'onglet
+    redevient actif.
+- `AppShell.tsx` : brancher `alertes` sur le nouvel écran.
+- `Produits.tsx` : sélectionner le produit demandé quand on arrive depuis
+  Alertes stock.
+- `SectionCard.tsx` + `AlertesStock.tsx` / `MouvementsRecents.tsx` /
+  `StockParEntrepot.tsx` (Dashboard) : remplacer les liens morts par
+  l'ouverture de l'onglet correspondant.
+
+## Points de vigilance
+
+- Un produit dont le stock minimum est à 0 n'apparaît qu'en cas de rupture.
+- Un produit jamais réceptionné (stock 0) apparaît en rupture : comportement
+  voulu par la vue actuelle, à confirmer à l'usage.
+- Respect de la charte graphique (tokens, Light + Dark, densité).
+
+## Avancement
+
+- [x] Décisions validées avec Jean Didier
+- [x] Règle d'alerte : `schema.sql` + fichier de migration écrits
+- [ ] **Migration à exécuter dans Supabase par Jean Didier** (pas d'accès
+      direct à la base depuis ce poste : `SUPABASE_DB_URL` absent de
+      `.env.local`). SQL non testé en base.
+- [x] Écran `pages/AlertesStock.tsx` + branchement `AppShell`
+- [x] "Voir dans Produits" (sélection transmise via `SelectionContext`)
+- [x] Liens morts du Dashboard corrigés (ouvrent l'onglet correspondant)
+- [x] Libellés ("En alerte", "Stock d'alerte") + cahier des charges et
+      glossaire alignés
+- [x] `tsc -b` + `vite build` OK. `oxlint` n'a pas pu tourner : son
+      exécutable est bloqué par la stratégie de contrôle d'application de
+      Windows sur ce poste.
+- [ ] Vérification en local par Jean Didier (Light + Dark)
+
+---
+
+# Fenêtre "Nouvelle réception" en tableau
+
+**Statut :** validé, exécution en cours (code complet, en attente migration SQL + vérif locale)
+**Démarré le :** 02/10/2026
+
+## Objectif
+
+Remplacer la petite fenêtre actuelle (une carte empilée par produit) par une
+grande fenêtre de saisie façon AIRSTOCK, ouverte par clic droit > "Nouvelle
+réception" sur l'écran Entrées de stock : informations générales en haut,
+lignes saisies directement dans un tableau en dessous.
+
+## Décisions actées avec Jean Didier (01/10/2026)
+
+1. Grande fenêtre par-dessus la liste des réceptions, fermée à
+   l'enregistrement.
+2. Saisie **façon Excel** (option B) : on tape directement dans les cases du
+   tableau, une ligne par produit.
+3. Ajout dès maintenant de la **date du mouvement** (modifiable) et des
+   **notes** sur la réception (modification de la base).
+
+## Analyse de l'existant
+
+- `NouvelleReceptionModal` (`pages/Receptions.tsx`) : formulaire empilé dans
+  le composant `Modal` (largeur fixe `max-w-sm`). Logique à conserver :
+  entrepôts autorisés (`peutSaisirReception`), création rapide de
+  fournisseur, avertissement "produit déjà stocké à un autre emplacement",
+  lot / N° série / expiration selon le produit, case anomalie (quarantaine),
+  quantité reçue = quantité attendue par défaut.
+- `creer_reception(p_entrepot_id, p_fournisseur_id, p_numero_po, p_lignes)` :
+  pas de notes ni de date. `receptions` n'a pas de colonne `notes`.
+- Modèle à suivre pour la date : `creer_reintegration` (paramètre
+  `p_date_mouvement`, qui fixe `cree_le` et l'année du numéro) et
+  `dateSaisieVersISO` côté app (date choisie + heure réelle de saisie, donc
+  la colonne "Enregistré par" garde la vraie heure).
+- Le stock n'augmente toujours qu'à la validation (inchangé).
+
+## Plan détaillé
+
+### 1. Base
+
+- `receptions.notes text`.
+- `creer_reception` recréée avec `p_notes` et `p_date_mouvement` (optionnels).
+- `schema.sql` mis à jour + `supabase/migrations/2026-10-02-reception-fournisseurs.sql`.
+
+### 2. API / types
+
+- `Reception.notes`, `creerReception({ ..., notes, dateMouvement })`.
+
+### 3. UI
+
+- `Modal` : option de largeur (`large`) sans changer les fenêtres existantes.
+- Nouvelle fenêtre (dans `Receptions.tsx`) :
+  - En-tête : Dépôt, Fournisseur (+ création rapide), N° bon de commande,
+    Opérateur (lecture seule), Bon de réception ("Généré à
+    l'enregistrement"), Date du mouvement, Notes.
+  - Tableau éditable : Référence (saisie avec suggestions), Désignation
+    (automatique), Qté commandée, Qté reçue, Prix unitaire, Localisation,
+    Lot, N° série, Expiration (actives seulement si le produit les gère),
+    Non conforme, suppression de ligne. Une ligne vide est toujours ajoutée
+    en bas ; Entrée descend à la cellule du dessous. Localisation proposée
+    par défaut : celle où le produit est déjà stocké dans ce dépôt.
+  - Pied : nombre de lignes, quantité totale, valeur totale, Annuler /
+    Enregistrer la réception. Confirmation avant de fermer si des lignes
+    sont saisies.
+- Panneau "Lignes" de l'écran : affiche les notes de la réception.
+
+## Points de vigilance
+
+- Tant que la migration n'est pas exécutée dans Supabase, l'enregistrement
+  d'une réception échoue (la fonction attend les nouveaux paramètres).
+- Les mouvements de stock gardent la date de **validation** (moment où le
+  stock bouge réellement), la date du mouvement saisie s'applique à la
+  réception.
+
+## Avancement
+
+- [x] Migration SQL + `schema.sql` (SQL non testé en base, pas d'accès
+      direct depuis ce poste)
+- [x] API / types
+- [x] Fenêtre en tableau, notes affichées dans le panneau Lignes
+- [x] Retours de Jean Didier (02/10/2026) :
+      - la feuille de saisie est un **onglet** (`pages/NouvelleReception.tsx`,
+        `EcranId` `'nouvelle-reception'` rattaché au module
+        Réceptions/Expéditions) et non plus une fenêtre : la saisie est
+        conservée quand on change d'onglet ; à l'enregistrement, l'onglet se
+        ferme et la liste des Entrées (rechargée à chaque retour) s'affiche ;
+      - bouton **+ Créer** du fournisseur : fiche complète
+        (`components/fournisseurs/NouveauFournisseurModal.tsx` : nom,
+        personne à contacter, téléphone, e-mail, adresse, ville, pays),
+        colonnes ajoutées à `fournisseurs` dans la même migration ;
+      - Lot, N° série et Expiration saisissables pour **tous** les produits
+        (avant : seulement si la fiche produit les gérait).
+- [x] Corrections suite aux tests (02/10/2026) :
+      - les erreurs Supabase s'affichaient "Erreur inconnue" partout (ce ne
+        sont pas des `Error` JS) : helper `lib/erreurs.ts` `messageErreur`,
+        avec un message clair si la base n'a pas reçu la migration ;
+      - retour sur la fenêtre = application remise à zéro : `AuthContext`
+        rechargeait le profil (écran "Chargement...", démontage de
+        l'application) à chaque nouvel objet session renvoyé par Supabase.
+        Rechargement désormais limité à un vrai changement d'utilisateur.
+- [x] `tsc -b` + `vite build` OK (`oxlint` bloqué par Windows sur ce poste)
+- [ ] Migration exécutée par Jean Didier + vérification locale
 
 ## Format utilisé pour chaque plan
 

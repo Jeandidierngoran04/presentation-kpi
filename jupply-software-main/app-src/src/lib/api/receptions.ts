@@ -4,6 +4,10 @@ import type { Reception, ReceptionLigne } from '../../types/stock'
 export interface ReceptionAffichee extends Reception {
   entrepot_nom: string
   fournisseur_nom: string | null
+  /** Opérateur qui a enregistré la réception dans le système. */
+  cree_par_nom: string
+  /** Opérateur qui a validé la réception (null tant qu'elle n'est pas validée). */
+  valide_par_nom: string | null
 }
 
 interface LigneReceptionBrute {
@@ -13,16 +17,25 @@ interface LigneReceptionBrute {
 }
 
 export async function getReceptions(): Promise<ReceptionAffichee[]> {
-  const { data, error } = await supabase
-    .from('receptions')
-    .select('*, entrepots(nom), fournisseurs(nom)')
-    .order('cree_le', { ascending: false })
+  // receptions a deux liens vers profiles (cree_par, valide_par) : les noms
+  // sont résolus à part plutôt que par jointure imbriquée ambiguë.
+  const [{ data, error }, { data: profils, error: erreurProfils }] = await Promise.all([
+    supabase.from('receptions').select('*, entrepots(nom), fournisseurs(nom)').order('cree_le', { ascending: false }),
+    supabase.from('profiles').select('id, nom_complet'),
+  ])
   if (error) throw error
-  return ((data ?? []) as unknown as LigneReceptionBrute[]).map((r) => ({
-    ...(r as unknown as Reception),
-    entrepot_nom: r.entrepots?.nom ?? '',
-    fournisseur_nom: r.fournisseurs?.nom ?? null,
-  }))
+  if (erreurProfils) throw erreurProfils
+  const nomParProfil = new Map((profils ?? []).map((p) => [p.id as string, p.nom_complet as string]))
+  return ((data ?? []) as unknown as LigneReceptionBrute[]).map((r) => {
+    const reception = r as unknown as Reception
+    return {
+      ...reception,
+      entrepot_nom: r.entrepots?.nom ?? '',
+      fournisseur_nom: r.fournisseurs?.nom ?? null,
+      cree_par_nom: nomParProfil.get(reception.cree_par) ?? '—',
+      valide_par_nom: reception.valide_par ? (nomParProfil.get(reception.valide_par) ?? '—') : null,
+    }
+  })
 }
 
 export async function getLignesReception(receptionId: string): Promise<ReceptionLigne[]> {
@@ -51,6 +64,9 @@ export interface NouvelleReception {
   entrepotId: string
   fournisseurId: string | null
   numeroPo: string | null
+  notes: string | null
+  /** Date du mouvement (ISO), par défaut maintenant. */
+  dateMouvement: string | null
   lignes: NouvelleLigneReception[]
 }
 
@@ -70,6 +86,8 @@ export async function creerReception(donnees: NouvelleReception): Promise<string
       prix_unitaire: l.prixUnitaire,
       anomalie: l.anomalie,
     })),
+    p_notes: donnees.notes,
+    p_date_mouvement: donnees.dateMouvement,
   })
   if (error) throw error
   return data as string

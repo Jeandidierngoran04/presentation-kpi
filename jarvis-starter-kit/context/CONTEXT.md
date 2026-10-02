@@ -53,9 +53,10 @@ Professionnel de la logistique qui développe des compétences en supply chain p
 
 Liste des projets ou chantiers actifs sur lesquels je veux que Claude m'aide :
 
-- Application web de gestion des stocks, approvisionnements et suivi des commandes
+- **Jupply** : application web de gestion des stocks, approvisionnements et suivi des commandes (dossier `jupply-software-main/`)
   - Stratégie : construction en phases (MVP) plutôt que tout d'un coup
-  - **Phase 1 (en cours de cadrage) :** modules Ventes (Commercial) + Magasins/Stocks + Approvisionnement (Achats), en SaaS multi-entreprises (données séparées par entreprise, logo/nom personnalisables)
+  - **Phase 1 (en construction depuis le 26/08/2026) :** modules Ventes (Commercial) + Magasins/Stocks + Approvisionnement (Achats), en SaaS multi-entreprises (données séparées par entreprise, logo/nom personnalisables)
+  - Avancement au 01/10/2026 : module Magasins/Stocks en cours (Entrepôts, Produits, Réceptions, Sorties, Réintégrations terminés ; Transferts et refonte visuelle en attente de vérification locale). État détaillé dans `jupply-software-main/HISTORY.md` et `PLAN.md`
   - **Phase 2+ (roadmap) :** Production, Comptabilité, Transport, chat interne, IA (assistant, prévisions, détection d'anomalies), dashboards avancés liés aux modules futurs
   - Inspiration produit : Odoo, Microsoft Dynamics, SAP ; logiciel métier AIRSTOCK vu en référence pour la gestion des dépôts/emplacements
 - Application web d'optimisation et de gestion du transport
@@ -85,4 +86,7 @@ Développement de ses applications web (n'étant pas développeur lui-même, Cla
 
 > Cette section se remplira au fil du temps avec les éléments de contexte qui émergent naturellement dans mes sessions avec Claude.
 
-[VIDE INITIALEMENT - SE REMPLIRA AU FIL DU TEMPS]
+- Le produit s'appelle Jupply. L'application réelle est dans `jupply-software-main/app-src/` (React, Vite, TypeScript, Tailwind, Supabase).
+- Méthode de travail sur Jupply : chaque chantier passe par un plan écrit dans `PLAN.md`, validé par Jean Didier avant exécution, puis vérifié en local avant archivage.
+- La charte graphique (`jupply-software-main/docs/charte-graphique/CHARTE_GRAPHIQUE.md`) est la référence visuelle unique : identité "Clean SaaS Sage", Light + Dark Mode, Plus Jakarta Sans.
+- AIRSTOCK reste la référence d'ergonomie pour les écrans de stock (tableaux denses, filtrage par colonne, onglets).

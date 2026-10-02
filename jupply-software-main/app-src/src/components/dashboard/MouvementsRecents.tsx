@@ -1,5 +1,6 @@
 import { ArrowDownToLine, ArrowUpFromLine, ArrowLeftRight, SlidersHorizontal, ClipboardCheck, Move, RotateCcw } from 'lucide-react'
 import type { MouvementAffiche, TypeMouvement } from '../../types/stock'
+import { useTabs } from '../../context/TabsContext'
 import { SectionCard } from './SectionCard'
 
 function formatDate(iso: string) {
@@ -23,8 +24,12 @@ const STYLES_TYPE: Record<TypeMouvement, { label: string; icone: typeof ArrowDow
 }
 
 export function MouvementsRecents({ mouvements }: { mouvements: MouvementAffiche[] }) {
+  const { ouvrirOnglet } = useTabs()
   return (
-    <SectionCard titre="Mouvements récents" lienTout={{ label: 'Voir tous les mouvements', to: '/stocks/mouvements' }}>
+    <SectionCard
+      titre="Mouvements récents"
+      lienTout={{ label: 'Voir tous les mouvements', onClick: () => ouvrirOnglet('mouvements', 'Mouvements') }}
+    >
       {mouvements.length === 0 ? (
         <p className="text-sm text-text-muted py-4 text-center">Aucun mouvement enregistré pour le moment.</p>
       ) : (

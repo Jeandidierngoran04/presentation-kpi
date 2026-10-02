@@ -3,7 +3,7 @@ import { Badge, type TonBadge } from '../ui/Badge'
 
 const STYLES: Record<StatutStock, { label: string; ton: TonBadge }> = {
   normal: { label: 'Normal', ton: 'succes' },
-  faible: { label: 'Stock faible', ton: 'alerte' },
+  faible: { label: 'En alerte', ton: 'alerte' },
   rupture: { label: 'Rupture', ton: 'danger' },
 }
 

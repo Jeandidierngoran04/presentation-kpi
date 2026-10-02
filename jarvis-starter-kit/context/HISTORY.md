@@ -7,6 +7,17 @@
 
 ---
 
+## 2026-10-01
+
+### Remise à niveau du contexte (rattrapage depuis le 13/08)
+- L'application de gestion des stocks porte désormais le nom **Jupply** et vit dans `jupply-software-main/` (application réelle dans `app-src/` : React, Vite, TypeScript, Tailwind, Supabase)
+- La Phase 1 est sortie du cadrage : elle est en construction depuis le 26/08/2026 (refonte du schéma de base selon le cahier des charges)
+- Écrans terminés : Entrepôts, Produits, Entrées de stock (Réceptions), Sorties de stock, Réintégrations, coquille applicative
+- En attente de vérification locale par Jean Didier : Transferts entre entrepôts, et refonte visuelle complète selon la charte graphique (Light + Dark)
+- Charte graphique formalisée le 05/09/2026 (`docs/charte-graphique/CHARTE_GRAPHIQUE.md`), référence visuelle unique du produit
+- Le suivi détaillé de Jupply se fait dans `jupply-software-main/HISTORY.md` et `PLAN.md`, ce journal ne garde que les jalons
+- CONTEXT.md et CLAUDE.md mis à jour en conséquence (statut de la Phase 1, nom du produit, nom de la skill de veille)
+
 ## 2026-08-13
 
 ### Cadrage fonctionnel Phase 1 de l'application de gestion des stocks

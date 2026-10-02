@@ -109,6 +109,11 @@ create table fournisseurs (
   entreprise_id uuid not null references entreprises(id) on delete cascade,
   nom text not null,
   contact text,
+  telephone text,
+  email text,
+  adresse text,
+  ville text,
+  pays text,
   cree_le timestamptz not null default now()
 );
 
@@ -214,6 +219,7 @@ create table receptions (
   cree_par uuid not null references profiles(id),
   valide_par uuid references profiles(id),
   valide_le timestamptz,
+  notes text,
   cree_le timestamptz not null default now(),
   unique (entreprise_id, numero)
 );
@@ -947,11 +953,15 @@ grant execute on function deplacer_stock to authenticated;
 -- 'en_attente'. p_lignes : tableau JSON, un objet par ligne avec les cles
 -- produit_id, emplacement_id, quantite_attendue, quantite_recue, lot,
 -- numero_serie, date_expiration, prix_unitaire, anomalie.
+-- p_date_mouvement (optionnel) fixe la date de la reception et l'annee de
+-- son numero, comme pour les reintegrations.
 create function creer_reception(
   p_entrepot_id uuid,
   p_fournisseur_id uuid,
   p_numero_po text,
-  p_lignes jsonb
+  p_lignes jsonb,
+  p_notes text default null,
+  p_date_mouvement timestamptz default null
 )
 returns uuid
 language plpgsql
@@ -961,6 +971,7 @@ declare
   v_entreprise_id uuid;
   v_reception_id uuid;
   v_numero text;
+  v_date timestamptz;
   v_ligne jsonb;
 begin
   select entreprise_id into v_entreprise_id from entrepots where id = p_entrepot_id;
@@ -971,10 +982,14 @@ begin
     raise exception 'Une reception doit contenir au moins une ligne.';
   end if;
 
-  v_numero := 'REC-' || to_char(now(), 'YYYY') || '-' || lpad(nextval('receptions_numero_seq')::text, 5, '0');
+  v_date := coalesce(p_date_mouvement, now());
+  v_numero := 'REC-' || to_char(v_date, 'YYYY') || '-' || lpad(nextval('receptions_numero_seq')::text, 5, '0');
 
-  insert into receptions (entreprise_id, numero, entrepot_id, fournisseur_id, numero_po, statut, cree_par)
-  values (v_entreprise_id, v_numero, p_entrepot_id, p_fournisseur_id, nullif(p_numero_po, ''), 'en_attente', auth.uid())
+  insert into receptions (entreprise_id, numero, entrepot_id, fournisseur_id, numero_po, statut, cree_par, notes, cree_le)
+  values (
+    v_entreprise_id, v_numero, p_entrepot_id, p_fournisseur_id, nullif(p_numero_po, ''), 'en_attente', auth.uid(),
+    nullif(p_notes, ''), v_date
+  )
   returning id into v_reception_id;
 
   for v_ligne in select * from jsonb_array_elements(p_lignes)
@@ -1602,6 +1617,9 @@ grant execute on function receptionner_transfert to authenticated;
 -- l'utilisateur qui interroge, pas celles du createur de la vue.
 -- Le stock place en Quarantaine est exclu du stock disponible (cahier des
 -- charges, section 5).
+-- Stock d'alerte = seuil de reapprovisionnement (point de commande) ; a
+-- defaut de seuil renseigne sur le produit, on retombe sur le stock minimum.
+-- Le statut 'faible' signifie donc "en alerte" (stock <= stock d'alerte).
 
 create view v_produits_stock with (security_invoker = true) as
 select
@@ -1610,7 +1628,8 @@ select
   coalesce(sum(case when e.est_quarantaine then 0 else s.quantite end), 0)::int as stock_actuel,
   case
     when coalesce(sum(case when e.est_quarantaine then 0 else s.quantite end), 0) = 0 then 'rupture'
-    when coalesce(sum(case when e.est_quarantaine then 0 else s.quantite end), 0) <= p.stock_min then 'faible'
+    when coalesce(sum(case when e.est_quarantaine then 0 else s.quantite end), 0)
+      <= coalesce(p.seuil_reappro, p.stock_min) then 'faible'
     else 'normal'
   end as statut
 from produits p
@@ -1636,7 +1655,8 @@ select
   coalesce(sum(case when e.est_quarantaine then 0 else s.quantite end), 0)::int as quantite_totale,
   count(distinct case when not e.est_quarantaine and s.quantite = 0 then s.produit_id end)::int as nb_rupture,
   count(distinct case
-    when not e.est_quarantaine and s.quantite > 0 and s.quantite <= p.stock_min then s.produit_id
+    when not e.est_quarantaine and s.quantite > 0 and s.quantite <= coalesce(p.seuil_reappro, p.stock_min)
+      then s.produit_id
   end)::int as nb_stock_faible
 from entrepots ent
 left join stock_produits s on s.entrepot_id = ent.id

@@ -12,6 +12,7 @@ export type EcranId =
   | 'mouvements'
   | 'inventaires'
   | 'alertes'
+  | 'nouvelle-reception'
 
 export interface Onglet {
   id: EcranId

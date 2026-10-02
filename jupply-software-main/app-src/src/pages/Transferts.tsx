@@ -7,6 +7,7 @@ import {
   peutReceptionnerTransfert,
   peutValiderTransfert,
 } from '../lib/permissions'
+import { messageErreur } from '../lib/erreurs'
 import { texteFiltre } from '../lib/filtreTexte'
 import { getEmplacements, getEntrepots } from '../lib/api/entrepots'
 import { getProduitsAvecStock } from '../lib/api/stock'
@@ -98,7 +99,7 @@ export function Transferts() {
       await validerTransfert(selection.id)
       apresAction()
     } catch (e) {
-      setErreur(e instanceof Error ? e.message : 'Erreur inconnue.')
+      setErreur(messageErreur(e))
     } finally {
       setEnvoiValidation(false)
     }
@@ -346,7 +347,7 @@ function NouveauTransfertModal({ produits, onFermer, onCree }: NouveauTransfertM
       await demanderTransfert(entrepotSourceId, entrepotDestinationId, lignes)
       onCree()
     } catch (err) {
-      setErreur(err instanceof Error ? err.message : 'Erreur inconnue.')
+      setErreur(messageErreur(err))
       setEnvoi(false)
     }
   }
@@ -532,7 +533,7 @@ function ExpedierTransfertModal({ transfert, lignes, onFermer, onExpedie }: Expe
       )
       onExpedie()
     } catch (err) {
-      setErreur(err instanceof Error ? err.message : 'Erreur inconnue.')
+      setErreur(messageErreur(err))
       setEnvoi(false)
     }
   }
@@ -650,7 +651,7 @@ function ReceptionnerTransfertModal({ transfert, lignes, onFermer, onReceptionne
       )
       onReceptionne()
     } catch (err) {
-      setErreur(err instanceof Error ? err.message : 'Erreur inconnue.')
+      setErreur(messageErreur(err))
       setEnvoi(false)
     }
   }

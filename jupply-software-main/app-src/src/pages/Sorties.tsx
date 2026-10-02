@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Search } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useSelection } from '../context/SelectionContext'
+import { messageErreur } from '../lib/erreurs'
 import { peutSaisirSortie } from '../lib/permissions'
 import { texteFiltre } from '../lib/filtreTexte'
 import { dateVersInput, dateSaisieVersISO } from '../lib/dates'
@@ -158,7 +159,7 @@ export function Sorties() {
       setDateMouvement(dateVersInput(new Date()))
       chargerDonnees()
     } catch (err) {
-      setErreur(err instanceof Error ? err.message : 'Erreur inconnue.')
+      setErreur(messageErreur(err))
     } finally {
       setEnvoi(false)
     }

@@ -11,6 +11,7 @@ import {
 import { useAuth } from '../context/AuthContext'
 import { useTabs } from '../context/TabsContext'
 import { useSelection } from '../context/SelectionContext'
+import { messageErreur } from '../lib/erreurs'
 import { peutGererCatalogue, peutSupprimerProduit } from '../lib/permissions'
 import { texteFiltre } from '../lib/filtreTexte'
 import { getProduitsAvecStock } from '../lib/api/stock'
@@ -59,7 +60,7 @@ const LABEL_TYPE: Record<TypeProduit, string> = {
 }
 const LABEL_STATUT: Record<StatutStock, string> = {
   normal: 'Normal',
-  faible: 'Stock faible',
+  faible: 'En alerte',
   rupture: 'Rupture',
 }
 
@@ -173,7 +174,7 @@ function IndicateurFiltre({
 export function Produits() {
   const { profil } = useAuth()
   const { ongletActifId } = useTabs()
-  const { definirProduitSelectionne } = useSelection()
+  const { definirProduitSelectionne, demandeAffichageProduit } = useSelection()
   const [produits, setProduits] = useState<ProduitAvecStock[]>([])
   const [categories, setCategories] = useState<Categorie[]>([])
   const [fournisseurs, setFournisseurs] = useState<Fournisseur[]>([])
@@ -228,6 +229,25 @@ export function Produits() {
     getFournisseursProduit(selectionId).then(setFournisseursProduit)
     getEquivalents(selectionId).then(setEquivalents)
   }, [selectionId])
+
+  // Reagit a "Voir dans Produits" (ecran Alertes stock) : retire les filtres
+  // pour que le produit soit visible, le selectionne et l'amene a l'ecran.
+  useEffect(() => {
+    if (!demandeAffichageProduit) return
+    const { produitId } = demandeAffichageProduit
+    setFiltres(FILTRES_VIDES)
+    setColonneActive(null)
+    setSelectionId(produitId)
+    definirProduitSelectionne(produitId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [demandeAffichageProduit])
+
+  useEffect(() => {
+    if (!demandeAffichageProduit || chargement) return
+    document
+      .querySelector(`[data-produit-id="${demandeAffichageProduit.produitId}"]`)
+      ?.scrollIntoView({ block: 'center' })
+  }, [demandeAffichageProduit, chargement])
 
   // Filtre "à la AIRSTOCK" : cliquer une cellule active sa colonne, puis
   // taper au clavier (sans avoir besoin de cliquer dans une case de saisie)
@@ -345,14 +365,6 @@ export function Produits() {
 
   return (
     <div className="h-full flex flex-col gap-2 p-4" onContextMenu={onClicDroitTableau}>
-      <div className="shrink-0 flex items-baseline justify-between gap-3">
-        <h1 className="text-lg font-bold text-text">Produits</h1>
-        <p className="text-xs text-text-muted">
-          Clic droit = ajouter/agir · double-clic = fiche référence · clique une colonne puis tape pour filtrer (
-          <code className="text-text-muted">*</code> = "contient")
-        </p>
-      </div>
-
       {chargement ? (
         <div className="text-sm text-text-muted py-12 text-center">Chargement...</div>
       ) : (
@@ -392,6 +404,7 @@ export function Produits() {
                   return (
                     <tr
                       key={p.id}
+                      data-produit-id={p.id}
                       onClick={() => {
                         setSelectionId(p.id)
                         definirProduitSelectionne(p.id)
@@ -545,7 +558,7 @@ export function Produits() {
               <p className="text-xs text-text-muted py-2 text-center">Aucun mouvement pour ce produit.</p>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-xs min-w-[480px]">
+                <table className="w-full text-xs min-w-[600px]">
                   <thead>
                     <tr className="text-left text-[10px] text-text-muted uppercase tracking-wide">
                       <th className="font-medium pb-1">Sens</th>
@@ -554,6 +567,7 @@ export function Produits() {
                       <th className="font-medium pb-1">Prix</th>
                       <th className="font-medium pb-1">SN/Lot</th>
                       <th className="font-medium pb-1">Prov./Dest.</th>
+                      <th className="font-medium pb-1">Enregistré par</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -576,6 +590,10 @@ export function Produits() {
                           </td>
                           <td className="py-1 text-text-muted font-mono text-[11px]">{m.numero_serie ?? m.lot ?? '—'}</td>
                           <td className="py-1 text-text-muted">{m.motif ?? '—'}</td>
+                          <td className="py-1 text-text-muted whitespace-nowrap">
+                            {new Date(m.cree_le).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} ·{' '}
+                            <span className="text-text">{m.utilisateur_nom}</span>
+                          </td>
                         </tr>
                       )
                     })}
@@ -756,7 +774,7 @@ function NouveauProduitModal({
       })
       onCree()
     } catch (err) {
-      setErreur(err instanceof Error ? err.message : 'Erreur inconnue.')
+      setErreur(messageErreur(err))
       setEnvoi(false)
     }
   }
@@ -830,7 +848,9 @@ function NouveauProduitModal({
             <input name="stock_max" type="number" min="0" className={CLASSE_INPUT} />
           </label>
           <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-text-muted">Seuil réappro</span>
+            <span className="text-xs font-medium text-text-muted" title="Seuil de réapprovisionnement (point de commande)">
+              Stock d'alerte
+            </span>
             <input name="seuil_reappro" type="number" min="0" className={CLASSE_INPUT} />
           </label>
         </div>
@@ -929,7 +949,7 @@ function FicheProduitModal({
             <dd className="text-text">{produit.prix_moyen_pondere.toLocaleString('fr-FR')} XOF</dd>
             <dt className="text-text-muted">Seuils</dt>
             <dd className="text-text">
-              min {produit.stock_min} · max {produit.stock_max ?? '—'} · réappro {produit.seuil_reappro ?? '—'}
+              min {produit.stock_min} · max {produit.stock_max ?? '—'} · alerte {produit.seuil_reappro ?? '—'}
             </dd>
           </dl>
         </div>
@@ -1038,7 +1058,7 @@ function AffecterLocalisationModal({ produit, onFermer, onAffecte }: AffecterLoc
       })
       onAffecte()
     } catch (err) {
-      setErreur(err instanceof Error ? err.message : 'Erreur inconnue.')
+      setErreur(messageErreur(err))
       setEnvoi(false)
     }
   }
@@ -1143,7 +1163,7 @@ function ModifierLocalisationModal({ produit, localisations, onFermer, onDeplace
       })
       onDeplace()
     } catch (err) {
-      setErreur(err instanceof Error ? err.message : 'Erreur inconnue.')
+      setErreur(messageErreur(err))
       setEnvoi(false)
     }
   }

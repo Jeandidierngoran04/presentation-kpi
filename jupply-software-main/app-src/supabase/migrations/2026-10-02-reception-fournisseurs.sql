@@ -1,0 +1,90 @@
+-- Migration du 02/10/2026 : notes et date du mouvement sur les receptions,
+-- coordonnees completes des fournisseurs.
+-- Peut etre re-executee sans risque (deja executee ou non).
+--
+-- A executer dans l'editeur SQL de Supabase (ou via
+-- scripts/run-sql.mjs). Ne modifie aucune donnee existante. schema.sql
+-- contient deja la nouvelle definition.
+
+begin;
+
+alter table receptions add column if not exists notes text;
+
+alter table fournisseurs
+  add column if not exists telephone text,
+  add column if not exists email text,
+  add column if not exists adresse text,
+  add column if not exists ville text,
+  add column if not exists pays text;
+
+-- L'ancienne version (4 parametres) est remplacee, pour qu'il n'existe
+-- qu'une seule fonction creer_reception.
+drop function if exists creer_reception(uuid, uuid, text, jsonb);
+
+create or replace function creer_reception(
+  p_entrepot_id uuid,
+  p_fournisseur_id uuid,
+  p_numero_po text,
+  p_lignes jsonb,
+  p_notes text default null,
+  p_date_mouvement timestamptz default null
+)
+returns uuid
+language plpgsql
+security invoker
+as $$
+declare
+  v_entreprise_id uuid;
+  v_reception_id uuid;
+  v_numero text;
+  v_date timestamptz;
+  v_ligne jsonb;
+begin
+  select entreprise_id into v_entreprise_id from entrepots where id = p_entrepot_id;
+  if v_entreprise_id is null then
+    raise exception 'Entrepot introuvable.';
+  end if;
+  if jsonb_array_length(p_lignes) = 0 then
+    raise exception 'Une reception doit contenir au moins une ligne.';
+  end if;
+
+  v_date := coalesce(p_date_mouvement, now());
+  v_numero := 'REC-' || to_char(v_date, 'YYYY') || '-' || lpad(nextval('receptions_numero_seq')::text, 5, '0');
+
+  insert into receptions (entreprise_id, numero, entrepot_id, fournisseur_id, numero_po, statut, cree_par, notes, cree_le)
+  values (
+    v_entreprise_id, v_numero, p_entrepot_id, p_fournisseur_id, nullif(p_numero_po, ''), 'en_attente', auth.uid(),
+    nullif(p_notes, ''), v_date
+  )
+  returning id into v_reception_id;
+
+  for v_ligne in select * from jsonb_array_elements(p_lignes)
+  loop
+    insert into receptions_lignes (
+      reception_id, produit_id, emplacement_id, quantite_attendue, quantite_recue,
+      lot, numero_serie, date_expiration, prix_unitaire, anomalie
+    )
+    values (
+      v_reception_id,
+      (v_ligne->>'produit_id')::uuid,
+      (v_ligne->>'emplacement_id')::uuid,
+      coalesce((v_ligne->>'quantite_attendue')::integer, 0),
+      coalesce((v_ligne->>'quantite_recue')::integer, 0),
+      nullif(v_ligne->>'lot', ''),
+      nullif(v_ligne->>'numero_serie', ''),
+      nullif(v_ligne->>'date_expiration', '')::date,
+      coalesce((v_ligne->>'prix_unitaire')::numeric, 0),
+      coalesce((v_ligne->>'anomalie')::boolean, false)
+    );
+  end loop;
+
+  return v_reception_id;
+end;
+$$;
+
+grant execute on function creer_reception to authenticated;
+
+-- Recharge le cache de l'API Supabase pour qu'elle voie la nouvelle signature.
+notify pgrst, 'reload schema';
+
+commit;

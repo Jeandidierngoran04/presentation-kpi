@@ -11,6 +11,8 @@ import { Receptions } from '../../pages/Receptions'
 import { Sorties } from '../../pages/Sorties'
 import { Reintegration } from '../../pages/Reintegration'
 import { Transferts } from '../../pages/Transferts'
+import { AlertesStock } from '../../pages/AlertesStock'
+import { NouvelleReception } from '../../pages/NouvelleReception'
 import { ComingSoon } from '../../pages/ComingSoon'
 
 const COMPOSANTS = {
@@ -23,7 +25,8 @@ const COMPOSANTS = {
   transferts: Transferts,
   mouvements: () => <ComingSoon titre="Mouvements de stock" />,
   inventaires: () => <ComingSoon titre="Inventaires" />,
-  alertes: () => <ComingSoon titre="Alertes stock" />,
+  alertes: AlertesStock,
+  'nouvelle-reception': NouvelleReception,
 } satisfies Record<EcranId, () => ReactElement>
 
 function ZoneContenu() {
