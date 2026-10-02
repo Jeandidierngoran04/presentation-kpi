@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { MapPin, Plus, ShieldAlert, Warehouse } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
+import { useTabs } from '../context/TabsContext'
 import { peutGererEmplacements, peutGererEntrepots } from '../lib/permissions'
 import {
   creerEmplacement,
@@ -18,6 +19,7 @@ const CLASSE_BOUTON_PRIMAIRE =
 
 export function Entrepots() {
   const { profil, entrepotsAssignes } = useAuth()
+  const { ongletActifId } = useTabs()
   const [entrepots, setEntrepots] = useState<EntrepotAvecStats[]>([])
   const [chargement, setChargement] = useState(true)
   const [erreur, setErreur] = useState<string | null>(null)
@@ -27,14 +29,16 @@ export function Entrepots() {
   const [modalEmplacementOuvert, setModalEmplacementOuvert] = useState(false)
 
   function chargerEntrepots() {
-    setChargement(true)
     getEntrepots()
       .then(setEntrepots)
       .catch((e) => setErreur(e.message ?? 'Erreur inconnue.'))
       .finally(() => setChargement(false))
   }
 
-  useEffect(chargerEntrepots, [])
+  // Rechargé à chaque retour sur l'onglet (quantités par entrepôt à jour).
+  useEffect(() => {
+    if (ongletActifId === 'entrepots') chargerEntrepots()
+  }, [ongletActifId])
 
   useEffect(() => {
     if (!entrepotSelectionne) return

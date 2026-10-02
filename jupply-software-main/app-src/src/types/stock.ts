@@ -266,3 +266,18 @@ export interface TransfertLigneAffichee extends TransfertLigne {
   produit_designation: string
 }
 
+
+/** Ce qu'il reste d'un lot à un emplacement (hors Quarantaine), tel qu'affiché dans la feuille de sortie. */
+export interface StockLot {
+  /** Identifiant du lot en base ; null tant que le suivi par lot n'est pas installé (repli sur le stock par emplacement). */
+  id: string | null
+  produit_id: string
+  entrepot_id: string
+  emplacement_id: string
+  emplacement_code: string
+  lot: string | null
+  numero_serie: string | null
+  date_expiration: string | null
+  date_entree: string | null
+  quantite: number
+}

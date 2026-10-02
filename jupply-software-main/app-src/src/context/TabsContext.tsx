@@ -13,6 +13,11 @@ export type EcranId =
   | 'inventaires'
   | 'alertes'
   | 'nouvelle-reception'
+  | 'nouvelle-sortie'
+  | 'historique-sorties'
+  | 'historique-entrees'
+  | 'historique-reintegrations'
+  | 'historique-transferts'
 
 export interface Onglet {
   id: EcranId

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Search } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
+import { useTabs } from '../context/TabsContext'
 import { messageErreur } from '../lib/erreurs'
 import { peutReintegrer } from '../lib/permissions'
 import { texteFiltre } from '../lib/filtreTexte'
@@ -34,6 +35,7 @@ interface LignePanierReintegration {
 
 export function Reintegration() {
   const { profil, entrepotsAssignes } = useAuth()
+  const { ongletActifId } = useTabs()
 
   const [entrepots, setEntrepots] = useState<Entrepot[]>([])
   const [entrepotId, setEntrepotId] = useState('')
@@ -74,6 +76,12 @@ export function Reintegration() {
       dateFin: dateFin ? `${dateFin}T23:59:59` : null,
     }).then(setSortiesAReintegrer)
   }
+
+  // Rechargé à chaque retour sur l'onglet (sans toucher au panier en cours).
+  useEffect(() => {
+    if (ongletActifId === 'reintegration') chargerSorties()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ongletActifId])
 
   useEffect(() => {
     chargerSorties()

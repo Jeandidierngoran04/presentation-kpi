@@ -200,7 +200,6 @@ export function Produits() {
   const { ouvrir: ouvrirMenu, menu } = useMenuContextuel()
 
   function chargerListe() {
-    setChargement(true)
     Promise.all([
       getProduitsAvecStock(),
       getCategories(),
@@ -221,7 +220,14 @@ export function Produits() {
       .finally(() => setChargement(false))
   }
 
-  useEffect(chargerListe, [])
+  // Les onglets restent montés en arrière-plan : on recharge à chaque retour
+  // sur celui-ci, pour refléter les entrées/sorties faites dans un autre onglet.
+  useEffect(() => {
+    if (ongletActifId !== 'produits') return
+    chargerListe()
+    if (selectionId) getMouvementsProduit(selectionId).then(setMouvements)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ongletActifId])
 
   useEffect(() => {
     if (!selectionId) return

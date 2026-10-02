@@ -53,6 +53,32 @@
   (heure + opérateur) dans Produits et Entrées de stock, bandeaux d'aide
   retirés.
 
+- **[2026-10-02] Refonte de l'écran Sorties Manuelles.** En-tête sur une
+  ligne, recherche par référence ou désignation, panier sur toute la
+  hauteur, message d'erreur sur une référence en rupture. Code complet, en
+  attente de vérification locale.
+
+- **[2026-10-02] Suivi par lot FEFO / FIFO.** Premier périmé, premier
+  sorti (sinon premier entré, premier sorti). Stock par lot (`stock_lots`)
+  tenu à jour automatiquement, feuille de sortie avec quantité par lot,
+  note obligatoire pour un lot périmé, lot obligatoire avec une date
+  d'expiration, bons numérotés `BS-`. Code complet, migration
+  `app-src/supabase/migrations/2026-10-02-stock-lots-fefo.sql` testée sur
+  une base de test, en attente d'exécution dans Supabase et de la
+  vérification locale. Limite connue : le lot n'est pas conservé à travers
+  un transfert.
+
+- **[2026-10-03] Parcours de sortie, bon de sortie PDF et module
+  Historique.** "Sorties Manuelles" ouvre la liste du jour ; la saisie se
+  fait dans l'onglet "Nouvelle sortie" ; à la validation, bulle "Sortie
+  effectuée" et fenêtre d'impression du bon (PDF au modèle AIRSTOCK, trié
+  par localisation, sans prix). Champs Reçu par / Motif séparés. Nouveau
+  module Historique (Sorties, Entrées, Réintégrations, Transferts, Tous les
+  mouvements) : filtre par dates, clic droit sur le numéro, détail au
+  double-clic, exports PDF / Excel / CSV. Code complet, en attente de la
+  migration `app-src/supabase/migrations/2026-10-03-historique-recu-par.sql`
+  et de la vérification locale.
+
 ## Terminé
 
 - **[2026-08-30 → 2026-08-31] Sorties de stock et Réintégrations.** Voir

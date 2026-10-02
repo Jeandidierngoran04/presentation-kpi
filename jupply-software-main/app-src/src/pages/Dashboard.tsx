@@ -10,6 +10,7 @@ import {
   type KpisStock,
 } from '../lib/api/stock'
 import type { ProduitAvecStock, MouvementAffiche, StockParEntrepot as StockParEntrepotType } from '../types/stock'
+import { useTabs } from '../context/TabsContext'
 import { KpiCard } from '../components/dashboard/KpiCard'
 import { AlertesStock } from '../components/dashboard/AlertesStock'
 import { MouvementsRecents } from '../components/dashboard/MouvementsRecents'
@@ -25,10 +26,15 @@ interface DonneesDashboard {
 }
 
 export function Dashboard() {
+  const { ongletActifId } = useTabs()
   const [donnees, setDonnees] = useState<DonneesDashboard | null>(null)
   const [erreur, setErreur] = useState<string | null>(null)
+  const estActif = ongletActifId === 'dashboard'
 
+  // Rechargé à chaque retour sur l'onglet : les indicateurs suivent les
+  // opérations faites dans les autres onglets.
   useEffect(() => {
+    if (!estActif) return
     let annule = false
     Promise.all([getProduitsAvecStock(), getMouvementsRecents(8), getStockParEntrepot(), getMouvementsAujourdhui()])
       .then(([produits, mouvements, entrepots, mouvementsAujourdhui]) => {
@@ -41,7 +47,7 @@ export function Dashboard() {
     return () => {
       annule = true
     }
-  }, [])
+  }, [estActif])
 
   if (erreur) {
     return (

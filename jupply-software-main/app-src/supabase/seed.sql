@@ -165,7 +165,7 @@ begin
     v_stock_apres := rec.qte_principal;
     v_utilisateur_id := v_utilisateur_ids[1 + ((v_compteur + 1) % v_nb_utilisateurs)];
     insert into mouvements_stock (entreprise_id, produit_id, entrepot_id, emplacement_id, type, quantite, stock_avant, stock_apres, utilisateur_id, reference, motif, prix_unitaire, cree_le)
-    values (v_entreprise_id, v_produit_id, v_entrepot_principal, v_emplacement_a, 'sortie', v_qte, v_stock_avant, v_stock_apres, v_utilisateur_id, 'SOR-' || lpad(v_compteur::text, 5, '0'), 'Livraison client', rec.prix, now() - ((1 + v_compteur % 20) || ' days')::interval);
+    values (v_entreprise_id, v_produit_id, v_entrepot_principal, v_emplacement_a, 'sortie', v_qte, v_stock_avant, v_stock_apres, v_utilisateur_id, 'BS-' || lpad(v_compteur::text, 5, '0'), 'Livraison client', rec.prix, now() - ((1 + v_compteur % 20) || ' days')::interval);
 
     insert into stock_produits (produit_id, entrepot_id, emplacement_id, quantite)
     values (v_produit_id, v_entrepot_principal, v_emplacement_a, rec.qte_principal);
@@ -188,7 +188,7 @@ begin
     elsif v_compteur % 4 = 1 and rec.qte_principal >= 3 then
       v_utilisateur_id := v_utilisateur_ids[1 + ((v_compteur + 3) % v_nb_utilisateurs)];
       insert into mouvements_stock (entreprise_id, produit_id, entrepot_id, emplacement_id, type, quantite, stock_avant, stock_apres, utilisateur_id, reference, motif, prix_unitaire, cree_le)
-      values (v_entreprise_id, v_produit_id, v_entrepot_principal, v_emplacement_a, 'sortie', 3, rec.qte_principal, rec.qte_principal - 3, v_utilisateur_id, 'SOR-' || lpad((2000 + v_compteur)::text, 5, '0'), 'Commande client', rec.prix, now() - interval '1 hour');
+      values (v_entreprise_id, v_produit_id, v_entrepot_principal, v_emplacement_a, 'sortie', 3, rec.qte_principal, rec.qte_principal - 3, v_utilisateur_id, 'BS-' || lpad((2000 + v_compteur)::text, 5, '0'), 'Commande client', rec.prix, now() - interval '1 hour');
       update stock_produits set quantite = quantite - 3 where produit_id = v_produit_id and entrepot_id = v_entrepot_principal and emplacement_id = v_emplacement_a;
     end if;
 
@@ -233,7 +233,7 @@ begin
 
   -- Bon de sortie de démonstration
   insert into bons_sortie (entreprise_id, numero, entrepot_id, demande_par, statut, motif, cree_le)
-  values (v_entreprise_id, 'SOR-2026-001', v_entrepot_principal, v_utilisateur_ids[1], 'confirmee', 'Livraison client Abidjan', now() - interval '2 days')
+  values (v_entreprise_id, 'BS-2026-001', v_entrepot_principal, v_utilisateur_ids[1], 'confirmee', 'Livraison client Abidjan', now() - interval '2 days')
   returning id into v_bon_sortie_id;
 
   select id into v_produit_tmp from produits where entreprise_id = v_entreprise_id and reference = 'ART-0008';

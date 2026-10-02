@@ -39,6 +39,8 @@ declare
   v_numero text;
   v_date timestamptz;
   v_ligne jsonb;
+  v_gere_expiration boolean;
+  v_reference text;
 begin
   select entreprise_id into v_entreprise_id from entrepots where id = p_entrepot_id;
   if v_entreprise_id is null then
@@ -60,6 +62,17 @@ begin
 
   for v_ligne in select * from jsonb_array_elements(p_lignes)
   loop
+    select gere_expiration, reference into v_gere_expiration, v_reference
+      from produits where id = (v_ligne->>'produit_id')::uuid;
+
+    if coalesce(v_gere_expiration, false) and nullif(v_ligne->>'date_expiration', '') is null then
+      raise exception 'Produit % : la date d''expiration est obligatoire.', v_reference;
+    end if;
+    if nullif(v_ligne->>'date_expiration', '') is not null
+       and nullif(v_ligne->>'lot', '') is null and nullif(v_ligne->>'numero_serie', '') is null then
+      raise exception 'Produit % : le numero de lot (ou de serie) est obligatoire avec une date d''expiration.', v_reference;
+    end if;
+
     insert into receptions_lignes (
       reception_id, produit_id, emplacement_id, quantite_attendue, quantite_recue,
       lot, numero_serie, date_expiration, prix_unitaire, anomalie

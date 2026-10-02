@@ -182,6 +182,42 @@ create table stock_produits (
   unique (produit_id, entrepot_id, emplacement_id)
 );
 
+-- Stock restant par lot. La somme des lots d'un (produit, entrepot,
+-- emplacement) est toujours egale a stock_produits.quantite.
+create table stock_lots (
+  id uuid primary key default gen_random_uuid(),
+  produit_id uuid not null references produits(id) on delete cascade,
+  entrepot_id uuid not null references entrepots(id) on delete cascade,
+  emplacement_id uuid not null references emplacements(id) on delete cascade,
+  lot text,
+  numero_serie text,
+  date_expiration date,
+  -- Date d'entree en stock : sert au FIFO.
+  date_entree timestamptz not null default now(),
+  prix_unitaire numeric(14, 2),
+  quantite integer not null check (quantite > 0)
+);
+
+create index on stock_lots (produit_id, entrepot_id, emplacement_id);
+
+-- Tampon interne : lots retires d'un emplacement pendant une transaction,
+-- pour les reposer a l'identique si le meme produit est remis ailleurs dans
+-- la meme transaction (deplacement interne). Volontairement sans cle
+-- etrangere : il est ecrit depuis un trigger, y compris pendant une
+-- suppression en cascade.
+create table lots_en_mouvement (
+  id uuid primary key default gen_random_uuid(),
+  transaction_id bigint not null default txid_current(),
+  produit_id uuid not null,
+  entrepot_id uuid not null,
+  lot text,
+  numero_serie text,
+  date_expiration date,
+  date_entree timestamptz not null,
+  prix_unitaire numeric(14, 2),
+  quantite integer not null check (quantite > 0)
+);
+
 create table mouvements_stock (
   id uuid primary key default gen_random_uuid(),
   entreprise_id uuid not null references entreprises(id) on delete cascade,
@@ -253,7 +289,10 @@ create table bons_sortie (
   entrepot_id uuid not null references entrepots(id) on delete cascade,
   demande_par uuid not null references profiles(id),
   statut text not null default 'demandee' check (statut in ('demandee', 'confirmee', 'annulee')),
+  -- Motif / affectation (imprime dans le bloc de titre du bon).
   motif text,
+  -- Personne qui recoit la sortie (cadre "Recu par / Given to" du bon).
+  recu_par text,
   cree_le timestamptz not null default now(),
   unique (entreprise_id, numero)
 );
@@ -263,7 +302,12 @@ create table bons_sortie_lignes (
   bon_sortie_id uuid not null references bons_sortie(id) on delete cascade,
   produit_id uuid not null references produits(id) on delete cascade,
   emplacement_id uuid references emplacements(id) on delete set null,
-  quantite integer not null check (quantite > 0)
+  quantite integer not null check (quantite > 0),
+  -- Lot sorti (affichage du bon + retour dans le lot d'origine a la reintegration).
+  lot text,
+  numero_serie text,
+  date_expiration date,
+  date_entree_lot timestamptz
 );
 
 -- Reintegration : annule tout ou partie d'une sortie deja confirmee, ligne
@@ -666,6 +710,20 @@ create policy "modification stock" on stock_produits
 create policy "suppression stock" on stock_produits
   for delete using (entrepot_id in (select entrepots_visibles()));
 
+-- Lots : memes regles que stock_produits (une seule policy "for all", qui
+-- couvre aussi les verrous "for update" poses par les fonctions).
+alter table stock_lots enable row level security;
+create policy "acces lots visibles" on stock_lots
+  for all
+  using (entrepot_id in (select entrepots_visibles()))
+  with check (entrepot_id in (select entrepots_visibles()));
+
+alter table lots_en_mouvement enable row level security;
+create policy "acces lots en mouvement visibles" on lots_en_mouvement
+  for all
+  using (entrepot_id in (select entrepots_visibles()))
+  with check (entrepot_id in (select entrepots_visibles()));
+
 alter table mouvements_stock enable row level security;
 create policy "lecture mouvements visibles" on mouvements_stock
   for select using (entrepot_id in (select entrepots_visibles()));
@@ -836,6 +894,158 @@ create policy "lecture affectations visibles" on affectations_outillage
 -- avec verrou sur la ligne source pour deplacer_stock, pour rester
 -- coherent en cas d'acces concurrents (cahier des charges, section 19).
 
+-- Ajoute une quantite a un lot (le cree s'il n'existe pas encore a cet
+-- emplacement avec exactement les memes caracteristiques).
+create function ajouter_lot(
+  p_produit_id uuid,
+  p_entrepot_id uuid,
+  p_emplacement_id uuid,
+  p_lot text,
+  p_numero_serie text,
+  p_date_expiration date,
+  p_date_entree timestamptz,
+  p_prix_unitaire numeric,
+  p_quantite integer
+)
+returns void
+language plpgsql
+security invoker
+as $$
+declare
+  v_id uuid;
+  v_date_entree timestamptz := coalesce(p_date_entree, now());
+begin
+  if p_quantite is null or p_quantite <= 0 then
+    return;
+  end if;
+
+  select id into v_id from stock_lots
+    where produit_id = p_produit_id and entrepot_id = p_entrepot_id and emplacement_id = p_emplacement_id
+      and lot is not distinct from nullif(p_lot, '')
+      and numero_serie is not distinct from nullif(p_numero_serie, '')
+      and date_expiration is not distinct from p_date_expiration
+      and date_entree = v_date_entree
+    limit 1
+    for update;
+
+  if v_id is not null then
+    update stock_lots set quantite = quantite + p_quantite where id = v_id;
+  else
+    insert into stock_lots (
+      produit_id, entrepot_id, emplacement_id, lot, numero_serie, date_expiration, date_entree, prix_unitaire, quantite
+    )
+    values (
+      p_produit_id, p_entrepot_id, p_emplacement_id, nullif(p_lot, ''), nullif(p_numero_serie, ''),
+      p_date_expiration, v_date_entree, p_prix_unitaire, p_quantite
+    );
+  end if;
+end;
+$$;
+
+-- Garde stock_lots egal a stock_produits apres chaque ecriture du stock.
+-- Les fonctions qui connaissent le lot (reception, sortie, reintegration)
+-- mettent stock_lots a jour AVANT stock_produits : l'ecart est alors nul et
+-- ce trigger ne fait rien. Pour toutes les autres operations :
+--   - stock en baisse : les lots sont consommes dans l'ordre FEFO puis FIFO
+--     (expiration la plus proche d'abord, lots sans date ensuite, puis
+--     entree la plus ancienne) ;
+--   - stock en hausse : on repose les lots retires plus tot dans la meme
+--     transaction (deplacement interne), sinon un lot "sans lot" est cree.
+create function synchroniser_lots()
+returns trigger
+language plpgsql
+security invoker
+as $$
+declare
+  v_produit_id uuid;
+  v_entrepot_id uuid;
+  v_emplacement_id uuid;
+  v_cible integer;
+  v_total integer;
+  v_ecart integer;
+  v_prise integer;
+  v_lot record;
+begin
+  if tg_op = 'DELETE' then
+    v_produit_id := old.produit_id;
+    v_entrepot_id := old.entrepot_id;
+    v_emplacement_id := old.emplacement_id;
+    v_cible := 0;
+  else
+    v_produit_id := new.produit_id;
+    v_entrepot_id := new.entrepot_id;
+    v_emplacement_id := new.emplacement_id;
+    v_cible := new.quantite;
+  end if;
+
+  select coalesce(sum(quantite), 0) into v_total from stock_lots
+    where produit_id = v_produit_id and entrepot_id = v_entrepot_id and emplacement_id = v_emplacement_id;
+
+  v_ecart := v_cible - v_total;
+  if v_ecart = 0 then
+    return null;
+  end if;
+
+  -- Menage : restes de transactions precedentes.
+  delete from lots_en_mouvement where transaction_id <> txid_current();
+
+  if v_ecart > 0 then
+    for v_lot in
+      select * from lots_en_mouvement
+        where transaction_id = txid_current() and produit_id = v_produit_id and entrepot_id = v_entrepot_id
+        order by date_expiration asc nulls last, date_entree asc, id
+    loop
+      exit when v_ecart <= 0;
+      v_prise := least(v_lot.quantite, v_ecart);
+      perform ajouter_lot(
+        v_produit_id, v_entrepot_id, v_emplacement_id, v_lot.lot, v_lot.numero_serie,
+        v_lot.date_expiration, v_lot.date_entree, v_lot.prix_unitaire, v_prise
+      );
+      if v_prise = v_lot.quantite then
+        delete from lots_en_mouvement where id = v_lot.id;
+      else
+        update lots_en_mouvement set quantite = quantite - v_prise where id = v_lot.id;
+      end if;
+      v_ecart := v_ecart - v_prise;
+    end loop;
+
+    if v_ecart > 0 then
+      perform ajouter_lot(v_produit_id, v_entrepot_id, v_emplacement_id, null, null, null, now(), null, v_ecart);
+    end if;
+  else
+    v_ecart := -v_ecart;
+    for v_lot in
+      select * from stock_lots
+        where produit_id = v_produit_id and entrepot_id = v_entrepot_id and emplacement_id = v_emplacement_id
+        order by date_expiration asc nulls last, date_entree asc, id
+        for update
+    loop
+      exit when v_ecart <= 0;
+      v_prise := least(v_lot.quantite, v_ecart);
+      if v_prise = v_lot.quantite then
+        delete from stock_lots where id = v_lot.id;
+      else
+        update stock_lots set quantite = quantite - v_prise where id = v_lot.id;
+      end if;
+      insert into lots_en_mouvement (
+        produit_id, entrepot_id, lot, numero_serie, date_expiration, date_entree, prix_unitaire, quantite
+      )
+      values (
+        v_produit_id, v_entrepot_id, v_lot.lot, v_lot.numero_serie, v_lot.date_expiration,
+        v_lot.date_entree, v_lot.prix_unitaire, v_prise
+      );
+      v_ecart := v_ecart - v_prise;
+    end loop;
+  end if;
+
+  return null;
+end;
+$$;
+
+create trigger stock_produits_synchroniser_lots
+  after insert or update of quantite or delete on stock_produits
+  for each row execute function synchroniser_lots();
+
 create function affecter_localisation(
   p_produit_id uuid,
   p_entrepot_id uuid,
@@ -973,6 +1183,8 @@ declare
   v_numero text;
   v_date timestamptz;
   v_ligne jsonb;
+  v_gere_expiration boolean;
+  v_reference text;
 begin
   select entreprise_id into v_entreprise_id from entrepots where id = p_entrepot_id;
   if v_entreprise_id is null then
@@ -994,6 +1206,17 @@ begin
 
   for v_ligne in select * from jsonb_array_elements(p_lignes)
   loop
+    select gere_expiration, reference into v_gere_expiration, v_reference
+      from produits where id = (v_ligne->>'produit_id')::uuid;
+
+    if coalesce(v_gere_expiration, false) and nullif(v_ligne->>'date_expiration', '') is null then
+      raise exception 'Produit % : la date d''expiration est obligatoire.', v_reference;
+    end if;
+    if nullif(v_ligne->>'date_expiration', '') is not null
+       and nullif(v_ligne->>'lot', '') is null and nullif(v_ligne->>'numero_serie', '') is null then
+      raise exception 'Produit % : le numero de lot (ou de serie) est obligatoire avec une date d''expiration.', v_reference;
+    end if;
+
     insert into receptions_lignes (
       reception_id, produit_id, emplacement_id, quantite_attendue, quantite_recue,
       lot, numero_serie, date_expiration, prix_unitaire, anomalie
@@ -1032,6 +1255,7 @@ declare
   v_entreprise_id uuid;
   v_entrepot_id uuid;
   v_numero text;
+  v_date_entree timestamptz;
   v_ligne record;
   v_quarantaine_id uuid;
   v_qte_normale integer;
@@ -1045,7 +1269,8 @@ declare
   v_une_ligne_anomalie boolean := false;
   v_statut text;
 begin
-  select entreprise_id, entrepot_id, numero into v_entreprise_id, v_entrepot_id, v_numero
+  select entreprise_id, entrepot_id, numero, cree_le
+    into v_entreprise_id, v_entrepot_id, v_numero, v_date_entree
     from receptions where id = p_reception_id;
 
   if v_entrepot_id is null then
@@ -1084,6 +1309,12 @@ begin
       v_stock_avant := coalesce(v_stock_avant, 0);
       v_stock_apres := v_stock_avant + v_qte_normale;
 
+      -- Le lot d'abord, le stock ensuite (voir synchroniser_lots).
+      perform ajouter_lot(
+        v_ligne.produit_id, v_entrepot_id, v_ligne.emplacement_id, v_ligne.lot, v_ligne.numero_serie,
+        v_ligne.date_expiration, v_date_entree, v_ligne.prix_unitaire, v_qte_normale
+      );
+
       insert into stock_produits (produit_id, entrepot_id, emplacement_id, quantite)
       values (v_ligne.produit_id, v_entrepot_id, v_ligne.emplacement_id, v_qte_normale)
       on conflict (produit_id, entrepot_id, emplacement_id)
@@ -1105,6 +1336,11 @@ begin
         where produit_id = v_ligne.produit_id and entrepot_id = v_entrepot_id and emplacement_id = v_quarantaine_id;
       v_stock_avant := coalesce(v_stock_avant, 0);
       v_stock_apres := v_stock_avant + v_qte_quarantaine;
+
+      perform ajouter_lot(
+        v_ligne.produit_id, v_entrepot_id, v_quarantaine_id, v_ligne.lot, v_ligne.numero_serie,
+        v_ligne.date_expiration, v_date_entree, v_ligne.prix_unitaire, v_qte_quarantaine
+      );
 
       insert into stock_produits (produit_id, entrepot_id, emplacement_id, quantite)
       values (v_ligne.produit_id, v_entrepot_id, v_quarantaine_id, v_qte_quarantaine)
@@ -1148,12 +1384,16 @@ grant execute on function valider_reception to authenticated;
 -- verifie et decremente le stock de chaque ligne (verrou sur la ligne de
 -- stock concernee), insere les mouvements 'sortie', cree le bon au statut
 -- 'confirmee' directement (pas d'etape de validation separee, contrairement
--- aux receptions).
+-- aux receptions). Numerotation BS-<annee>-<sequence>.
+-- p_lignes : produit_id, emplacement_id, quantite et (optionnel)
+-- stock_lot_id. Sans stock_lot_id, les lots sont consommes automatiquement
+-- dans l'ordre FEFO / FIFO. Un lot perime ne sort qu'avec une note.
 create function creer_sortie(
   p_entrepot_id uuid,
   p_motif text,
   p_lignes jsonb,
-  p_date_mouvement timestamptz default null
+  p_date_mouvement timestamptz default null,
+  p_recu_par text default null
 )
 returns uuid
 language plpgsql
@@ -1170,6 +1410,8 @@ declare
   v_quantite integer;
   v_stock_avant integer;
   v_stock_apres integer;
+  v_stock_lot_id uuid;
+  v_lot stock_lots%rowtype;
 begin
   select entreprise_id into v_entreprise_id from entrepots where id = p_entrepot_id;
   if v_entreprise_id is null then
@@ -1180,10 +1422,12 @@ begin
   end if;
 
   v_date := coalesce(p_date_mouvement, now());
-  v_numero := 'SOR-' || to_char(v_date, 'YYYY') || '-' || lpad(nextval('bons_sortie_numero_seq')::text, 5, '0');
+  v_numero := 'BS-' || to_char(v_date, 'YYYY') || '-' || lpad(nextval('bons_sortie_numero_seq')::text, 5, '0');
 
-  insert into bons_sortie (entreprise_id, numero, entrepot_id, demande_par, statut, motif, cree_le)
-  values (v_entreprise_id, v_numero, p_entrepot_id, auth.uid(), 'confirmee', nullif(p_motif, ''), v_date)
+  insert into bons_sortie (entreprise_id, numero, entrepot_id, demande_par, statut, motif, recu_par, cree_le)
+  values (
+    v_entreprise_id, v_numero, p_entrepot_id, auth.uid(), 'confirmee', nullif(p_motif, ''), nullif(btrim(p_recu_par), ''), v_date
+  )
   returning id into v_bon_id;
 
   for v_ligne in select * from jsonb_array_elements(p_lignes)
@@ -1191,6 +1435,8 @@ begin
     v_produit_id := (v_ligne->>'produit_id')::uuid;
     v_emplacement_id := (v_ligne->>'emplacement_id')::uuid;
     v_quantite := (v_ligne->>'quantite')::integer;
+    v_stock_lot_id := nullif(v_ligne->>'stock_lot_id', '')::uuid;
+    v_lot := null;
 
     if v_produit_id is null or v_emplacement_id is null or v_quantite is null or v_quantite <= 0 then
       raise exception 'Ligne de sortie invalide (produit, emplacement et quantite requis).';
@@ -1204,6 +1450,28 @@ begin
       raise exception 'Stock insuffisant pour ce produit a cet emplacement.';
     end if;
 
+    -- Le lot d'abord, le stock ensuite (voir synchroniser_lots).
+    if v_stock_lot_id is not null then
+      select * into v_lot from stock_lots
+        where id = v_stock_lot_id and produit_id = v_produit_id
+          and entrepot_id = p_entrepot_id and emplacement_id = v_emplacement_id
+        for update;
+
+      if not found or v_lot.quantite < v_quantite then
+        raise exception 'Stock insuffisant dans le lot choisi.';
+      end if;
+      if v_lot.date_expiration is not null and v_lot.date_expiration < v_date::date
+         and nullif(btrim(coalesce(p_motif, '')), '') is null then
+        raise exception 'Lot perime : une note est obligatoire pour le sortir (ex. mise au rebut).';
+      end if;
+
+      if v_lot.quantite = v_quantite then
+        delete from stock_lots where id = v_lot.id;
+      else
+        update stock_lots set quantite = quantite - v_quantite where id = v_lot.id;
+      end if;
+    end if;
+
     v_stock_apres := v_stock_avant - v_quantite;
     if v_stock_apres = 0 then
       delete from stock_produits
@@ -1213,16 +1481,22 @@ begin
         where produit_id = v_produit_id and entrepot_id = p_entrepot_id and emplacement_id = v_emplacement_id;
     end if;
 
-    insert into bons_sortie_lignes (bon_sortie_id, produit_id, emplacement_id, quantite)
-    values (v_bon_id, v_produit_id, v_emplacement_id, v_quantite);
+    insert into bons_sortie_lignes (
+      bon_sortie_id, produit_id, emplacement_id, quantite, lot, numero_serie, date_expiration, date_entree_lot
+    )
+    values (
+      v_bon_id, v_produit_id, v_emplacement_id, v_quantite,
+      v_lot.lot, v_lot.numero_serie, v_lot.date_expiration, v_lot.date_entree
+    );
 
     insert into mouvements_stock (
       entreprise_id, produit_id, entrepot_id, emplacement_id,
-      type, quantite, stock_avant, stock_apres, utilisateur_id, reference, motif, cree_le
+      type, quantite, stock_avant, stock_apres, utilisateur_id, reference, motif, lot, numero_serie, cree_le
     )
     values (
       v_entreprise_id, v_produit_id, p_entrepot_id, v_emplacement_id,
-      'sortie', v_quantite, v_stock_avant, v_stock_apres, auth.uid(), v_numero, p_motif, v_date
+      'sortie', v_quantite, v_stock_avant, v_stock_apres, auth.uid(), v_numero, p_motif,
+      v_lot.lot, v_lot.numero_serie, v_date
     );
   end loop;
 
@@ -1261,6 +1535,10 @@ declare
   v_ligne_produit_id uuid;
   v_ligne_entrepot_id uuid;
   v_ligne_quantite_sortie integer;
+  v_ligne_lot text;
+  v_ligne_numero_serie text;
+  v_ligne_date_expiration date;
+  v_ligne_date_entree timestamptz;
   v_total_reintegre integer;
   v_disponible integer;
   v_stock_avant integer;
@@ -1292,8 +1570,10 @@ begin
       raise exception 'Ligne de reintegration invalide (ligne de sortie, emplacement et quantite requis).';
     end if;
 
-    select bsl.produit_id, bs.entrepot_id, bsl.quantite
-      into v_ligne_produit_id, v_ligne_entrepot_id, v_ligne_quantite_sortie
+    v_ligne_produit_id := null;
+    select bsl.produit_id, bs.entrepot_id, bsl.quantite, bsl.lot, bsl.numero_serie, bsl.date_expiration, bsl.date_entree_lot
+      into v_ligne_produit_id, v_ligne_entrepot_id, v_ligne_quantite_sortie,
+           v_ligne_lot, v_ligne_numero_serie, v_ligne_date_expiration, v_ligne_date_entree
       from bons_sortie_lignes bsl
       join bons_sortie bs on bs.id = bsl.bon_sortie_id
       where bsl.id = v_bon_sortie_ligne_id and bs.statut = 'confirmee'
@@ -1320,6 +1600,14 @@ begin
     v_stock_avant := coalesce(v_stock_avant, 0);
     v_stock_apres := v_stock_avant + v_quantite;
 
+    -- Le lot d'abord, le stock ensuite (voir synchroniser_lots) : la
+    -- quantite retrouve son lot d'origine (ou un lot "sans lot" date du jour
+    -- pour les sorties anterieures au suivi par lot).
+    perform ajouter_lot(
+      v_ligne_produit_id, p_entrepot_id, v_emplacement_id, v_ligne_lot, v_ligne_numero_serie,
+      v_ligne_date_expiration, coalesce(v_ligne_date_entree, v_date), null, v_quantite
+    );
+
     insert into stock_produits (produit_id, entrepot_id, emplacement_id, quantite)
     values (v_ligne_produit_id, p_entrepot_id, v_emplacement_id, v_quantite)
     on conflict (produit_id, entrepot_id, emplacement_id)
@@ -1330,11 +1618,12 @@ begin
 
     insert into mouvements_stock (
       entreprise_id, produit_id, entrepot_id, emplacement_id,
-      type, quantite, stock_avant, stock_apres, utilisateur_id, reference, motif, cree_le
+      type, quantite, stock_avant, stock_apres, utilisateur_id, reference, motif, lot, numero_serie, cree_le
     )
     values (
       v_entreprise_id, v_ligne_produit_id, p_entrepot_id, v_emplacement_id,
-      'reintegration', v_quantite, v_stock_avant, v_stock_apres, auth.uid(), v_numero, v_notes_ligne, v_date
+      'reintegration', v_quantite, v_stock_avant, v_stock_apres, auth.uid(), v_numero, v_notes_ligne,
+      v_ligne_lot, v_ligne_numero_serie, v_date
     );
   end loop;
 
@@ -1703,6 +1992,230 @@ left join (
 ) reint on reint.bon_sortie_ligne_id = bsl.id
 where bs.statut = 'confirmee'
   and bsl.quantite - coalesce(reint.quantite_reintegree, 0) > 0;
+
+-- ------------------------------------------------------------
+-- Vues de l'Historique (lecture seule, securite de l'utilisateur appliquee)
+-- ------------------------------------------------------------
+
+-- Bons de sortie : un par ligne, avec dépôt, émetteur et totaux.
+create view v_historique_sorties with (security_invoker = true) as
+select
+  bs.id,
+  bs.numero,
+  bs.entrepot_id,
+  e.nom as entrepot_nom,
+  bs.statut,
+  bs.motif,
+  bs.recu_par,
+  bs.demande_par,
+  pr.nom_complet as emis_par_nom,
+  bs.cree_le,
+  coalesce(l.nb_lignes, 0)::int as nb_lignes,
+  coalesce(l.quantite_totale, 0)::int as quantite_totale,
+  coalesce(r.quantite_reintegree, 0)::int as quantite_reintegree
+from bons_sortie bs
+join entrepots e on e.id = bs.entrepot_id
+left join profiles pr on pr.id = bs.demande_par
+left join (
+  select bon_sortie_id, count(*) as nb_lignes, sum(quantite) as quantite_totale
+  from bons_sortie_lignes group by bon_sortie_id
+) l on l.bon_sortie_id = bs.id
+left join (
+  select bsl.bon_sortie_id, sum(rl.quantite) as quantite_reintegree
+  from reintegrations_lignes rl
+  join bons_sortie_lignes bsl on bsl.id = rl.bon_sortie_ligne_id
+  group by bsl.bon_sortie_id
+) r on r.bon_sortie_id = bs.id;
+
+create view v_historique_sorties_lignes with (security_invoker = true) as
+select
+  bsl.id,
+  bsl.bon_sortie_id,
+  bsl.produit_id,
+  p.reference as produit_reference,
+  p.designation as produit_designation,
+  p.unite_mesure,
+  bsl.emplacement_id,
+  em.code as emplacement_code,
+  bsl.lot,
+  bsl.numero_serie,
+  bsl.date_expiration,
+  bsl.quantite,
+  coalesce(r.quantite_reintegree, 0)::int as quantite_reintegree
+from bons_sortie_lignes bsl
+join produits p on p.id = bsl.produit_id
+left join emplacements em on em.id = bsl.emplacement_id
+left join (
+  select bon_sortie_ligne_id, sum(quantite) as quantite_reintegree
+  from reintegrations_lignes group by bon_sortie_ligne_id
+) r on r.bon_sortie_ligne_id = bsl.id;
+
+-- Réceptions (entrées).
+create view v_historique_entrees with (security_invoker = true) as
+select
+  r.id,
+  r.numero,
+  r.entrepot_id,
+  e.nom as entrepot_nom,
+  r.fournisseur_id,
+  f.nom as fournisseur_nom,
+  r.numero_po,
+  r.statut,
+  r.notes,
+  r.cree_par,
+  pc.nom_complet as cree_par_nom,
+  r.valide_par,
+  pv.nom_complet as valide_par_nom,
+  r.valide_le,
+  r.cree_le,
+  coalesce(l.nb_lignes, 0)::int as nb_lignes,
+  coalesce(l.quantite_attendue, 0)::int as quantite_attendue,
+  coalesce(l.quantite_recue, 0)::int as quantite_recue
+from receptions r
+join entrepots e on e.id = r.entrepot_id
+left join fournisseurs f on f.id = r.fournisseur_id
+left join profiles pc on pc.id = r.cree_par
+left join profiles pv on pv.id = r.valide_par
+left join (
+  select reception_id, count(*) as nb_lignes, sum(quantite_attendue) as quantite_attendue, sum(quantite_recue) as quantite_recue
+  from receptions_lignes group by reception_id
+) l on l.reception_id = r.id;
+
+create view v_historique_entrees_lignes with (security_invoker = true) as
+select
+  rl.id,
+  rl.reception_id,
+  rl.produit_id,
+  p.reference as produit_reference,
+  p.designation as produit_designation,
+  p.unite_mesure,
+  rl.emplacement_id,
+  em.code as emplacement_code,
+  rl.lot,
+  rl.numero_serie,
+  rl.date_expiration,
+  rl.quantite_attendue,
+  rl.quantite_recue,
+  rl.anomalie
+from receptions_lignes rl
+join produits p on p.id = rl.produit_id
+left join emplacements em on em.id = rl.emplacement_id;
+
+-- Réintégrations.
+create view v_historique_reintegrations with (security_invoker = true) as
+select
+  ri.id,
+  ri.numero,
+  ri.entrepot_id,
+  e.nom as entrepot_nom,
+  ri.notes,
+  ri.demande_par,
+  pr.nom_complet as emis_par_nom,
+  ri.cree_le,
+  coalesce(l.nb_lignes, 0)::int as nb_lignes,
+  coalesce(l.quantite_totale, 0)::int as quantite_totale
+from reintegrations ri
+join entrepots e on e.id = ri.entrepot_id
+left join profiles pr on pr.id = ri.demande_par
+left join (
+  select reintegration_id, count(*) as nb_lignes, sum(quantite) as quantite_totale
+  from reintegrations_lignes group by reintegration_id
+) l on l.reintegration_id = ri.id;
+
+create view v_historique_reintegrations_lignes with (security_invoker = true) as
+select
+  rl.id,
+  rl.reintegration_id,
+  rl.produit_id,
+  p.reference as produit_reference,
+  p.designation as produit_designation,
+  p.unite_mesure,
+  rl.emplacement_id,
+  em.code as emplacement_code,
+  bsl.lot,
+  bsl.numero_serie,
+  bsl.date_expiration,
+  bs.numero as bon_sortie_numero,
+  rl.quantite,
+  rl.notes
+from reintegrations_lignes rl
+join produits p on p.id = rl.produit_id
+left join emplacements em on em.id = rl.emplacement_id
+left join bons_sortie_lignes bsl on bsl.id = rl.bon_sortie_ligne_id
+left join bons_sortie bs on bs.id = bsl.bon_sortie_id;
+
+-- Transferts.
+create view v_historique_transferts with (security_invoker = true) as
+select
+  t.id,
+  t.numero_suivi as numero,
+  t.entrepot_source_id,
+  es.nom as entrepot_source_nom,
+  t.entrepot_destination_id,
+  ed.nom as entrepot_destination_nom,
+  t.statut,
+  t.demande_par,
+  pr.nom_complet as emis_par_nom,
+  t.cree_le,
+  t.expedie_le,
+  t.recu_le,
+  coalesce(l.nb_lignes, 0)::int as nb_lignes,
+  coalesce(l.quantite_expediee, 0)::int as quantite_expediee,
+  coalesce(l.quantite_recue, 0)::int as quantite_recue
+from transferts t
+join entrepots es on es.id = t.entrepot_source_id
+join entrepots ed on ed.id = t.entrepot_destination_id
+left join profiles pr on pr.id = t.demande_par
+left join (
+  select transfert_id, count(*) as nb_lignes, sum(quantite_expediee) as quantite_expediee, sum(quantite_recue) as quantite_recue
+  from transferts_lignes group by transfert_id
+) l on l.transfert_id = t.id;
+
+create view v_historique_transferts_lignes with (security_invoker = true) as
+select
+  tl.id,
+  tl.transfert_id,
+  tl.produit_id,
+  p.reference as produit_reference,
+  p.designation as produit_designation,
+  p.unite_mesure,
+  es.code as emplacement_source_code,
+  ed.code as emplacement_destination_code,
+  tl.quantite_expediee,
+  tl.quantite_recue
+from transferts_lignes tl
+join produits p on p.id = tl.produit_id
+left join emplacements es on es.id = tl.emplacement_source_id
+left join emplacements ed on ed.id = tl.emplacement_destination_id;
+
+-- Tous les mouvements, avec dépôt, emplacement et opérateur.
+create view v_historique_mouvements with (security_invoker = true) as
+select
+  m.id,
+  m.cree_le,
+  m.type,
+  m.reference,
+  m.produit_id,
+  p.reference as produit_reference,
+  p.designation as produit_designation,
+  m.entrepot_id,
+  e.nom as entrepot_nom,
+  em.code as emplacement_code,
+  eo.code as emplacement_origine_code,
+  m.quantite,
+  m.stock_avant,
+  m.stock_apres,
+  m.lot,
+  m.numero_serie,
+  m.motif,
+  m.utilisateur_id,
+  pr.nom_complet as utilisateur_nom
+from mouvements_stock m
+join produits p on p.id = m.produit_id
+join entrepots e on e.id = m.entrepot_id
+left join emplacements em on em.id = m.emplacement_id
+left join emplacements eo on eo.id = m.emplacement_origine_id
+left join profiles pr on pr.id = m.utilisateur_id;
 
 -- Transferts enrichis des noms d'entrepots, pour l'ecran Transferts.
 create view v_transferts with (security_invoker = true) as

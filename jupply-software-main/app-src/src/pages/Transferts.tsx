@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent, type MouseEvent } from 'react'
 import { Plus, Search, Trash2 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
+import { useTabs } from '../context/TabsContext'
 import {
   peutDemanderTransfert,
   peutExpedierTransfert,
@@ -48,6 +49,7 @@ const STYLES_STATUT: Record<StatutTransfert, { label: string; classe: string }> 
 
 export function Transferts() {
   const { profil, entrepotsAssignes } = useAuth()
+  const { ongletActifId } = useTabs()
   const [transferts, setTransferts] = useState<TransfertAffiche[]>([])
   const [produits, setProduits] = useState<ProduitAvecStock[]>([])
   const [chargement, setChargement] = useState(true)
@@ -63,7 +65,6 @@ export function Transferts() {
   const { ouvrir: ouvrirMenu, menu } = useMenuContextuel()
 
   function chargerListe() {
-    setChargement(true)
     Promise.all([getTransferts(), getProduitsAvecStock()])
       .then(([t, p]) => {
         setTransferts(t)
@@ -73,7 +74,10 @@ export function Transferts() {
       .finally(() => setChargement(false))
   }
 
-  useEffect(chargerListe, [])
+  // Rechargé à chaque retour sur l'onglet.
+  useEffect(() => {
+    if (ongletActifId === 'transferts') chargerListe()
+  }, [ongletActifId])
 
   useEffect(() => {
     if (!selectionId) return

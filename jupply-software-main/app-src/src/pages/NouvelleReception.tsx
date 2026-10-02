@@ -249,6 +249,13 @@ export function NouvelleReception() {
       if (!l.produitId) return `Ligne ${numero} : référence inconnue.`
       if (quantiteCommandeeEffective(l) <= 0) return `Ligne ${numero} : saisis une quantité commandée ou reçue.`
       if (!l.emplacementId) return `Ligne ${numero} : localisation manquante.`
+      // Sans lot ni date, la sortie "premier périmé, premier sorti" est impossible (même contrôle côté base).
+      if (produitParId.get(l.produitId)?.gere_expiration && !l.dateExpiration) {
+        return `Ligne ${numero} : la date d'expiration est obligatoire pour ce produit.`
+      }
+      if (l.dateExpiration && !l.lot.trim() && !l.numeroSerie.trim()) {
+        return `Ligne ${numero} : le numéro de lot (ou de série) est obligatoire avec une date d'expiration.`
+      }
     }
     return null
   }

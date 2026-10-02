@@ -709,6 +709,314 @@ lignes saisies directement dans un tableau en dessous.
 - [x] `tsc -b` + `vite build` OK (`oxlint` bloqué par Windows sur ce poste)
 - [ ] Migration exécutée par Jean Didier + vérification locale
 
+---
+
+# Refonte de l'écran Sorties Manuelles
+
+**Statut :** validé, exécution en cours (code complet, en attente vérif locale)
+**Démarré le :** 02/10/2026
+
+## Objectif
+
+Demande de Jean Didier : l'onglet Sortie est mal exploité (zone Notes
+immense, panier écrasé), la recherche d'une référence et l'ajout au panier
+ne fonctionnent pas, et une référence en rupture doit déclencher un message
+d'erreur.
+
+## Analyse de l'existant
+
+- Cause du "on n'arrive pas à rechercher / ajouter" : défaut de mise en
+  page. Le bloc du haut (6 champs empilés + grande zone Notes) prenait
+  presque toute la hauteur, la zone du bas (recherche, liste, panier) était
+  écrasée à quelques pixels : liste des références invisible, champ de
+  recherche superposé au bouton Ajouter.
+- Les produits en rupture étaient masqués de la liste (donc aucun message).
+- `creer_sortie` renvoie l'identifiant du bon, et l'écran l'affichait tel
+  quel (un UUID) dans "Bon de sortie".
+
+## Plan détaillé
+
+- En-tête sur une seule ligne : Dépôt, Opérateur, Bon de sortie, Date du
+  mouvement, Notes / destinataire (champ d'une ligne, à droite).
+- Colonne gauche : recherche (référence **ou** désignation, Entrée pour
+  sélectionner) + liste de toutes les références avec leur stock dans le
+  dépôt (rupture en rouge).
+- Colonne droite : ligne en préparation (Référence, Désignation,
+  Localisation, Disponible, Quantité, "Ajouter au panier"), puis le panier
+  sur toute la hauteur restante, avec "Valider la sortie" dans sa barre de
+  titre (toujours visible) et une corbeille par ligne.
+- Référence en rupture dans le dépôt : message d'erreur, rien n'est mis en
+  préparation.
+- Le disponible tient compte de ce qui est déjà dans le panier.
+- Rechargement du stock à chaque retour sur l'onglet.
+- `creerSortie` relit le numéro `SOR-...` du bon créé.
+
+## Avancement
+
+- [x] `pages/Sorties.tsx` réécrit, `lib/api/sorties.ts`
+- [x] Corrections suite aux tests de Jean Didier (02/10/2026) :
+      - l'écran basculait tout seul sur le premier dépôt trouvé pour le
+        produit sélectionné (ici "Entrepôt secondaire", 25 unités, au lieu
+        de "Entrepôt principal", 235) : il reste désormais sur le dépôt en
+        cours s'il a du stock, sinon prend celui qui en a le plus ; en cas
+        de rupture dans le dépôt, le message indique où se trouve le stock ;
+      - écrans qui ne se mettaient pas à jour (Produits, Dashboard et ses
+        Top articles, Entrepôts, Transferts, Réintégration) : rechargement
+        silencieux à chaque retour sur l'onglet ;
+      - "Derniers mouvements" sans lot ni prix : migration
+        `2026-10-02-vue-mouvements.sql` qui recrée la vue
+        `v_mouvements_recents` (une vue `m.*` ne voit pas les colonnes
+        ajoutées après sa création). Hypothèse la plus probable, non
+        vérifiable sans accès à la base.
+- [x] `tsc -b` + `vite build` OK (`oxlint` bloqué par Windows sur ce poste)
+- [ ] Vérification en local par Jean Didier (Light + Dark)
+
+---
+
+# Suivi par lot : premier périmé, premier sorti (FEFO / FIFO)
+
+**Statut :** validé, exécution en cours (code complet, migration testée sur une base de test, en attente exécution dans Supabase + vérif locale)
+**Démarré le :** 02/10/2026
+
+## Objectif
+
+Demande de Jean Didier : quand un produit a une date d'expiration, la
+feuille de sortie doit proposer en premier le lot qui se périme le plus tôt,
+avec son numéro de lot (FEFO). Pour les produits sans date d'expiration, le
+système applique le FIFO (premier entré, premier sorti).
+
+## Analyse de l'existant
+
+- **Le stock n'est pas suivi par lot.** `stock_produits` ne connaît qu'une
+  quantité par (produit, entrepôt, emplacement). Le lot, le N° de série et
+  la date d'expiration sont saisis à la réception (`receptions_lignes`) et
+  recopiés dans l'historique (`mouvements_stock.lot`), mais une fois le
+  stock entré, rien ne dit quelle quantité reste de quel lot.
+- Sans cette information, impossible de savoir quel lot sortir en premier :
+  la règle FEFO/FIFO ne peut pas être ajoutée par un simple tri à l'écran.
+- 7 fonctions de la base font bouger le stock et devront toutes tenir les
+  lots à jour : `valider_reception`, `creer_sortie`, `creer_reintegration`,
+  `affecter_localisation`, `deplacer_stock`, `expedier_transfert`,
+  `receptionner_transfert` (plus l'inventaire quand il existera).
+
+## Plan détaillé
+
+### 1. Base
+
+- Nouvelle table `stock_lots` : produit, entrepôt, emplacement, lot,
+  N° de série, date d'expiration, date d'entrée (pour le FIFO), prix
+  d'entrée, quantité restante. `stock_produits` reste le total par
+  emplacement (rien à changer dans les écrans existants).
+- Reprise de l'existant : le stock actuel devient un lot "sans lot" par
+  emplacement, daté de son premier mouvement d'entrée connu.
+- **Conception retenue à l'exécution** (plus sûre que réécrire les 7
+  fonctions) : un trigger `synchroniser_lots` sur `stock_produits` garantit
+  en permanence "somme des lots = stock", quelle que soit l'opération.
+  - Stock en baisse : lots consommés dans l'ordre FEFO puis FIFO (date
+    d'expiration la plus proche d'abord, lots sans date après, puis date
+    d'entrée la plus ancienne).
+  - Stock en hausse : on repose les lots retirés dans la même transaction
+    (déplacement interne : le lot garde son identité), sinon lot "sans lot".
+  - Les fonctions qui connaissent le lot écrivent `stock_lots` avant
+    `stock_produits` (le trigger ne fait alors rien) : `valider_reception`
+    (crée les lots), `creer_sortie` (consomme le lot choisi via
+    `stock_lot_id`), `creer_reintegration` (retour dans le lot d'origine).
+  - `affecter_localisation`, `deplacer_stock`, `expedier_transfert`,
+    `receptionner_transfert` ne sont pas modifiées : le trigger s'en charge.
+- Fonction interne `ajouter_lot(...)`, table tampon `lots_en_mouvement`.
+- `bons_sortie_lignes` (lot, N° série, expiration, date d'entrée du lot) et
+  `mouvements_stock` enregistrent le lot sorti.
+- Bons de sortie numérotés `BS-<année>-<séquence>` (demande de Jean Didier,
+  à la place de `SOR-`).
+- Pas de vue dédiée : l'écran lit `stock_lots` directement.
+
+### 2. Écran Sorties
+
+- À la sélection d'une référence : tableau des lots disponibles dans
+  l'ordre de sortie (Lot / N° série, Expiration, Entré le, Localisation,
+  Disponible), le premier étant présélectionné.
+- Le panier affiche le lot et la date d'expiration de chaque ligne.
+- Lot périmé ou proche de la péremption signalé en couleur.
+
+### 3. Autres écrans
+
+- Produits : le panneau "Stock par dépôt" détaille les lots.
+- Alertes stock : base prête pour la future alerte de péremption.
+
+## Décisions actées avec Jean Didier (02/10/2026)
+
+1. **Ordre conseillé, pas imposé.** Les lots sont affichés dans l'ordre de
+   sortie ; l'opérateur peut en choisir un autre, un avertissement non
+   bloquant signale le lot qui aurait dû sortir en premier.
+2. **Lot périmé : sortie autorisée avec une note obligatoire** saisie par
+   l'opérateur (ex. rebut). Contrôle à l'écran et dans la base.
+3. **Quantités saisies lot par lot.** L'opérateur saisit la quantité à
+   prendre dans chaque lot ; le bon de sortie comporte une ligne par lot.
+4. **Lot obligatoire** (ou N° de série) dès qu'une date d'expiration est
+   saisie, et date d'expiration obligatoire pour un produit qui "gère
+   l'expiration". Contrôle à l'écran et dans la base.
+
+## Points de vigilance
+
+- **Transferts : l'identité du lot est perdue à la réception.** Le stock
+  reçu à destination devient un lot "sans lot" daté de la réception (le
+  transfert ne mémorise pas encore les lots expédiés). À traiter avec la
+  vérification du chantier Transferts.
+- Le stock déjà présent avant la migration est repris en lots "sans lot"
+  (pas de numéro ni de date d'expiration), datés de leur première entrée.
+- Sans accès direct à la base Supabase, la migration a été testée sur un
+  PostgreSQL en mémoire (PGlite) avec un environnement Supabase simulé
+  (rôle `authenticated`, RLS active) : 4 états de départ, 33 contrôles
+  (reprise de l'existant, réceptions, sorties par lot, lot périmé, FIFO
+  automatique, réintégration, déplacement, affectation, transfert,
+  suppressions en cascade, ré-exécution). Ce n'est pas la vraie base :
+  reste à l'exécuter dans Supabase.
+- Les migrations `2026-10-02-reception-fournisseurs.sql` et
+  `2026-10-02-stock-lots-fefo.sql` définissent la même `creer_reception` :
+  l'ordre d'exécution n'a pas d'importance. La seconde reprend tout le
+  contenu de la première.
+
+## Avancement
+
+- [x] Décisions validées avec Jean Didier
+- [x] Schéma + migration `supabase/migrations/2026-10-02-stock-lots-fefo.sql`
+      (testée sur base de test), `schema.sql` et `seed.sql` alignés
+- [x] API / types (`lib/api/lots.ts`, `StockLot`, `stockLotId` dans
+      `creerSortie`)
+- [x] Écran Sorties : lots dans l'ordre de sortie, quantité par lot, lot et
+      expiration dans le panier, avertissement d'ordre, note obligatoire
+      pour un lot périmé. Repli automatique sur le stock par emplacement
+      tant que la migration n'est pas exécutée.
+- [x] Nouvelle réception : contrôle lot / date d'expiration
+- [x] `tsc -b` + `vite build` OK
+- [ ] Migration exécutée dans Supabase par Jean Didier
+- [ ] Vérification en local par Jean Didier
+- [ ] Plus tard : détail des lots dans Produits, lots conservés dans les
+      transferts, alerte de péremption
+
+---
+
+# Parcours de sortie, bon de sortie PDF et module Historique
+
+**Statut :** validé, exécution en cours (phases 1 et 2 codées, migration testée sur base de test, en attente exécution Supabase + vérif locale)
+**Démarré le :** 03/10/2026
+
+## Objectif
+
+Demandes de Jean Didier :
+1. Le parcours de sortie n'est pas clair : un clic sur "Sorties Manuelles"
+   envoie directement sur la saisie, et après validation on reste sur le même
+   écran sans savoir ce qui s'est passé. Proposer mieux.
+2. Séparer "Reçu par" (destinataire) et "Motif / affectation".
+3. Pas de prix sur le bon de sortie.
+4. Pouvoir réimprimer : nouveau module **Historique** dans la Top Bar, liste
+   des mouvements par type (ex. Sorties, par numéro de bon), filtre par
+   plage de dates, clic droit sur la colonne N° de bon pour saisir un numéro,
+   double-clic pour le détail, export PDF / Excel / CSV.
+
+Le bon de sortie PDF reprend le modèle AIRSTOCK fourni (photo du
+25/05/2026) et sert de fiche de préparation au magasinier.
+
+## Analyse de l'existant
+
+- `Sorties.tsx` : feuille de saisie directe (onglet `sorties`), panier,
+  validation via `creer_sortie`, numéro `BS-` relu après coup.
+- `bons_sortie` a déjà `motif` ; il manque `recu_par`.
+  `bons_sortie_lignes` porte désormais lot, N° série, expiration.
+- Le parcours "liste + clic droit > nouveau document dans un onglet dédié"
+  existe déjà pour les réceptions (`Receptions.tsx` +
+  `NouvelleReception.tsx`) : le réutiliser donne une logique identique
+  partout.
+- Pas de composant de notification ("bulle") dans l'application.
+- Module Logistique : "Mouvements" n'est qu'un écran "à venir".
+- Aucune bibliothèque PDF / Excel installée.
+
+## Plan détaillé
+
+### 1. Parcours de sortie (proposition)
+
+- **"Sorties Manuelles" ouvre la liste des sorties du jour** (et non plus la
+  saisie) : N° de bon, heure, dépôt, motif, reçu par, émis par, lignes,
+  quantité. Bouton **+ Nouvelle sortie** bien visible (et clic droit).
+  Panneau du bas : détail du bon sélectionné, avec les localisations.
+- **"Nouvelle sortie" ouvre un onglet dédié** (la feuille actuelle) : la
+  saisie est conservée si on change d'onglet, comme pour les réceptions.
+- **À la validation** : l'onglet de saisie se ferme, retour sur la liste où
+  le nouveau bon apparaît en tête, en surbrillance ; bulle verte "Sortie
+  effectuée : BS-2026-00012" ; fenêtre "Bon de sortie enregistré" avec le
+  résumé (lignes, quantité, reçu par) et trois boutons : **Imprimer le bon
+  (PDF)**, **Nouvelle sortie**, **Fermer**.
+- Depuis Produits, "Sorties Manuelles" avec un produit sélectionné ouvre
+  directement "Nouvelle sortie" avec ce produit.
+
+### 2. Champs du bon
+
+- `bons_sortie.recu_par` (migration). Dans la saisie : **Reçu par** et
+  **Motif / affectation** séparés. `creer_sortie` reçoit `p_recu_par`.
+
+### 3. Bon de sortie PDF
+
+- En-tête "BON DE SORTIE / ISSUE", numéro, date, entreprise, dépôt ; bloc
+  motif / affectation ; tableau Localisation, Référence, Désignation,
+  N° de série, N° de lot, Expiration, Quantité, **trié par localisation**
+  (ordre de tournée) ; total ; cadres "Émis par" et "Reçu par" pour les
+  signatures ; "Page x sur y". Pas de prix.
+- Ouvert dans un nouvel onglet du navigateur (imprimer / enregistrer).
+
+### 4. Module Historique
+
+- Nouvelle pilule **Historique** dans la Top Bar. Sous-sections :
+  Sorties (phase 1), puis Entrées, Réintégrations, Transferts, Tous les
+  mouvements (phase 2, même modèle). "Mouvements" quitte Logistique.
+- Liste (ex. Sorties) : N° de bon, date, dépôt, motif, reçu par, émis par,
+  lignes, quantité. Filtre **du ... au ...** ; **clic droit sur la colonne
+  N° de bon** > saisir un numéro ; **double-clic** > fenêtre de détail
+  (lignes avec localisation, lot, série, expiration, quantité réintégrée).
+- **Export** du détail (PDF du bon, Excel, CSV) et de la liste filtrée
+  (Excel, CSV).
+
+### 5. Composants partagés
+
+- Bulle de notification (`ToastContext`), réutilisable partout (réceptions,
+  transferts...).
+- Fonctions d'export : PDF (`jspdf` + `jspdf-autotable`), Excel
+  (`write-excel-file`), CSV (sans bibliothèque, séparateur `;` et accents
+  compatibles Excel français).
+
+## Points de vigilance
+
+- 3 nouvelles bibliothèques (PDF et Excel), chargées seulement au moment de
+  l'export pour ne pas alourdir l'application.
+- Migration SQL à exécuter dans Supabase (`recu_par`), testée sur la base
+  de test.
+- Les anciens bons (`SOR-`) n'ont ni "Reçu par" ni lot : ils s'affichent et
+  s'exportent avec des cases vides.
+
+## Avancement
+
+- [x] Proposition de parcours validée par Jean Didier (03/10/2026) ; choix
+      techniques et découpage laissés à Claude
+- [x] Base : migration `2026-10-03-historique-recu-par.sql` (`recu_par`,
+      `creer_sortie` avec `p_recu_par`, 9 vues `v_historique_*`), testée
+      sur base de test (49 contrôles, 3 états de départ, ré-exécution) ;
+      `schema.sql` aligné. `creer_sortie` est aussi alignée dans la
+      migration des lots pour que l'ordre d'exécution n'ait pas d'importance.
+- [x] Phase 1 : `pages/Sorties.tsx` (liste du jour + "Nouvelle sortie" +
+      fenêtre "Bon de sortie enregistré"), `pages/NouvelleSortie.tsx`
+      (ancienne feuille, onglet dédié, Reçu par / Motif), bulle
+      `ToastContext`, PDF `lib/export/bonSortiePdf.ts` (vérifié sur un bon
+      d'essai), Historique > Sorties.
+- [x] Phase 2 (même composant `components/historique/ListeDocuments.tsx`,
+      configurations dans `configs.tsx`) : Entrées, Réintégrations,
+      Transferts, Tous les mouvements. "Mouvements" retiré de Logistique.
+- [x] Exports : Excel (`write-excel-file`), CSV (séparateur `;`, UTF-8),
+      PDF (`jspdf` + `jspdf-autotable`), chargés à la demande.
+- [x] `tsc -b` + `vite build` OK
+- [ ] Migration exécutée dans Supabase par Jean Didier
+- [ ] Vérification en local par Jean Didier (Light + Dark)
+- [ ] Plus tard : PDF des autres documents (bon de réception, bon de
+      transfert) sur le même modèle
+
 ## Format utilisé pour chaque plan
 
 ```

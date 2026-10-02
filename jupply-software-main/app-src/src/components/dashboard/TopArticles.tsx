@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getTopProduitsMouvementes, type PeriodeFiltre } from '../../lib/api/stock'
 import type { TopProduitMouvemente } from '../../types/stock'
+import { useTabs } from '../../context/TabsContext'
 import { SectionCard } from './SectionCard'
 
 const PERIODES: { valeur: PeriodeFiltre; label: string }[] = [
@@ -14,10 +15,13 @@ export function TopArticles() {
   const [periode, setPeriode] = useState<PeriodeFiltre>('semaine')
   const [produits, setProduits] = useState<TopProduitMouvemente[]>([])
   const [chargement, setChargement] = useState(true)
+  const { ongletActifId } = useTabs()
+  const estActif = ongletActifId === 'dashboard'
 
+  // Rechargé au changement de période et à chaque retour sur le Dashboard.
   useEffect(() => {
+    if (!estActif) return
     let annule = false
-    setChargement(true)
     getTopProduitsMouvementes(periode)
       .then((data) => {
         if (!annule) setProduits(data)
@@ -28,7 +32,7 @@ export function TopArticles() {
     return () => {
       annule = true
     }
-  }, [periode])
+  }, [periode, estActif])
 
   return (
     <SectionCard titre="Produits les plus mouvementés">

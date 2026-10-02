@@ -5,9 +5,11 @@ interface ModalProps {
   titre: string
   onFermer: () => void
   children: ReactNode
+  /** Grande fenêtre (détail d'un document, tableau) au lieu de la petite fenêtre standard. */
+  large?: boolean
 }
 
-export function Modal({ titre, onFermer, children }: ModalProps) {
+export function Modal({ titre, onFermer, children, large = false }: ModalProps) {
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') onFermer()
@@ -19,7 +21,9 @@ export function Modal({ titre, onFermer, children }: ModalProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4" onClick={onFermer}>
       <div
-        className="w-full max-w-sm bg-card rounded-xl border border-border p-5 text-text"
+        className={`w-full bg-card rounded-xl border border-border text-text ${
+          large ? 'max-w-[1100px] max-h-[88vh] flex flex-col p-5' : 'max-w-sm p-5'
+        }`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">

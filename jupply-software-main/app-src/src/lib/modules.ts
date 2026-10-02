@@ -1,9 +1,9 @@
 import {
   AlertTriangle,
   ArrowDownToLine,
-  ArrowLeftRight,
   ArrowUpFromLine,
   ClipboardList,
+  History,
   LayoutDashboard,
   Package,
   RotateCcw,
@@ -53,9 +53,17 @@ export const MODULES: Module[] = [
   {
     id: 'logistique',
     label: 'Logistique',
+    actions: [{ ecran: 'inventaires', label: 'Inventaires', icone: ClipboardList }],
+  },
+  {
+    id: 'historique',
+    label: 'Historique',
     actions: [
-      { ecran: 'mouvements', label: 'Mouvements', icone: ArrowLeftRight },
-      { ecran: 'inventaires', label: 'Inventaires', icone: ClipboardList },
+      { ecran: 'historique-sorties', label: 'Sorties', icone: ArrowUpFromLine },
+      { ecran: 'historique-entrees', label: 'Entrées', icone: ArrowDownToLine },
+      { ecran: 'historique-reintegrations', label: 'Réintégrations', icone: RotateCcw },
+      { ecran: 'historique-transferts', label: 'Transferts', icone: Truck },
+      { ecran: 'mouvements', label: 'Tous les mouvements', icone: History },
     ],
   },
 ]
@@ -63,6 +71,7 @@ export const MODULES: Module[] = [
 /** Écrans ouverts depuis un autre écran (pas de bouton dans le Sub-Header), rattachés à leur module. */
 const ECRANS_SECONDAIRES: Partial<Record<EcranId, string>> = {
   'nouvelle-reception': 'receptions-expeditions',
+  'nouvelle-sortie': 'receptions-expeditions',
 }
 
 export const MODULE_PAR_ECRAN = {

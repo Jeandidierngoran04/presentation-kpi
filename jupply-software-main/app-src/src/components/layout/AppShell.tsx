@@ -13,6 +13,15 @@ import { Reintegration } from '../../pages/Reintegration'
 import { Transferts } from '../../pages/Transferts'
 import { AlertesStock } from '../../pages/AlertesStock'
 import { NouvelleReception } from '../../pages/NouvelleReception'
+import { NouvelleSortie } from '../../pages/NouvelleSortie'
+import {
+  HistoriqueEntrees,
+  HistoriqueMouvements,
+  HistoriqueReintegrations,
+  HistoriqueSorties,
+  HistoriqueTransferts,
+} from '../../pages/Historique'
+import { ToastProvider } from '../../context/ToastContext'
 import { ComingSoon } from '../../pages/ComingSoon'
 
 const COMPOSANTS = {
@@ -23,10 +32,15 @@ const COMPOSANTS = {
   sorties: Sorties,
   reintegration: Reintegration,
   transferts: Transferts,
-  mouvements: () => <ComingSoon titre="Mouvements de stock" />,
+  mouvements: HistoriqueMouvements,
   inventaires: () => <ComingSoon titre="Inventaires" />,
   alertes: AlertesStock,
   'nouvelle-reception': NouvelleReception,
+  'nouvelle-sortie': NouvelleSortie,
+  'historique-sorties': HistoriqueSorties,
+  'historique-entrees': HistoriqueEntrees,
+  'historique-reintegrations': HistoriqueReintegrations,
+  'historique-transferts': HistoriqueTransferts,
 } satisfies Record<EcranId, () => ReactElement>
 
 function ZoneContenu() {
@@ -48,14 +62,16 @@ function ZoneContenu() {
 export function AppShell() {
   return (
     <SelectionProvider>
-      <TabsProvider>
-        <div className="flex flex-col h-screen overflow-hidden bg-canvas">
-          <TopBar />
-          <SousEntete />
-          <BarreOnglets />
-          <ZoneContenu />
-        </div>
-      </TabsProvider>
+      <ToastProvider>
+        <TabsProvider>
+          <div className="flex flex-col h-screen overflow-hidden bg-canvas">
+            <TopBar />
+            <SousEntete />
+            <BarreOnglets />
+            <ZoneContenu />
+          </div>
+        </TabsProvider>
+      </ToastProvider>
     </SelectionProvider>
   )
 }

@@ -8,9 +8,13 @@ export function SousEntete() {
   const module = moduleParId(moduleActifId)
 
   function onClic(a: ActionModule) {
-    // "Sorties Manuelles" prend en compte le produit selectionne (clic simple)
-    // dans Produits, meme si l'onglet Sortie est deja ouvert.
-    if (a.ecran === 'sorties') declencherSortieManuelle(produitSelectionneId)
+    // Depuis Produits, avec un produit selectionne : "Sorties Manuelles" ouvre
+    // directement la feuille de saisie avec ce produit. Sinon, la liste du jour.
+    if (a.ecran === 'sorties' && ongletActifId === 'produits' && produitSelectionneId) {
+      declencherSortieManuelle(produitSelectionneId)
+      ouvrirOnglet('nouvelle-sortie', 'Nouvelle sortie')
+      return
+    }
     ouvrirOnglet(a.ecran, a.label)
   }
 
