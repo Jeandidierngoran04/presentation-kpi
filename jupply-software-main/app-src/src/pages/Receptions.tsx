@@ -11,14 +11,18 @@ import {
   type ReceptionAffichee,
 } from '../lib/api/receptions'
 import type { ProduitAvecStock, ReceptionLigne, StatutReception } from '../types/stock'
+import { libelleMotif } from '../lib/api/quarantaine'
 import { useMenuContextuel } from '../components/ui/MenuContextuel'
+import { classeBadge, type TonBadge } from '../components/ui/Badge'
+import { EnTetePage } from '../components/ui/EnTetePage'
 import { useTabs } from '../context/TabsContext'
 
-const STYLES_STATUT: Record<StatutReception, { label: string; classe: string }> = {
-  en_attente: { label: 'En attente', classe: 'bg-muted text-text-muted' },
-  validee: { label: 'Validée', classe: 'bg-accent-soft text-accent-deep' },
-  partielle: { label: 'Partielle', classe: 'bg-warn-soft text-warn-deep' },
-  anomalie: { label: 'Anomalie', classe: 'bg-danger-soft text-danger-deep' },
+// Vert = terminé, bleu = en cours, gris = en attente, rouge = problème.
+const STYLES_STATUT: Record<StatutReception, { label: string; ton: TonBadge }> = {
+  en_attente: { label: 'En attente', ton: 'neutre' },
+  validee: { label: 'Validée', ton: 'succes' },
+  partielle: { label: 'Partielle', ton: 'info' },
+  anomalie: { label: 'Anomalie', ton: 'danger' },
 }
 
 function heure(iso: string): string {
@@ -94,14 +98,14 @@ export function Receptions() {
 
   return (
     <div className="h-full flex flex-col gap-2 p-4" onContextMenu={onClicDroitTableau}>
-      <h1 className="shrink-0 text-lg font-bold text-text">Entrées de stock</h1>
+      <EnTetePage titre="Entrées de stock" compteur={receptions.length} />
 
       {chargement ? (
         <div className="text-sm text-text-muted py-12 text-center">Chargement...</div>
       ) : (
         <div className="flex-1 min-h-0 bg-card rounded-lg border border-border overflow-hidden flex flex-col">
           <div className="overflow-auto flex-1">
-          <table className="w-full text-sm">
+          <table className="tableau-dense">
             <thead className="sticky top-0 z-10">
               <tr className="text-left text-[11px] text-text-muted uppercase tracking-wide bg-muted">
                 <th className="font-medium py-1 px-2">Numéro</th>
@@ -127,7 +131,7 @@ export function Receptions() {
                   <td className="py-1 px-2 text-text-muted">{r.fournisseur_nom ?? '—'}</td>
                   <td className="py-1 px-2 text-text-muted">{r.numero_po ?? '—'}</td>
                   <td className="py-1 px-2">
-                    <span className={`inline-flex items-center text-[11px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full ${STYLES_STATUT[r.statut].classe}`}>
+                    <span className={classeBadge(STYLES_STATUT[r.statut].ton)}>
                       {STYLES_STATUT[r.statut].label}
                     </span>
                   </td>
@@ -174,7 +178,7 @@ export function Receptions() {
             </p>
           )}
 
-          <table className="w-full text-xs">
+          <table className="tableau-dense">
             <thead>
               <tr className="text-left text-[10px] text-text-muted uppercase tracking-wide">
                 <th className="font-medium pb-1">Produit</th>
@@ -182,7 +186,7 @@ export function Receptions() {
                 <th className="font-medium pb-1">Reçu</th>
                 <th className="font-medium pb-1">Lot / N° série</th>
                 <th className="font-medium pb-1">Prix</th>
-                <th className="font-medium pb-1">Anomalie</th>
+                <th className="font-medium pb-1">Non conforme</th>
               </tr>
             </thead>
             <tbody>
@@ -196,9 +200,13 @@ export function Receptions() {
                   <td className="py-1 text-text-muted font-mono text-[11px]">{l.numero_serie ?? l.lot ?? '—'}</td>
                   <td className="py-1 text-text-muted">{l.prix_unitaire.toLocaleString('fr-FR')}</td>
                   <td className="py-1">
-                    {l.anomalie && (
-                      <span className="inline-flex items-center gap-1 text-danger text-xs font-semibold">
-                        <AlertTriangle size={12} /> Oui
+                    {(l.quantite_non_conforme || (l.anomalie ? l.quantite_recue : 0)) > 0 && (
+                      <span
+                        className="inline-flex items-center gap-1 text-danger text-xs font-semibold"
+                        title={l.constat_non_conformite ?? undefined}
+                      >
+                        <AlertTriangle size={12} /> {l.quantite_non_conforme || l.quantite_recue} ·{' '}
+                        {libelleMotif(l.motif_non_conformite ?? 'autre')}
                       </span>
                     )}
                   </td>

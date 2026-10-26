@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState, type MouseEvent } from 'react'
-import { RefreshCw } from 'lucide-react'
+import { RefreshCw, ShieldAlert } from 'lucide-react'
 import { useTabs } from '../context/TabsContext'
 import { useSelection } from '../context/SelectionContext'
 import { texteFiltre } from '../lib/filtreTexte'
 import { getProduitsAvecStock, stockAlerte } from '../lib/api/stock'
 import { getCommandesProduits, getLocalisationsProduits } from '../lib/api/produits'
+import { compterDossiersOuverts } from '../lib/api/quarantaine'
 import type { LocalisationProduit, ProduitAvecStock } from '../types/stock'
 import { useMenuContextuel } from '../components/ui/MenuContextuel'
 import { StatutBadge } from '../components/dashboard/StatutBadge'
@@ -82,9 +83,11 @@ export function AlertesStock() {
 
   const { ouvrir: ouvrirMenu, menu } = useMenuContextuel()
   const estActif = ongletActifId === 'alertes'
+  const [quarantaine, setQuarantaine] = useState<{ dossiers: number; unites: number } | null>(null)
 
   function charger() {
     setActualisation(true)
+    compterDossiersOuverts().then(setQuarantaine)
     Promise.all([getProduitsAvecStock(), getCommandesProduits(), getLocalisationsProduits()])
       .then(([p, cmd, loc]) => {
         setProduits(p)
@@ -178,10 +181,12 @@ export function AlertesStock() {
   ]
 
   return (
-    <div className="h-full flex flex-col gap-2 p-4">
+    <div className="h-full flex flex-col gap-2 p-[var(--content-padding)]">
       <div className="shrink-0 flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3 flex-wrap">
-          <h1 className="text-lg font-bold text-text">Alertes stock</h1>
+          <h1 className="text-[length:var(--page-title-size)] font-semibold text-text leading-tight">
+            Alertes stock <span className="ml-1 font-normal text-text-muted tabular-nums">[{lignes.length}]</span>
+          </h1>
           <div className="flex items-center gap-1.5">
             {pastilles.map((p) => (
               <button
@@ -197,6 +202,21 @@ export function AlertesStock() {
             ))}
           </div>
         </div>
+        <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => ouvrirOnglet('quarantaine', 'Quarantaine')}
+          title="Produits non conformes bloqués en quarantaine, et leur traitement"
+          className="inline-flex items-center gap-1.5 bg-card border border-border hover:bg-muted text-text text-xs font-semibold rounded-lg px-3 h-8 transition-colors"
+        >
+          <ShieldAlert size={14} strokeWidth={1.75} className="text-danger-deep" />
+          Quarantaine
+          {quarantaine && quarantaine.dossiers > 0 && (
+            <span className="inline-flex items-center justify-center min-w-5 h-5 rounded-full bg-danger-soft text-danger-deep text-[11px] font-bold px-1.5">
+              {quarantaine.dossiers}
+            </span>
+          )}
+        </button>
         <button
           onClick={charger}
           disabled={actualisation}
@@ -205,6 +225,7 @@ export function AlertesStock() {
           <RefreshCw size={14} strokeWidth={1.75} className={actualisation ? 'animate-spin' : ''} />
           Actualiser
         </button>
+        </div>
       </div>
 
       {erreur && (
@@ -218,7 +239,7 @@ export function AlertesStock() {
       ) : (
         <div className="flex-1 min-h-0 bg-card rounded-lg border border-border overflow-hidden flex flex-col">
           <div className="overflow-auto flex-1">
-            <table className="w-full text-[13px] min-w-[980px]">
+            <table className="tableau-dense min-w-[980px]">
               <thead className="sticky top-0 z-10">
                 <tr className="bg-card">
                   <IndicateurFiltre colonne="reference" actif={colonneActive} valeur={filtres.reference} />

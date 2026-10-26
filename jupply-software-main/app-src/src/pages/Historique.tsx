@@ -5,6 +5,7 @@ import { ListeDocuments, type ConfigDocuments } from '../components/historique/L
 import {
   CONFIG_ENTREES,
   CONFIG_MOUVEMENTS,
+  CONFIG_NON_CONFORMITES,
   CONFIG_REINTEGRATIONS,
   CONFIG_SORTIES,
   CONFIG_TRANSFERTS,
@@ -19,7 +20,7 @@ function EcranHistorique<D extends DocumentHistorique, L extends { id?: unknown 
   config: ConfigDocuments<D, L>
 }) {
   const { ongletActifId } = useTabs()
-  return <ListeDocuments config={config} estActif={ongletActifId === ecran} />
+  return <ListeDocuments config={config} titre={`Historique des ${config.libelle.toLowerCase()}`} estActif={ongletActifId === ecran} />
 }
 
 export function HistoriqueSorties() {
@@ -36,6 +37,10 @@ export function HistoriqueReintegrations() {
 
 export function HistoriqueTransferts() {
   return <EcranHistorique ecran="historique-transferts" config={CONFIG_TRANSFERTS} />
+}
+
+export function HistoriqueNonConformites() {
+  return <EcranHistorique ecran="historique-non-conformites" config={CONFIG_NON_CONFORMITES} />
 }
 
 export function HistoriqueMouvements() {

@@ -1,8 +1,7 @@
 import type { ReactElement } from 'react'
 import { TabsProvider, useTabs, type EcranId } from '../../context/TabsContext'
 import { SelectionProvider } from '../../context/SelectionContext'
-import { TopBar } from './TopBar'
-import { SousEntete } from './SousEntete'
+import { BarreLaterale } from './BarreLaterale'
 import { BarreOnglets } from './BarreOnglets'
 import { Dashboard } from '../../pages/Dashboard'
 import { Produits } from '../../pages/Produits'
@@ -17,11 +16,13 @@ import { NouvelleSortie } from '../../pages/NouvelleSortie'
 import {
   HistoriqueEntrees,
   HistoriqueMouvements,
+  HistoriqueNonConformites,
   HistoriqueReintegrations,
   HistoriqueSorties,
   HistoriqueTransferts,
 } from '../../pages/Historique'
 import { ToastProvider } from '../../context/ToastContext'
+import { Quarantaine } from '../../pages/Quarantaine'
 import { ComingSoon } from '../../pages/ComingSoon'
 
 const COMPOSANTS = {
@@ -41,6 +42,8 @@ const COMPOSANTS = {
   'historique-entrees': HistoriqueEntrees,
   'historique-reintegrations': HistoriqueReintegrations,
   'historique-transferts': HistoriqueTransferts,
+  'historique-non-conformites': HistoriqueNonConformites,
+  quarantaine: Quarantaine,
 } satisfies Record<EcranId, () => ReactElement>
 
 function ZoneContenu() {
@@ -64,11 +67,13 @@ export function AppShell() {
     <SelectionProvider>
       <ToastProvider>
         <TabsProvider>
-          <div className="flex flex-col h-screen overflow-hidden bg-canvas">
-            <TopBar />
-            <SousEntete />
-            <BarreOnglets />
-            <ZoneContenu />
+          {/* Barre latérale à gauche, zone de travail (onglets + écran) sur tout l'espace restant */}
+          <div className="flex h-screen overflow-hidden bg-canvas">
+            <BarreLaterale />
+            <div className="flex-1 min-w-0 flex flex-col">
+              <BarreOnglets />
+              <ZoneContenu />
+            </div>
           </div>
         </TabsProvider>
       </ToastProvider>

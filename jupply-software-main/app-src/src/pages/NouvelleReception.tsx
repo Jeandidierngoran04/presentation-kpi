@@ -10,6 +10,7 @@ import { getProduitsAvecStock } from '../lib/api/stock'
 import { getFournisseurs, getLocalisationsProduits } from '../lib/api/produits'
 import { creerReception, type NouvelleLigneReception } from '../lib/api/receptions'
 import type { Emplacement, Entrepot, Fournisseur, LocalisationProduit, ProduitAvecStock } from '../types/stock'
+import { MOTIFS_NC, type MotifNonConformite } from '../lib/api/quarantaine'
 import { NouveauFournisseurModal } from '../components/fournisseurs/NouveauFournisseurModal'
 import {
   CLASSE_BOUTON_PRIMAIRE,
@@ -31,7 +32,10 @@ interface LigneSaisie {
   lot: string
   numeroSerie: string
   dateExpiration: string
-  anomalie: boolean
+  /** Quantité déclarée non conforme par l'opérateur : seule elle part en quarantaine. */
+  quantiteNc: string
+  motifNc: MotifNonConformite | ''
+  constatNc: string
 }
 
 type ColonneSaisie =
@@ -43,6 +47,9 @@ type ColonneSaisie =
   | 'lot'
   | 'numeroSerie'
   | 'dateExpiration'
+  | 'quantiteNc'
+  | 'motifNc'
+  | 'constatNc'
 
 const CLASSE_CELLULE =
   'w-full h-8 px-2 bg-card text-xs text-text outline-none placeholder:text-text-muted ' +
@@ -62,7 +69,9 @@ function ligneVide(): LigneSaisie {
     lot: '',
     numeroSerie: '',
     dateExpiration: '',
-    anomalie: false,
+    quantiteNc: '',
+    motifNc: '',
+    constatNc: '',
   }
 }
 
@@ -75,7 +84,9 @@ function estVide(l: LigneSaisie): boolean {
     !l.lot &&
     !l.numeroSerie &&
     !l.dateExpiration &&
-    !l.anomalie
+    !l.quantiteNc &&
+    !l.motifNc &&
+    !l.constatNc
   )
 }
 
@@ -256,6 +267,15 @@ export function NouvelleReception() {
       if (l.dateExpiration && !l.lot.trim() && !l.numeroSerie.trim()) {
         return `Ligne ${numero} : le numéro de lot (ou de série) est obligatoire avec une date d'expiration.`
       }
+      // La mise en quarantaine est une décision de l'opérateur : quantité et motif explicites.
+      const quantiteNc = Number(l.quantiteNc || 0)
+      if (!Number.isInteger(quantiteNc) || quantiteNc < 0 || quantiteNc > quantiteRecueEffective(l)) {
+        return `Ligne ${numero} : la quantité non conforme doit être comprise entre 0 et la quantité reçue.`
+      }
+      if (quantiteNc > 0 && !l.motifNc) return `Ligne ${numero} : choisis le motif de la non-conformité.`
+      if (quantiteNc === 0 && (l.motifNc || l.constatNc.trim())) {
+        return `Ligne ${numero} : indique la quantité non conforme (ou retire le motif).`
+      }
     }
     return null
   }
@@ -278,7 +298,9 @@ export function NouvelleReception() {
         numeroSerie: l.numeroSerie || null,
         dateExpiration: l.dateExpiration || null,
         prixUnitaire: Number(l.prixUnitaire || 0),
-        anomalie: l.anomalie,
+        quantiteNonConforme: Number(l.quantiteNc || 0),
+        motifNonConformite: l.motifNc || null,
+        constatNonConformite: l.constatNc.trim() || null,
       }))
       await creerReception({
         entrepotId,
@@ -402,7 +424,7 @@ export function NouvelleReception() {
             ))}
           </datalist>
           <div ref={tableauRef} onKeyDown={onKeyDownTableau} className="flex-1 min-h-0 overflow-auto rounded-lg border border-border">
-            <table className="w-full min-w-[1150px] border-collapse text-xs">
+            <table className="w-full min-w-[1480px] border-collapse text-xs">
               <thead className="sticky top-0 z-10 text-[11px] text-text-muted uppercase tracking-wide">
                 <tr>
                   <th className={`${CLASSE_TH} w-9 text-center`}>#</th>
@@ -415,9 +437,14 @@ export function NouvelleReception() {
                   <th className={`${CLASSE_TH} w-28`}>Lot</th>
                   <th className={`${CLASSE_TH} w-28`}>N° série</th>
                   <th className={`${CLASSE_TH} w-32`}>Expiration</th>
-                  <th className={`${CLASSE_TH} w-12 text-center`} title="Non conforme : la quantité part en Quarantaine">
-                    NC
+                  <th
+                    className={`${CLASSE_TH} w-20 text-right`}
+                    title="Quantité non conforme (endommagée, avariée...) : seule cette quantité part en quarantaine, avec un dossier de non-conformité"
+                  >
+                    Qté NC
                   </th>
+                  <th className={`${CLASSE_TH} w-44`}>Motif NC</th>
+                  <th className={`${CLASSE_TH} w-56`}>Constat</th>
                   <th className={`${CLASSE_TH} w-9`} />
                 </tr>
               </thead>
@@ -428,7 +455,7 @@ export function NouvelleReception() {
                   const avertissement = avertissementEmplacement(ligne)
                   const vide = estVide(ligne)
                   return (
-                    <tr key={ligne.cle} className={ligne.anomalie ? 'bg-danger-soft/40' : ''}>
+                    <tr key={ligne.cle} className={Number(ligne.quantiteNc || 0) > 0 ? 'bg-danger-soft/40' : ''}>
                       <td className={`${CLASSE_TD} text-center text-text-muted bg-muted`}>{index + 1}</td>
                       <td className={CLASSE_TD}>
                         <input
@@ -528,14 +555,42 @@ export function NouvelleReception() {
                           className={CLASSE_CELLULE}
                         />
                       </td>
-                      <td className={`${CLASSE_TD} text-center`}>
+                      <td className={CLASSE_TD}>
                         <input
-                          type="checkbox"
-                          checked={ligne.anomalie}
-                          onChange={(e) => majLigne(ligne.cle, { anomalie: e.target.checked })}
+                          {...attributsCellule(index, 'quantiteNc')}
+                          type="number"
+                          min="0"
+                          value={ligne.quantiteNc}
+                          onChange={(e) => majLigne(ligne.cle, { quantiteNc: e.target.value })}
                           disabled={!produit}
-                          title="Produit non conforme ou endommagé : part en Quarantaine"
-                          className="accent-[var(--danger)]"
+                          placeholder="0"
+                          className={`${CLASSE_CELLULE} text-right`}
+                        />
+                      </td>
+                      <td className={CLASSE_TD}>
+                        <select
+                          {...attributsCellule(index, 'motifNc')}
+                          value={ligne.motifNc}
+                          onChange={(e) => majLigne(ligne.cle, { motifNc: e.target.value as MotifNonConformite | '' })}
+                          disabled={!produit}
+                          className={CLASSE_CELLULE}
+                        >
+                          <option value="">—</option>
+                          {MOTIFS_NC.map((m) => (
+                            <option key={m.valeur} value={m.valeur}>
+                              {m.label}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className={CLASSE_TD}>
+                        <input
+                          {...attributsCellule(index, 'constatNc')}
+                          value={ligne.constatNc}
+                          onChange={(e) => majLigne(ligne.cle, { constatNc: e.target.value })}
+                          disabled={!produit}
+                          placeholder={Number(ligne.quantiteNc || 0) > 0 ? 'Ex. 4 cartons écrasés' : ''}
+                          className={CLASSE_CELLULE}
                         />
                       </td>
                       <td className={`${CLASSE_TD} text-center`}>

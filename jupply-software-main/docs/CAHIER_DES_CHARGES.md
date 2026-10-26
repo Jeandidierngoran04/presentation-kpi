@@ -182,10 +182,15 @@ d'une marchandise, généralement en provenance d'un fournisseur.
   est enregistrée comme partielle ; le reliquat pourra être ajouté
   ultérieurement sur le même bon de commande.
 - Si la quantité reçue est supérieure à la quantité attendue, le surplus
-  est placé en quarantaine jusqu'à clarification avec le fournisseur.
-- Si un produit est endommagé ou non conforme, il est signalé comme
-  anomalie et placé en quarantaine ; après vérification, il peut être
-  transféré vers son emplacement définitif.
+  entre en stock ; l'opérateur peut le déclarer non conforme (motif
+  « Surplus de livraison ») pour le placer en quarantaine jusqu'à
+  clarification avec le fournisseur.
+- Si un produit est endommagé ou non conforme, l'opérateur indique la
+  quantité non conforme, le motif et le constat : seule cette quantité est
+  placée en quarantaine, avec un dossier de non-conformité (NC). **Rien ne
+  part en quarantaine sans décision de l'opérateur.** Le dossier est ensuite
+  traité : libération en stock, retour fournisseur, mise au rebut ou
+  réparation, avec mise à jour automatique du stock.
 - La validation définitive de la réception est effectuée par le
   Gestionnaire d'entrepôt ; le Magasinier peut également valider si cette
   autorisation lui est accordée.

@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, type ReactNode } from 'react'
-import { MODULE_PAR_ECRAN } from '../lib/modules'
+import { GROUPE_PAR_DEFAUT, MODULE_PAR_ECRAN } from '../lib/modules'
 
 export type EcranId =
   | 'dashboard'
@@ -18,19 +18,21 @@ export type EcranId =
   | 'historique-entrees'
   | 'historique-reintegrations'
   | 'historique-transferts'
+  | 'historique-non-conformites'
+  | 'quarantaine'
 
 export interface Onglet {
   id: EcranId
   titre: string
 }
 
-const ONGLET_DASHBOARD: Onglet = { id: 'dashboard', titre: 'Dashboard' }
-const MODULE_DEFAUT = 'magasin'
+const ONGLET_DASHBOARD: Onglet = { id: 'dashboard', titre: 'Tableau de bord' }
+const MODULE_DEFAUT = GROUPE_PAR_DEFAUT
 
 interface TabsState {
   onglets: Onglet[]
   ongletActifId: EcranId
-  /** Module metier affiche au Level 1 / Level 2 (peut differer du module de l'onglet actif si on vient de cliquer une pilule). */
+  /** Groupe de la barre laterale auquel appartient l'onglet actif. */
   moduleActifId: string
   definirModuleActif: (id: string) => void
   ouvrirOnglet: (ecran: EcranId, titre: string) => void

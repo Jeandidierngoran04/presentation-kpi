@@ -21,7 +21,8 @@ technique).
 ## Charte graphique
 
 `docs/charte-graphique/CHARTE_GRAPHIQUE.md` est la référence visuelle unique du
-produit (application et, plus tard, site vitrine) : navigation 3 niveaux,
+produit (application et, plus tard, site vitrine) : barre latérale repliable
+à gauche + onglets de travail, tableaux denses,
 palette Light/Dark "Clean SaaS Sage", typo Plus Jakarta Sans, iconographie
 outline, densité, composants.
 

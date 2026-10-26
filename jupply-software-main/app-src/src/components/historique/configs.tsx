@@ -2,6 +2,7 @@
 // sont déclarés une seule fois ici : ListeDocuments s'appuie sur leur stabilité.
 import type { BonSortieHistorique, DocumentHistorique, LigneBonSortie } from '../../lib/api/historique'
 import { ouvrirBonSortiePdf } from '../../lib/export/bonSortiePdf'
+import { libelleDecision, libelleMotif, ORIGINES_NC, STATUTS_NC, type StatutNc } from '../../lib/api/quarantaine'
 import { Badge, type TonBadge } from '../ui/Badge'
 import type { ConfigDocuments } from './ListeDocuments'
 
@@ -73,7 +74,7 @@ export const CONFIG_SORTIES: ConfigDocuments<BonSortieHistorique, LigneBonSortie
 const STATUTS_RECEPTION: Record<string, { label: string; ton: TonBadge }> = {
   en_attente: { label: 'En attente', ton: 'neutre' },
   validee: { label: 'Validée', ton: 'succes' },
-  partielle: { label: 'Partielle', ton: 'alerte' },
+  partielle: { label: 'Partielle', ton: 'info' },
   anomalie: { label: 'Anomalie', ton: 'danger' },
 }
 
@@ -160,9 +161,9 @@ export const CONFIG_REINTEGRATIONS: ConfigDocuments<DocumentHistorique, Document
 
 const STATUTS_TRANSFERT: Record<string, { label: string; ton: TonBadge }> = {
   demande: { label: 'Demandé', ton: 'neutre' },
-  valide: { label: 'Validé', ton: 'succes' },
-  expedie: { label: 'Expédié', ton: 'alerte' },
-  en_transit: { label: 'En transit', ton: 'alerte' },
+  valide: { label: 'Validé', ton: 'info' },
+  expedie: { label: 'Expédié', ton: 'info' },
+  en_transit: { label: 'En transit', ton: 'info' },
   recu: { label: 'Reçu', ton: 'succes' },
 }
 
@@ -203,6 +204,53 @@ export const CONFIG_TRANSFERTS: ConfigDocuments<DocumentHistorique, DocumentHist
     ],
   },
   titreDetail: (d) => `Transfert ${String(d.numero)}`,
+}
+
+// --- Non-conformités (quarantaine) --------------------------------------------
+
+export const CONFIG_NON_CONFORMITES: ConfigDocuments<DocumentHistorique, DocumentHistorique> = {
+  vue: 'v_quarantaine',
+  libelle: 'Non-conformités',
+  colonneNumero: { cle: 'numero', titre: 'N° NC' },
+  colonnes: [
+    { titre: 'N° NC', valeur: (d) => txt(d.numero), mono: true, largeurExcel: 16 },
+    { titre: 'Date', valeur: (d) => dateHeure(d.cree_le), rendu: (d) => texteDateHeure(d.cree_le), largeurExcel: 18 },
+    {
+      titre: 'Statut',
+      valeur: (d) => STATUTS_NC[d.statut as StatutNc]?.label ?? txt(d.statut),
+      rendu: (d) => {
+        const s = STATUTS_NC[d.statut as StatutNc]
+        return s ? <Badge ton={s.ton}>{s.label}</Badge> : String(d.statut)
+      },
+      largeurExcel: 14,
+    },
+    { titre: 'Référence', valeur: (d) => txt(d.produit_reference), mono: true, largeurExcel: 16 },
+    { titre: 'Désignation', valeur: (d) => txt(d.produit_designation), largeurExcel: 30 },
+    { titre: 'Lot / Série', valeur: (d) => txt(d.lot ?? d.numero_serie), mono: true, largeurExcel: 14 },
+    { titre: 'Motif', valeur: (d) => libelleMotif(txt(d.motif)), largeurExcel: 24 },
+    { titre: 'Fournisseur', valeur: (d) => txt(d.fournisseur_nom), largeurExcel: 22 },
+    { titre: 'N° commande', valeur: (d) => txt(d.numero_po), mono: true, largeurExcel: 14 },
+    { titre: 'Réception', valeur: (d) => txt(d.reception_numero), mono: true, largeurExcel: 16 },
+    { titre: 'Origine', valeur: (d) => ORIGINES_NC[String(d.origine)] ?? txt(d.origine), largeurExcel: 18 },
+    { titre: 'Qté initiale', valeur: (d) => nb(d.quantite_initiale), droite: true, largeurExcel: 10 },
+    { titre: 'Qté restante', valeur: (d) => nb(d.quantite_restante), droite: true, largeurExcel: 10 },
+    { titre: 'Déclaré par', valeur: (d) => txt(d.declare_par_nom), largeurExcel: 22 },
+  ],
+  lignes: {
+    vue: 'v_quarantaine_traitements',
+    colonneLien: 'non_conformite_id',
+    colonnes: [
+      { titre: 'Date', valeur: (l) => dateHeure(l.cree_le), rendu: (l) => texteDateHeure(l.cree_le), largeurExcel: 18 },
+      { titre: 'Décision', valeur: (l) => libelleDecision(String(l.decision)), largeurExcel: 20 },
+      { titre: 'Prise sur', valeur: (l) => (l.source === 'reparation' ? 'Retour de réparation' : 'À traiter'), largeurExcel: 18 },
+      { titre: 'Quantité', valeur: (l) => nb(l.quantite), droite: true, largeurExcel: 10 },
+      { titre: 'Destination', valeur: (l) => txt(l.emplacement_destination_code), mono: true, largeurExcel: 14 },
+      { titre: 'Document', valeur: (l) => txt(l.reference_document), mono: true, largeurExcel: 18 },
+      { titre: 'Commentaire', valeur: (l) => txt(l.commentaire), largeurExcel: 40 },
+      { titre: 'Traité par', valeur: (l) => txt(l.traite_par_nom), largeurExcel: 22 },
+    ],
+  },
+  titreDetail: (d) => `Dossier ${String(d.numero)}`,
 }
 
 // --- Tous les mouvements ------------------------------------------------------

@@ -63,6 +63,7 @@ export function Sorties() {
       <ListeDocuments
         config={CONFIG_SORTIES}
         estActif={ongletActifId === 'sorties'}
+        titre="Sorties du jour"
         duJourSeulement
         idEnSurbrillance={derniereSortie?.id ?? null}
         jetonRechargement={derniereSortie?.jeton ?? 0}

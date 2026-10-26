@@ -376,7 +376,7 @@ export function Produits() {
       ) : (
         <div className="flex-1 min-h-0 bg-card rounded-lg border border-border overflow-hidden flex flex-col">
           <div className="overflow-auto flex-1">
-            <table className="w-full text-sm min-w-[900px]">
+            <table className="tableau-dense min-w-[900px]">
               <thead className="sticky top-0 z-10">
                 <tr className="bg-card">
                   <th className="px-2 py-0.5" />

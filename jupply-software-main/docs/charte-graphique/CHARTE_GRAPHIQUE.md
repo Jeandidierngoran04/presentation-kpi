@@ -29,27 +29,69 @@ Ce qu'on évite : dégradés violets, ombres lourdes, icônes pleines, bordures
 
 ---
 
-## 2. Architecture de navigation (3 niveaux)
+## 2. Architecture de navigation : barre latérale + onglets
 
-Navigation **horizontale hiérarchique**, pas de sidebar. On exploite 100 % de
-la largeur.
+> **Décision du 27/10/2026 (Jean Didier)** : la navigation passe dans une
+> **barre latérale gauche**. Elle remplace la Top Bar (Level 1) et le
+> Sub-Header (Level 2) décrits plus bas, conservés ici pour l'historique.
+> Le Multi-Tab Workspace (Level 3) est conservé. Références : barre latérale
+> "Multi Source Inventory", densité de contenu "AeroTrack".
 
 ```
-+------------------------------------------------------------------+
-| LEVEL 1 : TOP BAR - Modules métiers globaux           (sticky)   |
-+------------------------------------------------------------------+
-| LEVEL 2 : SUB-HEADER - Menu fonctionnel du module actif          |
-+------------------------------------------------------------------+
-| LEVEL 3 : MULTI-TAB WORKSPACE - Onglets dynamiques (inverted radius)
-+--------------------------+---------------------------------------+
-|                                                                  |
-|   CONTENU PRINCIPAL DE LA VUE ACTIVE                              |
-|   (cartes blanches / conteneur principal)                        |
-|                                                                  |
-+------------------------------------------------------------------+
++--------+---------------------------------------------------------+
+| LOGO   | ONGLETS DE TRAVAIL (inverted radius)  | Recherche | Notif |
+|--------+---------------------------------------------------------+
+| Menu   |                                                         |
+| dossiers|  Titre [n]                                 Actions      |
+| (défil.|  Filtres...                                             |
+| interne)|  TABLEAU DENSE pleine largeur                          |
+|--------|                                                         |
+| Compte |                                                         |
+| Param. «                                                         |
++--------+---------------------------------------------------------+
 ```
 
-Le schéma d'origine est dans `assets/` (`layout-3-niveaux.png`).
+### Barre latérale
+
+- **Logo seul en haut** (pas de nom). Fond `--nav-fond`, bordure droite fine.
+- Entrées : icône outline 18px + libellé **13,5px** (sous-entrées 13px),
+  hauteur 34px (sous-entrées 30px), espacement serré et régulier.
+- Groupes : **Tableau de bord**, **Stock Management**, **Mouvement**,
+  **Inventaires**, **Historiques** ; **Paramètre** ancré en bas. Un groupe se
+  déplie comme un dossier (chevron `>` qui pivote), plusieurs peuvent rester
+  ouverts ; le dossier de l'écran affiché est toujours ouvert.
+- Entrée active : **fond gris clair discret** (`--nav-actif`), texte en
+  gras ; survol `--nav-survol`.
+- **Bas fixe** : compte (pastille ronde avec l'initiale du nom ; menu :
+  profil, préférences, mode clair/sombre, déconnexion), Paramètre, et la
+  flèche `«` / `»` pour réduire ou déplier la barre.
+- La liste défile à l'intérieur de la barre (barre de défilement fine) ; le
+  logo et le bas ne bougent pas.
+- **Réduite** : rail de 64px, icônes seules à la même place, info-bulle au
+  survol, sous-entrées d'un dossier dans un petit menu flottant. Transition
+  de largeur 180ms. L'état ouvert/réduit et les dossiers ouverts sont
+  mémorisés dans le navigateur.
+- Tokens : `--sidebar-width` (240px), `--sidebar-collapsed-width` (64px),
+  `--sidebar-transition`, `--nav-font-size`, `--nav-item-height`...
+  (`app-src/src/index.css`).
+
+### Zone de contenu dense
+
+- En-tête compact : **titre + compteur entre crochets** (« Sorties du jour
+  [12] ») à gauche, actions à droite (composant `EnTetePage`).
+- Ligne de filtres juste en dessous.
+- Tableau pleine largeur (classe `tableau-dense`) : lignes 34px, texte
+  12,5px, en-têtes 11,5px gris sur fond `muted` (casse normale), séparateurs
+  fins horizontaux et verticaux, texte tronqué avec « … » sans retour à la
+  ligne, numéro de document souligné comme un lien.
+- Badges de statut (petite capsule bordée) : **vert** = terminé, **bleu** =
+  en cours, **gris** = en attente, **rouge** = problème ; **orange** réservé
+  aux alertes de stock.
+
+### Ancienne navigation (avant le 27/10/2026)
+
+Navigation horizontale hiérarchique sur 3 niveaux (Top Bar, Sub-Header,
+onglets). Le schéma d'origine est dans `assets/` (`layout-3-niveaux.png`).
 
 ### Level 1 - Top Bar (modules métiers globaux)
 

@@ -11,6 +11,7 @@ import { exporterCsv, exporterExcel, nomFichierSur, type ValeurExport } from '..
 import { Modal } from '../ui/Modal'
 import { useMenuContextuel, type ElementMenuContextuel } from '../ui/MenuContextuel'
 import { CLASSE_CHAMP_COMPACT, CLASSE_LABEL } from '../ui/styles'
+import { EnTetePage } from '../ui/EnTetePage'
 
 export interface ColonneDocument<R> {
   titre: string
@@ -45,6 +46,8 @@ export interface ConfigDocuments<D extends DocumentHistorique, L> {
 
 interface ListeDocumentsProps<D extends DocumentHistorique, L> {
   config: ConfigDocuments<D, L>
+  /** Titre de l'écran (par défaut, le libellé de la configuration). */
+  titre?: string
   /** L'onglet est-il affiché ? Les données sont rechargées à chaque retour. */
   estActif: boolean
   /** Liste du jour (sans sélection de dates). */
@@ -71,7 +74,7 @@ function afficher<R>(colonne: ColonneDocument<R>, ligne: R): ReactNode {
 
 function TableauLignes<R extends { id?: unknown }>({ colonnes, lignes }: { colonnes: ColonneDocument<R>[]; lignes: R[] }) {
   return (
-    <table className="w-full text-xs">
+    <table className="tableau-dense">
       <thead className="sticky top-0 z-10">
         <tr className="text-left text-[11px] text-text-muted uppercase tracking-wide bg-muted">
           {colonnes.map((c) => (
@@ -118,6 +121,7 @@ function BoutonExport({ icone: Icone, label, onClick }: { icone: typeof FileText
  */
 export function ListeDocuments<D extends DocumentHistorique, L extends { id?: unknown }>({
   config,
+  titre,
   estActif,
   duJourSeulement = false,
   actions,
@@ -237,46 +241,55 @@ export function ListeDocuments<D extends DocumentHistorique, L extends { id?: un
   const numeroEstColonne = (c: ColonneDocument<D>) => config.colonneNumero && c.titre === config.colonneNumero.titre
 
   return (
-    <div className="h-full flex flex-col gap-2 p-3 min-h-0">
-      {/* Barre d'outils : période, filtre numéro, exports, actions */}
-      <div className="shrink-0 flex items-end justify-between gap-3 flex-wrap">
-        <div className="flex items-end gap-3 flex-wrap">
-          {duJourSeulement ? (
-            <div className="flex flex-col gap-1">
-              <span className={CLASSE_LABEL}>Période</span>
-              <div className="h-[26px] flex items-center text-[13px] font-semibold text-text">
-                Aujourd'hui, {new Date().toLocaleDateString('fr-FR')}
-              </div>
-            </div>
-          ) : (
-            <>
-              <label className="flex flex-col gap-1 w-[150px]">
-                <span className={CLASSE_LABEL}>Du</span>
-                <input type="date" value={du} max={au || undefined} onChange={(e) => setDu(e.target.value)} className={CLASSE_CHAMP_COMPACT} />
-              </label>
-              <label className="flex flex-col gap-1 w-[150px]">
-                <span className={CLASSE_LABEL}>Au</span>
-                <input type="date" value={au} min={du || undefined} onChange={(e) => setAu(e.target.value)} className={CLASSE_CHAMP_COMPACT} />
-              </label>
-            </>
-          )}
-          {numero && (
-            <span className="inline-flex items-center gap-1.5 h-[26px] rounded-full border border-accent bg-accent-soft px-2.5 text-xs font-semibold text-accent-deep">
-              {config.colonneNumero?.titre} : {numero} <span className="font-normal">(toutes dates)</span>
-              <button onClick={() => setNumero('')} title="Retirer le filtre" className="hover:text-danger">
-                <X size={13} strokeWidth={1.75} />
-              </button>
-            </span>
-          )}
-          <span className="h-[26px] flex items-center text-xs text-text-muted">
-            <span className="font-semibold text-text mr-1">{documents.length}</span> document(s)
+    <div className="h-full flex flex-col gap-2 p-[var(--content-padding)] min-h-0">
+      {/* En-tête compact : titre [nombre] à gauche, exports et actions à droite */}
+      <EnTetePage
+        titre={titre ?? config.libelle}
+        compteur={documents.length}
+        actions={
+          <>
+            <BoutonExport icone={FileSpreadsheet} label="Excel" onClick={() => exporterListe('excel')} />
+            <BoutonExport icone={FileDown} label="CSV" onClick={() => exporterListe('csv')} />
+            {actions}
+          </>
+        }
+      />
+
+      {/* Ligne de filtres */}
+      <div className="shrink-0 flex items-center gap-2 flex-wrap">
+        {duJourSeulement ? (
+          <span className="h-[26px] flex items-center rounded-md border border-border bg-muted px-2.5 text-xs text-text-muted">
+            Aujourd'hui, {new Date().toLocaleDateString('fr-FR')}
           </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <BoutonExport icone={FileSpreadsheet} label="Excel" onClick={() => exporterListe('excel')} />
-          <BoutonExport icone={FileDown} label="CSV" onClick={() => exporterListe('csv')} />
-          {actions}
-        </div>
+        ) : (
+          <>
+            <label className="flex items-center gap-1.5 text-xs text-text-muted">
+              Du
+              <input type="date" value={du} max={au || undefined} onChange={(e) => setDu(e.target.value)} className={`${CLASSE_CHAMP_COMPACT} w-[140px]`} />
+            </label>
+            <label className="flex items-center gap-1.5 text-xs text-text-muted">
+              au
+              <input type="date" value={au} min={du || undefined} onChange={(e) => setAu(e.target.value)} className={`${CLASSE_CHAMP_COMPACT} w-[140px]`} />
+            </label>
+          </>
+        )}
+        {config.colonneNumero && !numero && (
+          <button
+            type="button"
+            onClick={(e) => setSaisieNumero({ x: e.currentTarget.getBoundingClientRect().left, y: e.currentTarget.getBoundingClientRect().bottom + 4, valeur: '' })}
+            className="h-[26px] inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 text-xs text-text-muted hover:text-text"
+          >
+            <Search size={12} strokeWidth={1.75} /> {config.colonneNumero.titre}
+          </button>
+        )}
+        {numero && (
+          <span className="inline-flex items-center gap-1.5 h-[26px] rounded-full border border-accent bg-accent-soft px-2.5 text-xs font-semibold text-accent-deep">
+            {config.colonneNumero?.titre} : {numero} <span className="font-normal">(toutes dates)</span>
+            <button onClick={() => setNumero('')} title="Retirer le filtre" className="hover:text-danger">
+              <X size={13} strokeWidth={1.75} />
+            </button>
+          </span>
+        )}
       </div>
 
       {erreur && <div className="shrink-0 text-xs bg-danger-soft text-danger-deep rounded-lg px-3 py-2">{erreur}</div>}
@@ -288,7 +301,7 @@ export function ListeDocuments<D extends DocumentHistorique, L extends { id?: un
           if (elementsMenuTableau && elementsMenuTableau.length > 0) ouvrirMenu(e, elementsMenuTableau)
         }}
       >
-        <table className="w-full text-[13px]">
+        <table className="tableau-dense">
           <thead className="sticky top-0 z-10">
             <tr className="text-left text-[11px] text-text-muted uppercase tracking-wide bg-muted">
               {config.colonnes.map((c) => (
@@ -324,8 +337,13 @@ export function ListeDocuments<D extends DocumentHistorique, L extends { id?: un
                   <td
                     key={c.titre}
                     onContextMenu={numeroEstColonne(c) ? ouvrirSaisieNumero : undefined}
+                    title={typeof c.valeur(d) === 'string' ? (c.valeur(d) as string) : undefined}
                     className={`px-3 whitespace-nowrap ${c.droite ? 'text-right' : ''} ${
-                      c.mono ? 'font-mono text-xs text-text-muted' : 'text-text'
+                      numeroEstColonne(c)
+                        ? 'font-mono text-xs text-info-deep underline underline-offset-2'
+                        : c.mono
+                          ? 'font-mono text-xs text-text-muted'
+                          : 'text-text'
                     }`}
                   >
                     {afficher(c, d)}

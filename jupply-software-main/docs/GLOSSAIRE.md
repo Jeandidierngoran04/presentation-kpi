@@ -141,8 +141,9 @@ Commandé : 100, reçu : 70 → reste à recevoir : 30.* Le reliquat peut être
 complété plus tard sur le même bon de commande.
 
 **Réception en excès** — Le fournisseur livre davantage que ce qui avait
-été commandé. *Ex. : Commandé : 100, reçu : 110.* Le surplus est placé en
-quarantaine le temps de clarifier la situation.
+été commandé. *Ex. : Commandé : 100, reçu : 110.* Le surplus entre en
+stock, sauf si l'opérateur le déclare non conforme (il passe alors en
+quarantaine le temps de clarifier la situation).
 
 **Produit non conforme** — Produit reçu mais qui ne respecte pas ce qui
 était attendu (mauvais modèle, produit cassé, mauvais numéro de série,

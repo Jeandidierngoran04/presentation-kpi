@@ -1017,6 +1017,238 @@ Le bon de sortie PDF reprend le modèle AIRSTOCK fourni (photo du
 - [ ] Plus tard : PDF des autres documents (bon de réception, bon de
       transfert) sur le même modèle
 
+---
+
+# Gestion de la quarantaine (dossiers de non-conformité)
+
+**Statut :** validé, exécution en cours (code complet, migration testée sur base de test, en attente exécution Supabase + vérif locale)
+**Démarré le :** 03/10/2026
+
+## Objectif
+
+Demande de Jean Didier : suivre les produits en quarantaine (reçus non
+conformes : dommage, avarie...) depuis un bouton dans Alertes stock. Savoir
+à tout moment ce qui est en quarantaine, combien, pourquoi, depuis quand,
+de quel fournisseur et de quelle commande. Un outil **Traitement** : on
+retrouve le cas (N° de commande, code ou désignation), on le traite dans une
+fenêtre, et la validation met le stock à jour automatiquement. Demande
+explicite : une proposition professionnelle.
+
+## Analyse de l'existant
+
+- Chaque entrepôt a un emplacement "Quarantaine" (créé automatiquement),
+  exclu du stock disponible partout dans l'application.
+- La validation d'une réception y envoie les lignes cochées "non conforme"
+  et les surplus (reçu > commandé), avec seulement un motif générique dans
+  l'historique ("Anomalie à réception - Quarantaine").
+- **Il n'existe aucun suivi** : pas de motif détaillé, pas de dossier, pas
+  de décision, pas d'écran. La seule façon d'en sortir est un déplacement
+  manuel, sans trace de la décision prise. Le cahier des charges prévoit
+  une "libération de quarantaine après vérification" sans la détailler.
+- Le stock par lot (`stock_lots`) garde le lot des produits en quarantaine.
+
+## Proposition : le dossier de non-conformité
+
+Pratique standard en logistique et en qualité (NCR, *Non-Conformance
+Report*) : chaque mise en quarantaine ouvre un **dossier de non-conformité**
+numéroté `NC-2026-00001`, qui vit jusqu'à ce que toute la quantité ait reçu
+une décision.
+
+### 1. Ouverture du dossier
+
+- **Automatique à la validation d'une réception** : une ligne non conforme
+  ou un surplus ouvre un dossier rempli d'office (produit, lot / série,
+  quantité, fournisseur, N° de commande, N° de réception, déclarant, date).
+  Dans la feuille de réception, cocher "NC" demande le **motif** (liste) et
+  une **description** du constat.
+- **Manuelle, depuis le stock** : un dommage découvert en rayon (chute,
+  fuite, péremption) se déclare depuis l'écran Quarantaine : produit, lot,
+  emplacement, quantité, motif, description. La quantité passe en
+  quarantaine immédiatement.
+- **Reprise de l'existant** : le stock déjà en quarantaine devient des
+  dossiers "à qualifier".
+
+### 2. Motifs (liste fixe, plus "Autre")
+
+Endommagé / casse · Avarie de transport · Non conforme à la commande
+(mauvaise référence, spécification) · Surplus de livraison · Périmé ou date
+trop courte · Documents manquants (certificat, CoC) · Défaut qualité ·
+Autre.
+
+### 3. Écran Quarantaine (bouton "Quarantaine" dans Alertes stock)
+
+- **Indicateurs** : dossiers ouverts, unités bloquées, valeur bloquée (au
+  prix de réception), dossiers de plus de 30 jours.
+- **Liste** : N° NC, date, ancienneté (en jours, orange au-delà de 15,
+  rouge au-delà de 30), référence, désignation, lot / série, quantité
+  restante / initiale, motif, fournisseur, N° de commande, N° de réception,
+  statut (Ouvert, En cours, Clôturé).
+- Filtres : statut, dépôt, motif, et recherche libre (N° de commande,
+  N° NC, référence, désignation, fournisseur, lot).
+- En bas : la fiche du dossier sélectionné et l'historique de ses
+  traitements.
+
+### 4. Traitement
+
+- Bouton **Traitement** : un champ de recherche (N° de commande, code ou
+  désignation) affiche les dossiers ouverts correspondants ; on choisit le
+  dossier et on clique sur "Traiter".
+- **Fenêtre de traitement** : rappel du dossier, puis la quantité restante
+  est **répartie entre trois décisions** (une ou plusieurs) :
+  - **Libérer en stock** (vérifié conforme) : quantité + emplacement de
+    destination. Le produit redevient disponible, avec son lot.
+  - **Retour fournisseur** : quantité + N° de retour (RMA) ou d'avoir.
+    Sortie définitive du stock.
+  - **Mise au rebut / destruction** : quantité + N° de PV. Sortie
+    définitive du stock.
+- **Constat / commentaire obligatoire**, traité par (automatique), date.
+- À la validation : stock et lots mis à jour, mouvements dans l'historique
+  (référence = N° NC). S'il reste une quantité, le dossier passe "En cours",
+  sinon "Clôturé".
+
+### 5. Intégration
+
+- Alertes stock : bouton "Quarantaine (n)" ; Dashboard : indicateur "En
+  quarantaine" ; Historique : nouvelle liste "Non-conformités" avec exports.
+- Plus tard (phase 2) : PDF de la fiche NC, bon de retour fournisseur, PV
+  de destruction ; photos du dommage ; statistiques par fournisseur (taux
+  de non-conformité, utile pour évaluer les fournisseurs).
+
+## Décisions à valider avec Jean Didier
+
+1. Les trois décisions de traitement (Libérer / Retour fournisseur / Rebut)
+   suffisent-elles, ou faut-il "Réparation" (le produit reste bloqué en
+   attente de réparation) ?
+2. **Qui peut traiter ?** Proposition : Administrateur, Superviseur et
+   Gestionnaire d'entrepôt ; le Magasinier peut déclarer mais pas décider.
+3. La liste des motifs convient-elle ?
+4. Déclaration manuelle depuis le stock dès la phase 1 ? (recommandé)
+
+## Points de vigilance
+
+- Migration SQL importante (2 tables, fonctions de déclaration et de
+  traitement, modification de la validation des réceptions), testée sur la
+  base de test avant exécution dans Supabase.
+- Le traitement déplace ou sort les lots explicitement (le lot suit le
+  produit libéré).
+
+## Avancement
+
+- [x] Proposition validée par Jean Didier (03/10/2026), avec deux
+      corrections : **rien ne part en quarantaine sans décision de
+      l'opérateur** (le surplus n'y va plus automatiquement ; à la réception
+      l'opérateur saisit la quantité non conforme, le motif et le constat),
+      et **Réparation** ajoutée aux décisions. Tout le monde peut traiter
+      (restrictions plus tard). Motifs et déclaration manuelle : choix de
+      Claude (liste proposée, déclaration manuelle incluse).
+- [x] Base : migration `2026-10-03-quarantaine.sql` (colonnes NC sur
+      `receptions_lignes`, tables `non_conformites` /
+      `non_conformites_traitements`, `declarer_non_conformite`,
+      `traiter_non_conformite`, `valider_reception` réécrite, reprise de
+      l'existant, vues `v_quarantaine` / `v_quarantaine_traitements`).
+      Testée sur base de test : 68 contrôles, 3 états de départ,
+      ré-exécution dans le désordre. Anciennes migrations et `schema.sql`
+      alignés.
+- [x] Application : feuille de réception (Qté NC, Motif NC, Constat),
+      écran `pages/Quarantaine.tsx` (indicateurs, filtres, fiche,
+      traitements, exports Excel / CSV), fenêtres Traitement, recherche
+      "Traitement", Déclaration ; bouton dans Alertes stock, indicateur
+      Dashboard, Historique > Non-conformités ; cahier des charges et
+      glossaire alignés. `tsc -b` + `vite build` OK.
+- [ ] Phase 2 : documents PDF, photos, statistiques fournisseurs
+- [ ] Vérification en local par Jean Didier
+
+---
+
+# Nouvelle présentation : navigation latérale "nouvelle génération"
+
+**Statut :** validé, exécution en cours (étapes 1 à 3 codées, en attente de vérification locale). Proposition du 26/10 remplacée par le cahier des charges précis de Jean Didier (27/10/2026).
+**Démarré le :** 26/10/2026
+
+## Cahier des charges de Jean Didier (27/10/2026)
+
+- Barre latérale sur le modèle "Multi Source Inventory" : icône + libellé
+  13-14px, espacement serré, sous-menus en accordéon avec chevron, entrée
+  active sur fond gris clair, **logo seul en haut**, en bas Paramètres +
+  flèche « / » pour réduire, défilement interne fin (logo et bas fixes).
+- Barre réduite : rail d'icônes, info-bulle au survol, transition
+  150-200 ms, état mémorisé (localStorage), variables CSS
+  (`--sidebar-width: 240px`, `--sidebar-collapsed-width: 64px`).
+- Zone de contenu dense sur le modèle "AeroTrack" : en-tête "Titre [n]" +
+  actions à droite, ligne de filtres, tableau pleine largeur serré,
+  badges de statut (vert / bleu / gris / rouge), texte tronqué "…".
+- Uniquement mise en page et style : aucune logique métier ni donnée.
+
+## Plan des fichiers
+
+Étape 1 : coquille et barre latérale
+- `index.css` : nouveaux tokens (largeurs de barre, transition, tailles de
+  police, hauteurs de ligne, espacements), barre de défilement fine,
+  couleur "info" (bleu) pour les statuts en cours.
+- **Nouveau** `components/layout/BarreLaterale.tsx` : logo, entrées et
+  sous-menus, rail réduit, bas fixe (Paramètres + flèche), mémorisation.
+- **Nouveau** `components/layout/InfoBulle.tsx` : info-bulle affichée hors
+  de la barre (sinon coupée par le défilement interne).
+- `lib/modules.ts` : la liste devient des groupes avec icône (un groupe =
+  une entrée de la barre, ses écrans = les sous-entrées).
+- `AppShell.tsx` : barre latérale à gauche + zone de travail à droite.
+- `BarreOnglets.tsx` : devient l'unique ligne du haut de la zone de
+  travail (onglets à gauche ; recherche, thème, notifications, compte à
+  droite).
+- **Supprimés** : `TopBar.tsx`, `SousEntete.tsx` (leur contenu migre dans
+  la barre latérale et la ligne d'onglets ; le cas "Sorties Manuelles avec
+  un produit sélectionné" est conservé).
+- `TabsContext.tsx` : retouche mineure (module actif = groupe ouvert).
+
+Étape 2 : densité de la zone de contenu
+- `components/ui/styles.ts` et `Badge.tsx` : classes partagées de tableau
+  dense, ton "info" (bleu), troncature.
+- **Nouveau** `components/ui/EnTetePage.tsx` : "Titre [n]" + actions.
+- Appliqué aux écrans à liste : `ListeDocuments.tsx` (Sorties du jour +
+  les 6 listes de l'Historique), `Quarantaine.tsx`, `AlertesStock.tsx`,
+  `Produits.tsx`, `Receptions.tsx`, `Transferts.tsx`, `Entrepots.tsx`.
+
+Étape 3 : charte graphique (sections navigation et densité) mise à jour.
+
+## Points à trancher
+
+1. Barre du haut sombre et ses éléments (recherche, thème, notifications,
+   compte) : proposition de les placer à droite de la ligne d'onglets, en
+   une seule ligne fine.
+2. Couleur des statuts Jupply : vert = terminé (Validée, Reçu, Clôturé),
+   bleu = en cours (En transit, En cours, En réparation), gris = en attente
+   (En attente, Demandé), rouge = problème (Anomalie, Rupture, Ouvert NC) ;
+   l'orange reste réservé aux alertes de stock.
+3. Densité : partout, que la barre soit ouverte ou réduite (proposé).
+4. Groupes de la barre : organisation par métier de la proposition du 26/10
+   (Accueil, Stock, Opérations, Inventaires, Historique, Paramètres), ou les
+   modules actuels (Magasin, Réceptions/Expéditions, Logistique,
+   Historique) ?
+
+## Avancement
+
+- [x] Plan validé par Jean Didier (27/10/2026). Réponses : compte = pastille
+      avec l'initiale du nom en bas de la barre (menu profil, thème,
+      déconnexion) ; groupes Tableau de bord, Stock Management, Mouvement,
+      Inventaires, Historiques, Paramètre (ancré en bas), dépliables comme
+      des dossiers (plusieurs ouverts possibles). Couleurs de statut et
+      densité partout : proposition retenue (pas d'objection).
+- [x] Étape 1 : `index.css` (tokens, défilement fin, bleu info),
+      `BarreLaterale.tsx`, `InfoBulle.tsx`, `MenuFlottant.tsx`,
+      `lib/modules.ts` (groupes), `AppShell.tsx`, `BarreOnglets.tsx`
+      (onglets + recherche + notifications) ; `TopBar.tsx`, `SousEntete.tsx`,
+      `MenuCompte.tsx` supprimés ; `TabsContext.tsx` retouché.
+- [x] Étape 2 : classe `tableau-dense` (`index.css`), `EnTetePage.tsx`,
+      `Badge.tsx` (ton info, `classeBadge`) ; appliqué à `ListeDocuments`
+      (Sorties du jour + 6 listes Historique), Quarantaine, Alertes stock,
+      Entrées, Transferts, Entrepôts, Produits (tableau seulement : son
+      en-tête avait été retiré à la demande de Jean Didier).
+- [x] Étape 3 : charte graphique (section 2) et `CLAUDE.md` mis à jour.
+- [x] `tsc -b` + `vite build` OK. Rendu non vérifié visuellement (écran de
+      connexion, pas d'accès à l'application connectée).
+- [ ] Vérification en local par Jean Didier (Light + Dark)
+
+
 ## Format utilisé pour chaque plan
 
 ```

@@ -38,6 +38,37 @@
   --topbar-text: #F9FAFB;
   --topbar-muted: #9CA3AF;
   --topbar-hover: #1F2937;
+
+  /* Statut "en cours" (bleu) */
+  --info: #2563EB;
+  --info-soft: #DBEAFE;
+  --info-deep: #1D4ED8;
+
+  /* Barre laterale : fond, survol, entree active (gris clair discret) */
+  --nav-fond: #FFFFFF;
+  --nav-survol: #F3F4F1;
+  --nav-actif: #ECEEE9;
+
+  /* ---- Dimensions et densite (independantes du theme) ---- */
+  --sidebar-width: 240px;
+  --sidebar-collapsed-width: 64px;
+  --sidebar-transition: 180ms;
+  --nav-font-size: 13.5px;
+  --nav-sub-font-size: 13px;
+  --nav-item-height: 34px;
+  --nav-sub-item-height: 30px;
+  --nav-icon-size: 18px;
+  /* Decalage de l'icone : identique barre ouverte ou reduite, l'icone ne bouge pas pendant l'animation */
+  --nav-icon-gap: 23px;
+  --barre-haute-height: 40px;
+
+  --page-title-size: 18px;
+  --table-font-size: 12.5px;
+  --table-head-font-size: 11.5px;
+  --table-row-height: 34px;
+  --table-head-height: 32px;
+  --table-cell-padding-x: 12px;
+  --content-padding: 16px;
 }
 
 .dark {
@@ -69,6 +100,14 @@
   --topbar-text: #F9FAFB;
   --topbar-muted: #9CA3AF;
   --topbar-hover: #1F2937;
+
+  --info: #60A5FA;
+  --info-soft: #14254A;
+  --info-deep: #93C5FD;
+
+  --nav-fond: #0E1522;
+  --nav-survol: #172033;
+  --nav-actif: #1E293B;
 }
 
 @theme inline {
@@ -100,6 +139,14 @@
   --color-topbar-text: var(--topbar-text);
   --color-topbar-muted: var(--topbar-muted);
   --color-topbar-hover: var(--topbar-hover);
+
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-info-deep: var(--info-deep);
+
+  --color-nav-fond: var(--nav-fond);
+  --color-nav-survol: var(--nav-survol);
+  --color-nav-actif: var(--nav-actif);
 }
 
 body {
@@ -108,6 +155,87 @@ body {
   background: var(--color-canvas);
   color: var(--color-text);
   -webkit-font-smoothing: antialiased;
+}
+
+/* ============================================================
+   Barre laterale : largeur animee, defilement interne fin
+   ============================================================ */
+.barre-laterale {
+  width: var(--sidebar-width);
+  transition: width var(--sidebar-transition) ease;
+}
+.barre-laterale[data-reduite="true"] {
+  width: var(--sidebar-collapsed-width);
+}
+.barre-laterale .libelle-nav {
+  transition: opacity var(--sidebar-transition) ease;
+}
+.barre-laterale[data-reduite="true"] .libelle-nav {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.defilement-fin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.defilement-fin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.defilement-fin::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 999px;
+}
+.defilement-fin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .barre-laterale,
+  .barre-laterale .libelle-nav {
+    transition: none;
+  }
+}
+
+/* ============================================================
+   Tableaux denses (ecrans a liste) : lignes serrees, petit texte,
+   en-tetes discrets, separateurs fins, texte tronque avec "...".
+   Regles hors @layer : elles priment sur les utilitaires Tailwind
+   des cellules, pour une densite identique sur tous les ecrans.
+   ============================================================ */
+.tableau-dense {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--table-font-size);
+}
+.tableau-dense thead tr:last-child th {
+  height: var(--table-head-height);
+  padding: 0 var(--table-cell-padding-x);
+  font-size: var(--table-head-font-size);
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text-muted);
+  background: var(--muted);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.tableau-dense tbody td {
+  height: var(--table-row-height);
+  padding: 0 var(--table-cell-padding-x);
+  border-top: 1px solid var(--border);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 280px;
+}
+.tableau-dense thead tr:last-child th + th,
+.tableau-dense tbody td + td {
+  border-left: 1px solid var(--border);
+}
+.tableau-dense tbody tr:first-child td {
+  border-top: 0;
 }
 
 /* ============================================================

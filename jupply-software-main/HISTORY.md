@@ -79,6 +79,22 @@
   migration `app-src/supabase/migrations/2026-10-03-historique-recu-par.sql`
   et de la vérification locale.
 
+- **[2026-10-03] Gestion de la quarantaine.** Dossiers de non-conformité
+  (NC) ouverts à la réception ou manuellement, écran Quarantaine depuis
+  Alertes stock, outil Traitement (libérer, retour fournisseur, rebut,
+  réparation) qui met le stock à jour. Rien ne part en quarantaine sans
+  décision de l'opérateur (le surplus n'y va plus automatiquement). Code
+  complet, en attente de la migration
+  `app-src/supabase/migrations/2026-10-03-quarantaine.sql` et de la
+  vérification locale.
+
+- **[2026-10-26 → 27] Nouvelle présentation : barre latérale et densité.**
+  Barre latérale repliable (logo seul, dossiers dépliables, compte et
+  Paramètre en bas, rail d'icônes avec info-bulles, état mémorisé) à la
+  place de la navigation en haut ; écrans à liste denses (en-tête
+  "Titre [n]", filtres, tableau serré, badges vert / bleu / gris / rouge).
+  Code complet, en attente de vérification locale.
+
 ## Terminé
 
 - **[2026-08-30 → 2026-08-31] Sorties de stock et Réintégrations.** Voir

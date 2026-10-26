@@ -89,10 +89,9 @@ export function Entrepots() {
   return (
     <div className="h-full overflow-y-auto bg-canvas p-4 flex flex-col gap-4">
       <div className="flex items-end justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-xl font-bold text-text leading-tight">Entrepôts</h1>
-          <p className="text-[13px] text-text-muted mt-1">Sites de stockage, zones et emplacements.</p>
-        </div>
+        <h1 className="text-[length:var(--page-title-size)] font-semibold text-text leading-tight">
+          Entrepôts <span className="ml-1 font-normal text-text-muted tabular-nums">[{entrepots.length}]</span>
+        </h1>
         {peutGererEntrepots(profil?.role) && (
           <button
             onClick={() => setModalEntrepotOuvert(true)}
@@ -150,7 +149,7 @@ export function Entrepots() {
           {emplacements.length === 0 ? (
             <p className="text-sm text-text-muted py-4 text-center">Aucun emplacement pour le moment.</p>
           ) : (
-            <table className="w-full text-sm">
+            <table className="tableau-dense">
               <thead>
                 <tr className="text-left text-[11px] text-text-muted uppercase tracking-wide">
                   <th className="font-medium pb-2">Code</th>

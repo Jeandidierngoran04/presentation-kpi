@@ -21,6 +21,10 @@ begin;
 --    a deja ete appliquee.
 -- ------------------------------------------------------------
 alter table receptions add column if not exists notes text;
+alter table receptions_lignes
+  add column if not exists quantite_non_conforme integer not null default 0,
+  add column if not exists motif_non_conformite text,
+  add column if not exists constat_non_conformite text;
 alter table fournisseurs
   add column if not exists telephone text,
   add column if not exists email text,
@@ -299,6 +303,9 @@ declare
   v_ligne jsonb;
   v_gere_expiration boolean;
   v_reference text;
+  v_quantite_recue integer;
+  v_quantite_nc integer;
+  v_motif_nc text;
 begin
   select entreprise_id into v_entreprise_id from entrepots where id = p_entrepot_id;
   if v_entreprise_id is null then
@@ -331,21 +338,45 @@ begin
       raise exception 'Produit % : le numero de lot (ou de serie) est obligatoire avec une date d''expiration.', v_reference;
     end if;
 
+    v_quantite_recue := coalesce((v_ligne->>'quantite_recue')::integer, 0);
+    v_quantite_nc := coalesce((v_ligne->>'quantite_non_conforme')::integer, 0);
+    v_motif_nc := nullif(v_ligne->>'motif_non_conformite', '');
+    -- Ancienne application : case "anomalie" cochee = toute la ligne non conforme.
+    if v_quantite_nc = 0 and coalesce((v_ligne->>'anomalie')::boolean, false) then
+      v_quantite_nc := v_quantite_recue;
+    end if;
+    if v_quantite_nc < 0 or v_quantite_nc > v_quantite_recue then
+      raise exception 'Produit % : la quantite non conforme doit etre comprise entre 0 et la quantite recue.', v_reference;
+    end if;
+    if v_quantite_nc > 0 then
+      v_motif_nc := coalesce(v_motif_nc, 'autre');
+      if v_motif_nc not in ('endommage', 'avarie_transport', 'non_conforme_commande', 'surplus',
+                            'perime', 'documents_manquants', 'defaut_qualite', 'autre') then
+        raise exception 'Produit % : motif de non-conformite inconnu.', v_reference;
+      end if;
+    else
+      v_motif_nc := null;
+    end if;
+
     insert into receptions_lignes (
       reception_id, produit_id, emplacement_id, quantite_attendue, quantite_recue,
-      lot, numero_serie, date_expiration, prix_unitaire, anomalie
+      lot, numero_serie, date_expiration, prix_unitaire, anomalie,
+      quantite_non_conforme, motif_non_conformite, constat_non_conformite
     )
     values (
       v_reception_id,
       (v_ligne->>'produit_id')::uuid,
       (v_ligne->>'emplacement_id')::uuid,
       coalesce((v_ligne->>'quantite_attendue')::integer, 0),
-      coalesce((v_ligne->>'quantite_recue')::integer, 0),
+      v_quantite_recue,
       nullif(v_ligne->>'lot', ''),
       nullif(v_ligne->>'numero_serie', ''),
       nullif(v_ligne->>'date_expiration', '')::date,
       coalesce((v_ligne->>'prix_unitaire')::numeric, 0),
-      coalesce((v_ligne->>'anomalie')::boolean, false)
+      v_quantite_nc > 0,
+      v_quantite_nc,
+      v_motif_nc,
+      case when v_quantite_nc > 0 then nullif(btrim(v_ligne->>'constat_non_conformite'), '') end
     );
   end loop;
 
@@ -368,6 +399,8 @@ declare
   v_entrepot_id uuid;
   v_numero text;
   v_date_entree timestamptz;
+  v_fournisseur_id uuid;
+  v_numero_po text;
   v_ligne record;
   v_quarantaine_id uuid;
   v_qte_normale integer;
@@ -380,9 +413,10 @@ declare
   v_une_ligne_incomplete boolean := false;
   v_une_ligne_anomalie boolean := false;
   v_statut text;
+  v_numero_nc text;
 begin
-  select entreprise_id, entrepot_id, numero, cree_le
-    into v_entreprise_id, v_entrepot_id, v_numero, v_date_entree
+  select entreprise_id, entrepot_id, numero, cree_le, fournisseur_id, numero_po
+    into v_entreprise_id, v_entrepot_id, v_numero, v_date_entree, v_fournisseur_id, v_numero_po
     from receptions where id = p_reception_id;
 
   if v_entrepot_id is null then
@@ -397,16 +431,15 @@ begin
       v_une_ligne_incomplete := true;
     end if;
 
-    if v_ligne.anomalie then
-      v_une_ligne_anomalie := true;
-      v_qte_normale := 0;
+    -- Seule la quantite declaree non conforme par l'operateur part en
+    -- quarantaine (lignes anterieures : case "anomalie" = toute la ligne).
+    v_qte_quarantaine := least(greatest(coalesce(v_ligne.quantite_non_conforme, 0), 0), v_ligne.quantite_recue);
+    if v_qte_quarantaine = 0 and v_ligne.anomalie then
       v_qte_quarantaine := v_ligne.quantite_recue;
-    elsif v_ligne.quantite_recue > v_ligne.quantite_attendue then
-      v_qte_normale := v_ligne.quantite_attendue;
-      v_qte_quarantaine := v_ligne.quantite_recue - v_ligne.quantite_attendue;
-    else
-      v_qte_normale := v_ligne.quantite_recue;
-      v_qte_quarantaine := 0;
+    end if;
+    v_qte_normale := v_ligne.quantite_recue - v_qte_quarantaine;
+    if v_qte_quarantaine > 0 then
+      v_une_ligne_anomalie := true;
     end if;
 
     -- PMP : capturer le stock total du produit (tous entrepots) et le PMP
@@ -444,6 +477,8 @@ begin
     end if;
 
     if v_qte_quarantaine > 0 then
+      v_numero_nc := 'NC-' || to_char(now(), 'YYYY') || '-' || lpad(nextval('non_conformites_numero_seq')::text, 5, '0');
+
       select quantite into v_stock_avant from stock_produits
         where produit_id = v_ligne.produit_id and entrepot_id = v_entrepot_id and emplacement_id = v_quarantaine_id;
       v_stock_avant := coalesce(v_stock_avant, 0);
@@ -465,9 +500,20 @@ begin
       )
       values (
         v_entreprise_id, v_ligne.produit_id, v_entrepot_id, v_quarantaine_id, 'entree', v_qte_quarantaine,
-        v_stock_avant, v_stock_apres, auth.uid(), v_numero,
-        case when v_ligne.anomalie then 'Anomalie à réception - Quarantaine' else 'Surplus à réception - Quarantaine' end,
+        v_stock_avant, v_stock_apres, auth.uid(), v_numero, 'Non-conformité à réception - Quarantaine (' || v_numero_nc || ')',
         v_ligne.lot, v_ligne.numero_serie, v_ligne.prix_unitaire
+      );
+
+      insert into non_conformites (
+        entreprise_id, numero, entrepot_id, emplacement_id, produit_id, lot, numero_serie, date_expiration,
+        date_entree_lot, prix_unitaire, origine, reception_id, fournisseur_id, numero_po, motif, constat,
+        quantite_initiale, quantite_restante, declare_par
+      )
+      values (
+        v_entreprise_id, v_numero_nc, v_entrepot_id, v_quarantaine_id, v_ligne.produit_id, v_ligne.lot,
+        v_ligne.numero_serie, v_ligne.date_expiration, v_date_entree, v_ligne.prix_unitaire, 'reception',
+        p_reception_id, v_fournisseur_id, v_numero_po, coalesce(v_ligne.motif_non_conformite, 'autre'),
+        v_ligne.constat_non_conformite, v_qte_quarantaine, v_qte_quarantaine, auth.uid()
       );
     end if;
 

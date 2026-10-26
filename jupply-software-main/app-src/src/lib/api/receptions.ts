@@ -57,7 +57,10 @@ export interface NouvelleLigneReception {
   numeroSerie?: string | null
   dateExpiration?: string | null
   prixUnitaire: number
-  anomalie: boolean
+  /** Quantité déclarée non conforme : part en quarantaine avec un dossier NC à la validation. */
+  quantiteNonConforme: number
+  motifNonConformite: string | null
+  constatNonConformite: string | null
 }
 
 export interface NouvelleReception {
@@ -84,7 +87,9 @@ export async function creerReception(donnees: NouvelleReception): Promise<string
       numero_serie: l.numeroSerie ?? null,
       date_expiration: l.dateExpiration ?? null,
       prix_unitaire: l.prixUnitaire,
-      anomalie: l.anomalie,
+      quantite_non_conforme: l.quantiteNonConforme,
+      motif_non_conformite: l.motifNonConformite,
+      constat_non_conformite: l.constatNonConformite,
     })),
     p_notes: donnees.notes,
     p_date_mouvement: donnees.dateMouvement,

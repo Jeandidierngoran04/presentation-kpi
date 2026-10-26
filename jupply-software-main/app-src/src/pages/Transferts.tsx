@@ -34,17 +34,20 @@ import type {
 } from '../types/stock'
 import { Modal } from '../components/ui/Modal'
 import { useMenuContextuel } from '../components/ui/MenuContextuel'
+import { classeBadge, type TonBadge } from '../components/ui/Badge'
+import { EnTetePage } from '../components/ui/EnTetePage'
 
 const CLASSE_INPUT = 'border border-border rounded-lg px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30'
 const CLASSE_BOUTON_PRIMAIRE =
   'bg-accent hover:bg-accent-strong text-accent-contrast text-sm font-semibold rounded-lg py-2.5 transition-colors disabled:opacity-60'
 
-const STYLES_STATUT: Record<StatutTransfert, { label: string; classe: string }> = {
-  demande: { label: 'Demandé', classe: 'bg-muted text-text-muted' },
-  valide: { label: 'Validé', classe: 'bg-accent-soft text-accent-deep' },
-  expedie: { label: 'Expédié', classe: 'bg-warn-soft text-warn-deep' },
-  en_transit: { label: 'En transit', classe: 'bg-warn-soft text-warn-deep' },
-  recu: { label: 'Reçu', classe: 'bg-accent-soft text-accent-deep' },
+// Vert = terminé, bleu = en cours, gris = en attente.
+const STYLES_STATUT: Record<StatutTransfert, { label: string; ton: TonBadge }> = {
+  demande: { label: 'Demandé', ton: 'neutre' },
+  valide: { label: 'Validé', ton: 'info' },
+  expedie: { label: 'Expédié', ton: 'info' },
+  en_transit: { label: 'En transit', ton: 'info' },
+  recu: { label: 'Reçu', ton: 'succes' },
 }
 
 export function Transferts() {
@@ -121,17 +124,14 @@ export function Transferts() {
 
   return (
     <div className="h-full flex flex-col gap-2 p-4" onContextMenu={onClicDroitTableau}>
-      <div className="shrink-0 flex items-baseline justify-between gap-3">
-        <h1 className="text-lg font-bold text-text">Transferts entre entrepôts</h1>
-        <p className="text-xs text-text-muted">Clic droit = nouveau transfert</p>
-      </div>
+      <EnTetePage titre="Transferts entre entrepôts" compteur={transferts.length} />
 
       {chargement ? (
         <div className="text-sm text-text-muted py-12 text-center">Chargement...</div>
       ) : (
         <div className="flex-1 min-h-0 bg-card rounded-lg border border-border overflow-hidden flex flex-col">
           <div className="overflow-auto flex-1">
-            <table className="w-full text-sm">
+            <table className="tableau-dense">
               <thead className="sticky top-0 z-10">
                 <tr className="text-left text-[11px] text-text-muted uppercase tracking-wide bg-muted">
                   <th className="font-medium py-1 px-2">Numéro</th>
@@ -154,7 +154,7 @@ export function Transferts() {
                     <td className="py-1 px-2 font-medium text-text">{t.entrepot_source_nom}</td>
                     <td className="py-1 px-2 font-medium text-text">{t.entrepot_destination_nom}</td>
                     <td className="py-1 px-2">
-                      <span className={`inline-flex items-center text-[11px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full ${STYLES_STATUT[t.statut].classe}`}>
+                      <span className={classeBadge(STYLES_STATUT[t.statut].ton)}>
                         {STYLES_STATUT[t.statut].label}
                       </span>
                     </td>
@@ -205,7 +205,7 @@ export function Transferts() {
             </div>
           </div>
 
-          <table className="w-full text-xs">
+          <table className="tableau-dense">
             <thead>
               <tr className="text-left text-[10px] text-text-muted uppercase tracking-wide">
                 <th className="font-medium pb-1">Produit</th>

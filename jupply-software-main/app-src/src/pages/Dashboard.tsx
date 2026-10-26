@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { AlertTriangle, ArrowDownToLine, ArrowUpFromLine, ClipboardList, Package, PackageX } from 'lucide-react'
+import { AlertTriangle, ArrowDownToLine, ArrowUpFromLine, ClipboardList, Package, PackageX, ShieldAlert } from 'lucide-react'
 import {
   calculerKpis,
   calculerStockParCategorie,
@@ -11,6 +11,7 @@ import {
 } from '../lib/api/stock'
 import type { ProduitAvecStock, MouvementAffiche, StockParEntrepot as StockParEntrepotType } from '../types/stock'
 import { useTabs } from '../context/TabsContext'
+import { compterDossiersOuverts } from '../lib/api/quarantaine'
 import { KpiCard } from '../components/dashboard/KpiCard'
 import { AlertesStock } from '../components/dashboard/AlertesStock'
 import { MouvementsRecents } from '../components/dashboard/MouvementsRecents'
@@ -23,10 +24,12 @@ interface DonneesDashboard {
   mouvements: MouvementAffiche[]
   entrepots: StockParEntrepotType[]
   kpis: KpisStock
+  /** Null tant que la base n'a pas la gestion de la quarantaine. */
+  quarantaine: { dossiers: number; unites: number } | null
 }
 
 export function Dashboard() {
-  const { ongletActifId } = useTabs()
+  const { ongletActifId, ouvrirOnglet } = useTabs()
   const [donnees, setDonnees] = useState<DonneesDashboard | null>(null)
   const [erreur, setErreur] = useState<string | null>(null)
   const estActif = ongletActifId === 'dashboard'
@@ -36,10 +39,16 @@ export function Dashboard() {
   useEffect(() => {
     if (!estActif) return
     let annule = false
-    Promise.all([getProduitsAvecStock(), getMouvementsRecents(8), getStockParEntrepot(), getMouvementsAujourdhui()])
-      .then(([produits, mouvements, entrepots, mouvementsAujourdhui]) => {
+    Promise.all([
+      getProduitsAvecStock(),
+      getMouvementsRecents(8),
+      getStockParEntrepot(),
+      getMouvementsAujourdhui(),
+      compterDossiersOuverts(),
+    ])
+      .then(([produits, mouvements, entrepots, mouvementsAujourdhui, quarantaine]) => {
         if (annule) return
-        setDonnees({ produits, mouvements, entrepots, kpis: calculerKpis(produits, mouvementsAujourdhui) })
+        setDonnees({ produits, mouvements, entrepots, kpis: calculerKpis(produits, mouvementsAujourdhui), quarantaine })
       })
       .catch((e) => {
         if (!annule) setErreur(e.message ?? 'Erreur inconnue lors du chargement des données.')
@@ -72,7 +81,7 @@ export function Dashboard() {
     )
   }
 
-  const { produits, mouvements, entrepots, kpis } = donnees
+  const { produits, mouvements, entrepots, kpis, quarantaine } = donnees
 
   return (
     <div className="h-full overflow-y-auto bg-canvas p-4 flex flex-col gap-4">
@@ -84,10 +93,16 @@ export function Dashboard() {
           </p>
         </div>
         <div className="flex gap-2">
-          <button className="flex items-center gap-1.5 text-xs font-semibold bg-card border border-border text-text rounded-lg px-3 py-2 hover:bg-muted transition-colors">
+          <button
+            onClick={() => ouvrirOnglet('nouvelle-reception', 'Nouvelle réception')}
+            className="flex items-center gap-1.5 text-xs font-semibold bg-card border border-border text-text rounded-lg px-3 py-2 hover:bg-muted transition-colors"
+          >
             <ArrowDownToLine size={14} strokeWidth={1.75} /> Nouvelle entrée
           </button>
-          <button className="flex items-center gap-1.5 text-xs font-semibold bg-card border border-border text-text rounded-lg px-3 py-2 hover:bg-muted transition-colors">
+          <button
+            onClick={() => ouvrirOnglet('nouvelle-sortie', 'Nouvelle sortie')}
+            className="flex items-center gap-1.5 text-xs font-semibold bg-card border border-border text-text rounded-lg px-3 py-2 hover:bg-muted transition-colors"
+          >
             <ArrowUpFromLine size={14} strokeWidth={1.75} /> Nouvelle sortie
           </button>
           <button className="flex items-center gap-1.5 text-xs font-semibold bg-accent text-accent-contrast rounded-lg px-3 py-2 hover:bg-accent-strong transition-colors">
@@ -96,7 +111,7 @@ export function Dashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3">
         <KpiCard icone={Package} label="Produits" valeur={String(kpis.totalProduits)} indication="Références enregistrées" />
         <KpiCard
           icone={ClipboardList}
@@ -132,6 +147,15 @@ export function Dashboard() {
           indication="Unités sorties"
           tonalite="neutre"
         />
+        <button type="button" onClick={() => ouvrirOnglet('quarantaine', 'Quarantaine')} className="text-left" title="Ouvrir la quarantaine">
+          <KpiCard
+            icone={ShieldAlert}
+            label="En quarantaine"
+            valeur={String(quarantaine?.unites ?? 0)}
+            indication={`${quarantaine?.dossiers ?? 0} dossier(s) à traiter`}
+            tonalite={quarantaine && quarantaine.dossiers > 0 ? 'danger' : 'succes'}
+          />
+        </button>
       </div>
 
       <AlertesStock produits={produits} />

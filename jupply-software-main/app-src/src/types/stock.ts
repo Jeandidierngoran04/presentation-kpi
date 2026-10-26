@@ -171,6 +171,9 @@ export interface ReceptionLigne {
   date_expiration: string | null
   prix_unitaire: number
   anomalie: boolean
+  quantite_non_conforme: number | null
+  motif_non_conformite: string | null
+  constat_non_conformite: string | null
   cree_le: string
 }
 
