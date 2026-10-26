@@ -95,6 +95,18 @@
   "Titre [n]", filtres, tableau serré, badges vert / bleu / gris / rouge).
   Code complet, en attente de vérification locale.
 
+- **[2026-10-27] Commandes fournisseurs (PO).** Bons de commande (Envoyé,
+  Transit, Réceptionné), réception rattachée avec quantités reçues et
+  écarts. Base testée et écrans codés (création, statuts Fait → Envoyé →
+  En transit → En cours de réception → Complétée, clôture avec motif,
+  réception avec quarantaine, confirmations). En attente de la migration
+  Supabase et de la vérification locale. PDF plus tard.
+
+- **[2026-10-27] Bulle « Info » et fenêtre d'informations.** Clic sur une
+  ligne de Produits : bulle « Info », puis fenêtre (Détails, Stock,
+  Historique, Fournisseur). Panneau du bas retiré. Composant réutilisable,
+  à étendre aux autres tableaux après vérification locale.
+
 ## Terminé
 
 - **[2026-08-30 → 2026-08-31] Sorties de stock et Réintégrations.** Voir

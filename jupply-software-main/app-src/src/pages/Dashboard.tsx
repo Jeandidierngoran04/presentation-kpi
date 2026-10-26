@@ -94,7 +94,7 @@ export function Dashboard() {
         </div>
         <div className="flex gap-2">
           <button
-            onClick={() => ouvrirOnglet('nouvelle-reception', 'Nouvelle réception')}
+            onClick={() => ouvrirOnglet('nouvelle-reception', 'Entrée manuelle')}
             className="flex items-center gap-1.5 text-xs font-semibold bg-card border border-border text-text rounded-lg px-3 py-2 hover:bg-muted transition-colors"
           >
             <ArrowDownToLine size={14} strokeWidth={1.75} /> Nouvelle entrée

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type MouseEvent } from 'react'
-import { AlertTriangle } from 'lucide-react'
+import { AlertTriangle, Plus } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { messageErreur } from '../lib/erreurs'
 import { peutValiderReception } from '../lib/permissions'
@@ -68,7 +68,7 @@ export function Receptions() {
   const produitParId = useMemo(() => new Map(produits.map((p) => [p.id, p])), [produits])
 
   function onClicDroitTableau(e: MouseEvent) {
-    ouvrirMenu(e, [{ label: 'Nouvelle réception', onClick: () => ouvrirOnglet('nouvelle-reception', 'Nouvelle réception') }])
+    ouvrirMenu(e, [{ label: 'Créer une entrée manuelle', onClick: () => ouvrirOnglet('nouvelle-reception', 'Entrée manuelle') }])
   }
 
   async function onValider() {
@@ -98,7 +98,19 @@ export function Receptions() {
 
   return (
     <div className="h-full flex flex-col gap-2 p-4" onContextMenu={onClicDroitTableau}>
-      <EnTetePage titre="Entrées de stock" compteur={receptions.length} />
+      <EnTetePage
+        titre="Entrées de stock"
+        compteur={receptions.length}
+        actions={
+          <button
+            type="button"
+            onClick={() => ouvrirOnglet('nouvelle-reception', 'Entrée manuelle')}
+            className="inline-flex items-center gap-1.5 bg-accent hover:bg-accent-strong text-accent-contrast text-xs font-semibold rounded-md px-3 h-8"
+          >
+            <Plus size={14} strokeWidth={1.75} /> Créer une entrée manuelle
+          </button>
+        }
+      />
 
       {chargement ? (
         <div className="text-sm text-text-muted py-12 text-center">Chargement...</div>

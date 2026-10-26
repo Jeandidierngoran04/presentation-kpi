@@ -341,7 +341,7 @@ export function NouvelleSortie() {
         recuPar: recuPar.trim() || null,
       })
       // Retour sur la liste des sorties, puis fermeture de cet onglet.
-      ouvrirOnglet('sorties', 'Sorties Manuelles')
+      ouvrirOnglet('sorties', 'Sorties')
       fermerOnglet('nouvelle-sortie')
     } catch (err) {
       setErreur(messageErreur(err))

@@ -1,13 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent, type MouseEvent } from 'react'
-import {
-  ArrowDownToLine,
-  ArrowLeftRight,
-  ArrowUpFromLine,
-  ClipboardCheck,
-  Move,
-  RotateCcw,
-  SlidersHorizontal,
-} from 'lucide-react'
+import { Search, X } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useTabs } from '../context/TabsContext'
 import { useSelection } from '../context/SelectionContext'
@@ -28,7 +20,6 @@ import {
   getFournisseurs,
   getFournisseursProduit,
   getLocalisationsProduits,
-  getMouvementsProduit,
   getToutesLesEquivalences,
   lierEquivalent,
   supprimerProduit,
@@ -39,16 +30,16 @@ import type {
   Entrepot,
   Fournisseur,
   LocalisationProduit,
-  MouvementAffiche,
   ProduitAvecStock,
   ProduitEquivalent,
   StatutStock,
-  TypeMouvement,
   TypeProduit,
 } from '../types/stock'
 import { Modal } from '../components/ui/Modal'
 import { useMenuContextuel, type ElementMenuContextuel } from '../components/ui/MenuContextuel'
 import { StatutBadge } from '../components/dashboard/StatutBadge'
+import { CLASSE_LIGNE_INFO, ItemInfoPopover, useItemInfo } from '../components/ui/ItemInfo'
+import { ProduitInfoPanel } from '../components/produits/ProduitInfoPanel'
 
 const CLASSE_INPUT = 'border border-border rounded-lg px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30'
 const CLASSE_BOUTON_PRIMAIRE =
@@ -62,19 +53,6 @@ const LABEL_STATUT: Record<StatutStock, string> = {
   normal: 'Normal',
   faible: 'En alerte',
   rupture: 'Rupture',
-}
-
-const STYLES_TYPE_MOUVEMENT: Record<
-  TypeMouvement,
-  { label: string; icone: typeof ArrowDownToLine; classe: string; signe: '+' | '-' | '' }
-> = {
-  entree: { label: 'IN', icone: ArrowDownToLine, classe: 'bg-accent-soft text-accent-deep', signe: '+' },
-  sortie: { label: 'OUT', icone: ArrowUpFromLine, classe: 'bg-danger-soft text-danger-deep', signe: '-' },
-  transfert: { label: 'TRF', icone: ArrowLeftRight, classe: 'bg-muted text-text-muted', signe: '' },
-  ajustement: { label: 'AJT', icone: SlidersHorizontal, classe: 'bg-warn-soft text-warn-deep', signe: '' },
-  inventaire: { label: 'INV', icone: ClipboardCheck, classe: 'bg-warn-soft text-warn-deep', signe: '' },
-  deplacement: { label: 'DEP', icone: Move, classe: 'bg-muted text-text-muted', signe: '' },
-  reintegration: { label: 'REINT', icone: RotateCcw, classe: 'bg-accent-soft text-accent-deep', signe: '+' },
 }
 
 interface Filtres {
@@ -106,32 +84,6 @@ function correspond(produit: ProduitAvecStock, filtres: Filtres, localisationTex
     texteFiltre(LABEL_STATUT[produit.statut], filtres.statut) &&
     texteFiltre(localisationTexte, filtres.localisation)
   )
-}
-
-interface LigneDepot {
-  entrepot_id: string
-  entrepot_nom: string
-  emplacements: string[]
-  quantite: number
-}
-
-function grouperParDepot(lignes: LocalisationProduit[]): LigneDepot[] {
-  const parEntrepot = new Map<string, LigneDepot>()
-  for (const l of lignes) {
-    const existant = parEntrepot.get(l.entrepot_id)
-    if (existant) {
-      existant.quantite += l.quantite
-      if (!existant.emplacements.includes(l.emplacement_code)) existant.emplacements.push(l.emplacement_code)
-    } else {
-      parEntrepot.set(l.entrepot_id, {
-        entrepot_id: l.entrepot_id,
-        entrepot_nom: l.entrepot_nom,
-        emplacements: [l.emplacement_code],
-        quantite: l.quantite,
-      })
-    }
-  }
-  return Array.from(parEntrepot.values())
 }
 
 /** Localisation exacte (codes d'emplacement), pas juste le nom de l'entrepôt. */
@@ -174,7 +126,7 @@ function IndicateurFiltre({
 export function Produits() {
   const { profil } = useAuth()
   const { ongletActifId } = useTabs()
-  const { definirProduitSelectionne, demandeAffichageProduit } = useSelection()
+  const { definirProduitSelectionne, demandeAffichageProduit, demandeRechercheProduit } = useSelection()
   const [produits, setProduits] = useState<ProduitAvecStock[]>([])
   const [categories, setCategories] = useState<Categorie[]>([])
   const [fournisseurs, setFournisseurs] = useState<Fournisseur[]>([])
@@ -184,6 +136,7 @@ export function Produits() {
   const [chargement, setChargement] = useState(true)
   const [erreur, setErreur] = useState<string | null>(null)
   const [filtres, setFiltres] = useState<Filtres>(FILTRES_VIDES)
+  const [recherche, setRecherche] = useState('')
   const [colonneActive, setColonneActive] = useState<ColonneFiltrable | null>(null)
   const [modalOuvert, setModalOuvert] = useState(false)
   const [popupEquivalentsId, setPopupEquivalentsId] = useState<string | null>(null)
@@ -192,12 +145,13 @@ export function Produits() {
   const [ficheOuverte, setFicheOuverte] = useState(false)
 
   const [selectionId, setSelectionId] = useState<string | null>(null)
-  const [mouvements, setMouvements] = useState<MouvementAffiche[]>([])
   const [fournisseursProduit, setFournisseursProduit] = useState<Fournisseur[]>([])
   const [equivalents, setEquivalents] = useState<ProduitEquivalent[]>([])
   const [rechercheEquivalent, setRechercheEquivalent] = useState('')
 
   const { ouvrir: ouvrirMenu, menu } = useMenuContextuel()
+  // Bulle « Info » puis fenêtre d'informations de la ligne cliquée.
+  const info = useItemInfo<ProduitAvecStock>()
 
   function chargerListe() {
     Promise.all([
@@ -225,13 +179,11 @@ export function Produits() {
   useEffect(() => {
     if (ongletActifId !== 'produits') return
     chargerListe()
-    if (selectionId) getMouvementsProduit(selectionId).then(setMouvements)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ongletActifId])
 
   useEffect(() => {
     if (!selectionId) return
-    getMouvementsProduit(selectionId).then(setMouvements)
     getFournisseursProduit(selectionId).then(setFournisseursProduit)
     getEquivalents(selectionId).then(setEquivalents)
   }, [selectionId])
@@ -248,6 +200,14 @@ export function Produits() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [demandeAffichageProduit])
 
+  // Recherche lancée depuis la barre du haut.
+  useEffect(() => {
+    if (!demandeRechercheProduit) return
+    setRecherche(demandeRechercheProduit.terme)
+    setFiltres(FILTRES_VIDES)
+    setColonneActive(null)
+  }, [demandeRechercheProduit])
+
   useEffect(() => {
     if (!demandeAffichageProduit || chargement) return
     document
@@ -259,7 +219,7 @@ export function Produits() {
   // taper au clavier (sans avoir besoin de cliquer dans une case de saisie)
   // remplit le filtre affiché au-dessus de l'en-tête de cette colonne.
   const unModalEstOuvert =
-    modalOuvert || popupEquivalentsId != null || modalAffecterId != null || modalDeplacerId != null || ficheOuverte
+    modalOuvert || popupEquivalentsId != null || modalAffecterId != null || modalDeplacerId != null || ficheOuverte || info.panneauOuvert
 
   useEffect(() => {
     if (!colonneActive || ongletActifId !== 'produits' || unModalEstOuvert) return
@@ -289,17 +249,24 @@ export function Produits() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [colonneActive, ongletActifId, unModalEstOuvert])
 
+  // Le tableau se refiltre (saisie au clavier, recherche) : la ligne bouge, la bulle se referme.
+  const { bulleOuverte, fermer: fermerInfo } = info
+  useEffect(() => {
+    if (bulleOuverte) fermerInfo()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtres, recherche])
+
+  // Recherche : code ou nom du produit ("commence par", * en tête = "contient").
   const produitsFiltres = useMemo(
-    () => produits.filter((p) => correspond(p, filtres, resumeLocalisation(localisations.get(p.id)))),
-    [produits, filtres, localisations],
+    () =>
+      produits.filter(
+        (p) =>
+          (!recherche.trim() || texteFiltre(p.reference, recherche) || texteFiltre(p.designation, recherche)) &&
+          correspond(p, filtres, resumeLocalisation(localisations.get(p.id))),
+      ),
+    [produits, filtres, localisations, recherche],
   )
   const selection = produits.find((p) => p.id === selectionId) ?? null
-  const depotsSelection = useMemo(
-    () => (selectionId ? grouperParDepot(localisations.get(selectionId) ?? []) : []),
-    [selectionId, localisations],
-  )
-  const totalDepots = depotsSelection.reduce((total, d) => total + d.quantite, 0)
-
   function equivalentsDe(produitId: string): ProduitAvecStock[] {
     const ids = equivalences.get(produitId) ?? []
     return ids.map((id) => produits.find((p) => p.id === id)).filter((p): p is ProduitAvecStock => p != null)
@@ -360,9 +327,14 @@ export function Produits() {
 
   function apresChangementLocalisation() {
     chargerListe()
-    if (selectionId) {
-      getMouvementsProduit(selectionId).then(setMouvements)
-    }
+  }
+
+  /** Clic sur une ligne (ou une cellule) : sélection, colonne de filtre éventuelle, bulle « Info ». */
+  function cliquerLigne(e: MouseEvent<HTMLElement>, produit: ProduitAvecStock, colonne?: ColonneFiltrable) {
+    setSelectionId(produit.id)
+    definirProduitSelectionne(produit.id)
+    if (colonne) setColonneActive(colonne)
+    info.ouvrirBulle(e, produit)
   }
 
   if (erreur) {
@@ -370,13 +342,34 @@ export function Produits() {
   }
 
   return (
-    <div className="h-full flex flex-col gap-2 p-4" onContextMenu={onClicDroitTableau}>
+    <div className="h-full flex flex-col gap-2 p-[var(--content-padding)]" onContextMenu={onClicDroitTableau}>
+      {/* Ligne de recherche : code ou nom, * = "contient" */}
+      <div className="shrink-0 flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 bg-card border border-border rounded-md px-2.5 h-[30px] w-[320px] max-w-full focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/30">
+          <Search size={14} strokeWidth={1.75} className="text-text-muted shrink-0" />
+          <input
+            value={recherche}
+            onChange={(e) => setRecherche(e.target.value)}
+            placeholder="Code ou nom du produit (* = contient)"
+            className="bg-transparent outline-none text-[12.5px] w-full text-text placeholder:text-text-muted"
+          />
+          {recherche && (
+            <button type="button" onClick={() => setRecherche('')} className="text-text-muted hover:text-text" title="Effacer la recherche">
+              <X size={13} strokeWidth={1.75} />
+            </button>
+          )}
+        </div>
+        <span className="text-xs text-text-muted">
+          <span className="font-semibold text-text tabular-nums">{produitsFiltres.length}</span> / {produits.length} produit(s)
+        </span>
+      </div>
       {chargement ? (
         <div className="text-sm text-text-muted py-12 text-center">Chargement...</div>
       ) : (
         <div className="flex-1 min-h-0 bg-card rounded-lg border border-border overflow-hidden flex flex-col">
           <div className="overflow-auto flex-1">
-            <table className="tableau-dense min-w-[900px]">
+            <table className="tableau-dense tableau-ajuste">
+              <colgroup><col style={{ width: '4%' }} /><col style={{ width: '11%' }} /><col style={{ width: '25%' }} /><col style={{ width: '14%' }} /><col style={{ width: '10%' }} /><col style={{ width: '7%' }} /><col style={{ width: '10%' }} /><col style={{ width: '8%' }} /><col style={{ width: '11%' }} /></colgroup>
               <thead className="sticky top-0 z-10">
                 <tr className="bg-card">
                   <th className="px-2 py-0.5" />
@@ -411,18 +404,20 @@ export function Produits() {
                     <tr
                       key={p.id}
                       data-produit-id={p.id}
-                      onClick={() => {
-                        setSelectionId(p.id)
-                        definirProduitSelectionne(p.id)
-                      }}
+                      tabIndex={-1}
+                      onClick={(e) => cliquerLigne(e, p)}
                       onDoubleClick={() => {
+                        info.fermer()
                         setSelectionId(p.id)
                         setFicheOuverte(true)
                       }}
-                      onContextMenu={(e) => onClicDroitLigne(e, p)}
-                      className={`border-t border-border cursor-pointer ${
+                      onContextMenu={(e) => {
+                        info.fermer()
+                        onClicDroitLigne(e, p)
+                      }}
+                      className={`border-t border-border cursor-pointer outline-none ${
                         selectionId === p.id ? 'bg-accent-soft' : 'hover:bg-muted'
-                      }`}
+                      } ${info.element?.id === p.id ? CLASSE_LIGNE_INFO : ''}`}
                     >
                       <td
                         className="py-1 px-2 text-xs text-text-muted"
@@ -442,9 +437,7 @@ export function Produits() {
                         className="py-1 px-2 font-mono text-xs text-text-muted"
                         onClick={(e) => {
                           e.stopPropagation()
-                          setSelectionId(p.id)
-                          definirProduitSelectionne(p.id)
-                          setColonneActive('reference')
+                          cliquerLigne(e, p, 'reference')
                         }}
                       >
                         {p.reference}
@@ -453,9 +446,7 @@ export function Produits() {
                         className="py-1 px-2 font-medium text-text"
                         onClick={(e) => {
                           e.stopPropagation()
-                          setSelectionId(p.id)
-                          definirProduitSelectionne(p.id)
-                          setColonneActive('designation')
+                          cliquerLigne(e, p, 'designation')
                         }}
                       >
                         {p.designation}
@@ -464,9 +455,7 @@ export function Produits() {
                         className="py-1 px-2 text-text-muted"
                         onClick={(e) => {
                           e.stopPropagation()
-                          setSelectionId(p.id)
-                          definirProduitSelectionne(p.id)
-                          setColonneActive('categorie')
+                          cliquerLigne(e, p, 'categorie')
                         }}
                       >
                         {p.categorie_nom ?? '—'}
@@ -475,9 +464,7 @@ export function Produits() {
                         className="py-1 px-2 text-text-muted"
                         onClick={(e) => {
                           e.stopPropagation()
-                          setSelectionId(p.id)
-                          definirProduitSelectionne(p.id)
-                          setColonneActive('type')
+                          cliquerLigne(e, p, 'type')
                         }}
                       >
                         {LABEL_TYPE[p.type]}
@@ -487,9 +474,7 @@ export function Produits() {
                         className="py-1 px-2"
                         onClick={(e) => {
                           e.stopPropagation()
-                          setSelectionId(p.id)
-                          definirProduitSelectionne(p.id)
-                          setColonneActive('statut')
+                          cliquerLigne(e, p, 'statut')
                         }}
                       >
                         <StatutBadge statut={p.statut} />
@@ -499,9 +484,7 @@ export function Produits() {
                         className="py-1 px-2 text-text-muted font-mono text-xs"
                         onClick={(e) => {
                           e.stopPropagation()
-                          setSelectionId(p.id)
-                          definirProduitSelectionne(p.id)
-                          setColonneActive('localisation')
+                          cliquerLigne(e, p, 'localisation')
                         }}
                       >
                         {resumeLocalisation(localisations.get(p.id))}
@@ -518,97 +501,18 @@ export function Produits() {
         </div>
       )}
 
-      {selection && (
-        <div className="shrink-0 max-h-[26vh] overflow-y-auto grid grid-cols-1 lg:grid-cols-2 gap-2">
-          <div className="bg-card rounded-lg border border-border p-2.5">
-            <h2 className="text-xs font-semibold text-text uppercase tracking-wide mb-1.5">
-              Stock par dépôt — {selection.designation}
-            </h2>
-            {depotsSelection.length === 0 ? (
-              <p className="text-xs text-text-muted py-2 text-center">Aucun stock disponible pour ce produit.</p>
-            ) : (
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="text-left text-[10px] text-text-muted uppercase tracking-wide">
-                    <th className="font-medium pb-1">Dépôt</th>
-                    <th className="font-medium pb-1">Localisation</th>
-                    <th className="font-medium pb-1">Stock</th>
-                    <th className="font-medium pb-1">Dispo</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {depotsSelection.map((d) => (
-                    <tr key={d.entrepot_id} className="border-t border-border">
-                      <td className="py-1 font-medium text-text">{d.entrepot_nom}</td>
-                      <td className="py-1 text-text-muted">{d.emplacements.join(', ')}</td>
-                      <td className="py-1 text-text-muted">{d.quantite}</td>
-                      <td className="py-1 text-text-muted">{d.quantite}</td>
-                    </tr>
-                  ))}
-                  <tr className="border-t border-border font-semibold">
-                    <td className="py-1 text-text">Total</td>
-                    <td className="py-1" />
-                    <td className="py-1 text-text">{totalDepots}</td>
-                    <td className="py-1 text-text">{totalDepots}</td>
-                  </tr>
-                </tbody>
-              </table>
-            )}
-          </div>
-
-          <div className="bg-card rounded-lg border border-border p-2.5">
-            <h2 className="text-xs font-semibold text-text uppercase tracking-wide mb-1.5">
-              Derniers mouvements
-            </h2>
-            {mouvements.length === 0 ? (
-              <p className="text-xs text-text-muted py-2 text-center">Aucun mouvement pour ce produit.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs min-w-[600px]">
-                  <thead>
-                    <tr className="text-left text-[10px] text-text-muted uppercase tracking-wide">
-                      <th className="font-medium pb-1">Sens</th>
-                      <th className="font-medium pb-1">Date</th>
-                      <th className="font-medium pb-1">Qté</th>
-                      <th className="font-medium pb-1">Prix</th>
-                      <th className="font-medium pb-1">SN/Lot</th>
-                      <th className="font-medium pb-1">Prov./Dest.</th>
-                      <th className="font-medium pb-1">Enregistré par</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {mouvements.map((m) => {
-                      const { label, icone: Icone, classe, signe } = STYLES_TYPE_MOUVEMENT[m.type]
-                      return (
-                        <tr key={m.id} className="border-t border-border">
-                          <td className="py-1">
-                            <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${classe}`}>
-                              <Icone size={10} strokeWidth={1.75} /> {label}
-                            </span>
-                          </td>
-                          <td className="py-1 text-text-muted">{new Date(m.cree_le).toLocaleDateString('fr-FR')}</td>
-                          <td className="py-1 font-semibold text-text">
-                            {signe}
-                            {m.quantite}
-                          </td>
-                          <td className="py-1 text-text-muted">
-                            {m.prix_unitaire != null ? m.prix_unitaire.toLocaleString('fr-FR') : '—'}
-                          </td>
-                          <td className="py-1 text-text-muted font-mono text-[11px]">{m.numero_serie ?? m.lot ?? '—'}</td>
-                          <td className="py-1 text-text-muted">{m.motif ?? '—'}</td>
-                          <td className="py-1 text-text-muted whitespace-nowrap">
-                            {new Date(m.cree_le).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} ·{' '}
-                            <span className="text-text">{m.utilisateur_nom}</span>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </div>
+      {info.bulleOuverte && info.ligne && (
+        <ItemInfoPopover ligne={info.ligne} x={info.x} onInfo={info.afficherPanneau} onFermer={info.fermer} />
+      )}
+      {info.panneauOuvert && info.element && (
+        <ProduitInfoPanel
+          produit={produits.find((p) => p.id === info.element?.id) ?? info.element}
+          enCommande={commandes.get(info.element.id) ?? 0}
+          localisations={localisations.get(info.element.id) ?? []}
+          equivalents={equivalentsDe(info.element.id)}
+          onFermer={info.fermer}
+          elementRetour={info.ligne}
+        />
       )}
 
       {ficheOuverte && selection && (

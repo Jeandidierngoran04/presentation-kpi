@@ -3,6 +3,7 @@
 import { useTabs, type EcranId } from '../context/TabsContext'
 import { ListeDocuments, type ConfigDocuments } from '../components/historique/ListeDocuments'
 import {
+  CONFIG_COMMANDES,
   CONFIG_ENTREES,
   CONFIG_MOUVEMENTS,
   CONFIG_NON_CONFORMITES,
@@ -41,6 +42,10 @@ export function HistoriqueTransferts() {
 
 export function HistoriqueNonConformites() {
   return <EcranHistorique ecran="historique-non-conformites" config={CONFIG_NON_CONFORMITES} />
+}
+
+export function HistoriqueCommandes() {
+  return <EcranHistorique ecran="historique-commandes" config={CONFIG_COMMANDES} />
 }
 
 export function HistoriqueMouvements() {

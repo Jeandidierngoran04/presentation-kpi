@@ -1246,8 +1246,165 @@ Autre.
 - [x] Étape 3 : charte graphique (section 2) et `CLAUDE.md` mis à jour.
 - [x] `tsc -b` + `vite build` OK. Rendu non vérifié visuellement (écran de
       connexion, pas d'accès à l'application connectée).
+- [x] Retours de Jean Didier (27/10/2026) :
+      - aucun écran ouvert par défaut (Tableau de bord fermable comme les
+        autres, écran d'accueil avec raccourcis quand rien n'est ouvert) ;
+      - recherche de produits par code ou nom (* = contient) dans Produits
+        et dans la barre du haut (ouvre Produits filtré) ;
+      - plus de défilement horizontal : tableaux à largeurs fixées
+        (`tableau-ajuste` + colgroup) dans Produits (et ses panneaux),
+        Quarantaine, Alertes stock, Historique ; onglets qui rétrécissent
+        comme dans un navigateur, barre de défilement masquée ;
+      - onglets déplaçables par glisser-déposer, clic molette pour fermer,
+        icône du groupe sur chaque onglet ; titres distincts (Sorties /
+        Historique des sorties) ; entrée active avec liseré et lueur,
+        icône du dossier actif en couleur ;
+      - Mouvement : "Créer une entrée manuelle" (menu + bouton dans
+        Entrées), feuille sans quantité commandée ni bon de commande ;
+        entrée "Commandes fournisseurs (PO)" grisée en attendant le
+        chantier PO (plan ci-dessous).
 - [ ] Vérification en local par Jean Didier (Light + Dark)
 
+
+---
+
+# Commandes fournisseurs (PO)
+
+**Statut :** validé, exécution en cours
+**Démarré le :** 27/10/2026
+
+## Objectif
+
+Demande de Jean Didier : séparer les **entrées manuelles** (produits non
+commandés, sans quantité commandée ni écart : fait le 27/10) des
+**commandes passées aux fournisseurs**, suivies dans un écran PO avec les
+statuts Envoyé, Transit, Réceptionné ; à la réception, saisir les
+quantités reçues et les comparer à la commande.
+
+## Analyse de l'existant
+
+- Les réceptions (`receptions`, `receptions_lignes`) ont déjà une quantité
+  attendue, une quantité reçue, un statut "partielle" et un champ
+  `numero_po` texte libre : il n'existe pas de vraie commande à laquelle
+  rattacher plusieurs réceptions.
+- La validation d'une réception met à jour le stock, les lots, le PMP et
+  ouvre les dossiers de non-conformité : à réutiliser tel quel.
+- Entrée "Commandes fournisseurs (PO)" déjà placée dans Mouvement (grisée).
+
+## Proposition
+
+### 1. Le bon de commande
+
+- Numéro `PO-2026-00001`, fournisseur (obligatoire), dépôt de livraison,
+  date de commande, date de livraison prévue, notes.
+- Lignes saisies en tableau (comme l'entrée manuelle) : référence,
+  quantité commandée, prix unitaire, total ; total de la commande.
+- **Statuts** : Brouillon (en préparation) → **Envoyé** → **En transit** →
+  **Réceptionné partiellement** → **Réceptionné** ; Annulé possible tant que
+  rien n'est reçu.
+- Bon de commande en **PDF** à envoyer au fournisseur (même modèle que le
+  bon de sortie, avec les prix).
+
+### 2. La réception d'une commande
+
+- Depuis le PO : bouton **Réceptionner**. La feuille s'ouvre pré-remplie
+  avec les lignes de la commande : quantité commandée, déjà reçue, reste à
+  recevoir, et une colonne **Quantité reçue** à saisir (+ lot, expiration,
+  quantité non conforme).
+- **Écart** calculé ligne par ligne (reçu − commandé), en couleur.
+- Livraison en plusieurs fois : le reliquat reste attendu, le PO passe
+  "Réceptionné partiellement" ; il passe "Réceptionné" quand tout est reçu
+  (ou quand on solde le reliquat volontairement, avec un motif).
+- La validation réutilise la validation existante (stock, lots, PMP,
+  quarantaine) : aucune règle de stock n'est réécrite.
+
+### 3. Écrans
+
+- **Mouvement > Commandes fournisseurs (PO)** : liste dense (N° PO,
+  fournisseur, date, livraison prévue, montant, statut, % reçu) avec
+  filtres par statut et fournisseur, bouton "Créer une commande".
+- Fiche PO : lignes, réceptions liées, historique des statuts.
+- Historiques : nouvelle liste "Commandes fournisseurs".
+- Alertes stock : action "Préparer une commande" depuis les produits en
+  alerte (le PO se pré-remplit avec ces produits).
+- La colonne "En commande" des écrans Produits et Alertes stock lit les
+  reliquats des PO.
+
+## Décisions actées avec Jean Didier (27/10/2026)
+
+1. **Statuts** : **Fait** (commande créée) → **Envoyé** (envoyée au
+   fournisseur) → **En transit** (le fournisseur annonce l'expédition) →
+   **En cours de réception** (reçu partiellement) → **Complétée** (reçu =
+   commandé : ligne grisée, plus aucune réception possible). **Clôture
+   manuelle** possible à tout moment, avec un motif.
+2. **PDF du bon de commande** : voulu, à faire plus tard.
+3. **Plusieurs réceptions** sur un PO tant que le reçu est inférieur au
+   commandé ; dès que reçu = commandé, la commande passe Complétée.
+4. **Quarantaine à la réception** : quantité non conforme, motif et constat
+   par ligne (même mécanisme que l'entrée manuelle, dossier NC).
+5. **Messages de validation / contre-vérification** avant chaque action
+   (changement de statut, réception, clôture, enregistrement).
+6. La préparation des commandes se fait depuis Sorties : pas d'action
+   "Préparer une commande" dans Alertes stock.
+
+## Choix techniques
+
+- La quantité reçue d'une ligne compte tout ce qui a été livré, y compris
+  la part mise en quarantaine (suivie ensuite dans son dossier NC).
+- Une réception de commande est enregistrée et validée en une fois (après
+  confirmation) : stock, lots, PMP et quarantaine passent par la validation
+  existante.
+- Une livraison supérieure au commandé est acceptée après un avertissement.
+
+## Avancement
+
+- [x] Proposition validée par Jean Didier
+- [x] Base : migration `2026-10-27-commandes-fournisseurs.sql` (tables,
+      fonctions, vues, colonne « En commande » alimentée par les reliquats),
+      testée sur base de test (35 contrôles), `schema.sql` aligné
+- [x] Écrans : liste Mouvement > Commandes fournisseurs (filtres par statut,
+      lignes terminées grisées, barre reçu / commandé, retard en rouge),
+      onglet « Nouvelle commande », fiche en bas avec actions, fenêtre de
+      réception en deux temps (saisie puis vérification des écarts),
+      confirmations avant chaque action, clôture avec motif obligatoire,
+      liste Historiques > Commandes fournisseurs
+- [ ] Exécuter la migration dans Supabase (Jean Didier)
+- [ ] PDF du bon de commande (plus tard)
+- [ ] Vérification en local par Jean Didier
+
+# Bulle « Info ? » et fenêtre d'informations
+
+**Statut :** validé, exécution en cours
+
+## Objectif
+
+Clic sur une ligne d'un tableau : une petite bulle « Info » apparaît à côté
+du clic. Clic sur « Info » : une fenêtre flottante (en-tête sombre, onglets,
+défilement interne) affiche toutes les informations de l'élément.
+
+## Décisions actées (27/10/2026)
+
+- Un seul composant réutilisable (`ItemInfoPopover` + `ItemInfoPanel`,
+  alimentés par des props), branché d'abord sur Produits, puis étendu aux
+  autres tableaux de consultation (Alertes stock, Quarantaine, Commandes
+  fournisseurs, Entrées, Transferts, Historiques, Emplacements). Pas sur les
+  feuilles de saisie.
+- Produits : le panneau du bas (stock par dépôt, derniers mouvements) est
+  supprimé, la fenêtre Info le remplace. Double-clic (fiche) et clic droit
+  (menu) inchangés.
+- Fenêtre produit : onglets Détails (référence, désignation, catégorie,
+  type, unité, PMP, suivi lot / série / expiration, équivalents), Stock
+  (disponible, statut, en commande, min / seuil / max, répartition par
+  emplacement, lots), Historique (10 derniers mouvements), Fournisseur.
+- Fermeture : « × », Échap, clic en dehors. Focus piégé dans la fenêtre,
+  rendu à la ligne à la fermeture. Aucune donnée ni logique métier modifiée.
+
+## Avancement
+
+- [x] Composants bulle + fenêtre (`components/ui/ItemInfo.tsx`, contenu produit dans `components/produits/ProduitInfoPanel.tsx`)
+- [x] Branchement sur Produits, retrait du panneau du bas
+- [ ] Vérification en local par Jean Didier
+- [ ] Extension aux autres tableaux
 
 ## Format utilisé pour chaque plan
 

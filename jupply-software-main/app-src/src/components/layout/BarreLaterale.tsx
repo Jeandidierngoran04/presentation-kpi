@@ -80,7 +80,7 @@ export function BarreLaterale() {
       ouvrirOnglet('nouvelle-sortie', 'Nouvelle sortie')
       return
     }
-    ouvrirOnglet(entree.ecran, entree.label)
+    ouvrirOnglet(entree.ecran, entree.titreOnglet ?? entree.label)
   }
 
   function clicGroupe(groupe: GroupeMenu, e: MouseEvent<HTMLButtonElement>) {
@@ -116,10 +116,10 @@ export function BarreLaterale() {
           }}
           aria-expanded={groupe.entrees ? ouvert : undefined}
           className={`${CLASSE_LIGNE} ${
-            feuilleActive || (reduite && actif) ? 'bg-nav-actif text-text font-semibold' : 'text-text hover:bg-nav-survol'
+            feuilleActive || (reduite && actif) ? 'nav-actif-lueur text-text font-semibold' : 'text-text hover:bg-nav-survol'
           } ${actif && !feuilleActive ? 'font-semibold' : 'font-medium'}`}
         >
-          <Icone size={18} strokeWidth={1.6} className="shrink-0 text-text-muted" />
+          <Icone size={18} strokeWidth={1.6} className={`shrink-0 ${actif ? 'text-accent-deep' : 'text-text-muted'}`} />
           <span className="libelle-nav flex-1 min-w-0 truncate">{groupe.label}</span>
           {groupe.entrees && (
             <ChevronRight
@@ -142,7 +142,7 @@ export function BarreLaterale() {
         disabled={entree.bientot}
         className={`${CLASSE_SOUS_LIGNE} ${
           estActif(entree.ecran)
-            ? 'bg-nav-actif text-text font-semibold'
+            ? 'nav-actif-lueur text-text font-semibold'
             : entree.bientot
               ? 'text-text-muted/60 cursor-default'
               : 'text-text hover:bg-nav-survol'

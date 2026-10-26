@@ -124,7 +124,6 @@ export function NouvelleReception() {
   const [entrepotId, setEntrepotId] = useState('')
   const [fournisseurId, setFournisseurId] = useState('')
   const [ficheFournisseurOuverte, setFicheFournisseurOuverte] = useState(false)
-  const [numeroPo, setNumeroPo] = useState('')
   const [dateMouvement, setDateMouvement] = useState(() => dateVersInput(new Date()))
   const [notes, setNotes] = useState('')
   const [lignes, setLignes] = useState<LigneSaisie[]>([ligneVide()])
@@ -236,7 +235,7 @@ export function NouvelleReception() {
 
   /** Retour à la liste des réceptions, en fermant cet onglet. */
   function revenirALaListe() {
-    ouvrirOnglet('entrees', 'Entrées manuelles')
+    ouvrirOnglet('entrees', 'Entrées')
     fermerOnglet('nouvelle-reception')
   }
 
@@ -258,7 +257,7 @@ export function NouvelleReception() {
     for (const l of lignesRemplies) {
       const numero = lignes.indexOf(l) + 1
       if (!l.produitId) return `Ligne ${numero} : référence inconnue.`
-      if (quantiteCommandeeEffective(l) <= 0) return `Ligne ${numero} : saisis une quantité commandée ou reçue.`
+      if (quantiteCommandeeEffective(l) <= 0) return `Ligne ${numero} : saisis la quantité reçue.`
       if (!l.emplacementId) return `Ligne ${numero} : localisation manquante.`
       // Sans lot ni date, la sortie "premier périmé, premier sorti" est impossible (même contrôle côté base).
       if (produitParId.get(l.produitId)?.gere_expiration && !l.dateExpiration) {
@@ -305,7 +304,8 @@ export function NouvelleReception() {
       await creerReception({
         entrepotId,
         fournisseurId: fournisseurId || null,
-        numeroPo: numeroPo || null,
+        // Entrée manuelle : produits non commandés. Les commandes fournisseurs auront leur propre écran (PO).
+        numeroPo: null,
         notes: notes.trim() || null,
         dateMouvement: dateMouvement ? dateSaisieVersISO(dateMouvement) : null,
         lignes: lignesReception,
@@ -358,10 +358,6 @@ export function NouvelleReception() {
                 )}
               </div>
             </div>
-            <label className="flex flex-col gap-1">
-              <span className={CLASSE_LABEL}>N° bon de commande</span>
-              <input value={numeroPo} onChange={(e) => setNumeroPo(e.target.value)} className={CLASSE_CHAMP_COMPACT} />
-            </label>
           </div>
 
           <div className="flex flex-col gap-2">
@@ -424,14 +420,13 @@ export function NouvelleReception() {
             ))}
           </datalist>
           <div ref={tableauRef} onKeyDown={onKeyDownTableau} className="flex-1 min-h-0 overflow-auto rounded-lg border border-border">
-            <table className="w-full min-w-[1480px] border-collapse text-xs">
+            <table className="w-full min-w-[1360px] border-collapse text-xs">
               <thead className="sticky top-0 z-10 text-[11px] text-text-muted uppercase tracking-wide">
                 <tr>
                   <th className={`${CLASSE_TH} w-9 text-center`}>#</th>
                   <th className={`${CLASSE_TH} w-36`}>Référence</th>
                   <th className={CLASSE_TH}>Désignation</th>
-                  <th className={`${CLASSE_TH} w-24 text-right`}>Qté cmdée</th>
-                  <th className={`${CLASSE_TH} w-24 text-right`}>Qté reçue</th>
+                  <th className={`${CLASSE_TH} w-24 text-right`}>Quantité</th>
                   <th className={`${CLASSE_TH} w-24 text-right`}>Prix unit.</th>
                   <th className={`${CLASSE_TH} w-36`}>Localisation</th>
                   <th className={`${CLASSE_TH} w-28`}>Lot</th>
@@ -476,22 +471,11 @@ export function NouvelleReception() {
                       </td>
                       <td className={CLASSE_TD}>
                         <input
-                          {...attributsCellule(index, 'quantiteAttendue')}
-                          type="number"
-                          min="0"
-                          value={ligne.quantiteAttendue}
-                          onChange={(e) => majLigne(ligne.cle, { quantiteAttendue: e.target.value })}
-                          className={`${CLASSE_CELLULE} text-right`}
-                        />
-                      </td>
-                      <td className={CLASSE_TD}>
-                        <input
                           {...attributsCellule(index, 'quantiteRecue')}
                           type="number"
                           min="0"
                           value={ligne.quantiteRecue}
                           onChange={(e) => majLigne(ligne.cle, { quantiteRecue: e.target.value })}
-                          placeholder={ligne.quantiteAttendue}
                           className={`${CLASSE_CELLULE} text-right`}
                         />
                       </td>

@@ -32,14 +32,18 @@ export function comparerOrdreSortie(a: StockLot, b: StockLot): number {
  * Lots en stock (hors Quarantaine), groupés par produit et triés dans l'ordre
  * de sortie. Renvoie null si la base n'a pas encore le suivi par lot
  * (migration non exécutée) : l'appelant se replie sur le stock par emplacement.
+ * Avec produitId, ne lit que les lots de ce produit.
  */
-export async function getStockLots(): Promise<Map<string, StockLot[]> | null> {
-  const { data, error } = await supabase
+export async function getStockLots(produitId?: string): Promise<Map<string, StockLot[]> | null> {
+  let requete = supabase
     .from('stock_lots')
     .select(
       'id, produit_id, entrepot_id, emplacement_id, lot, numero_serie, date_expiration, date_entree, quantite, emplacements(code, est_quarantaine)',
     )
     .gt('quantite', 0)
+  // Un seul produit (fenêtre Info) ou tous.
+  if (produitId) requete = requete.eq('produit_id', produitId)
+  const { data, error } = await requete
   if (error) return null
 
   const parProduit = new Map<string, StockLot[]>()

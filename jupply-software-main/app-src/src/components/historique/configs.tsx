@@ -3,6 +3,7 @@
 import type { BonSortieHistorique, DocumentHistorique, LigneBonSortie } from '../../lib/api/historique'
 import { ouvrirBonSortiePdf } from '../../lib/export/bonSortiePdf'
 import { libelleDecision, libelleMotif, ORIGINES_NC, STATUTS_NC, type StatutNc } from '../../lib/api/quarantaine'
+import { STATUTS_COMMANDE, type StatutCommande } from '../../lib/api/commandes'
 import { Badge, type TonBadge } from '../ui/Badge'
 import type { ConfigDocuments } from './ListeDocuments'
 
@@ -155,6 +156,49 @@ export const CONFIG_REINTEGRATIONS: ConfigDocuments<DocumentHistorique, Document
     ],
   },
   titreDetail: (d) => `Réintégration ${String(d.numero)}`,
+}
+
+// --- Commandes fournisseurs (PO) -------------------------------------------------
+
+export const CONFIG_COMMANDES: ConfigDocuments<DocumentHistorique, DocumentHistorique> = {
+  vue: 'v_commandes_fournisseurs',
+  libelle: 'Commandes',
+  colonneNumero: { cle: 'numero', titre: 'N° PO' },
+  colonnes: [
+    { titre: 'N° PO', valeur: (d) => txt(d.numero), mono: true, largeurExcel: 16 },
+    { titre: 'Date', valeur: (d) => dateHeure(d.cree_le), rendu: (d) => texteDateHeure(d.cree_le), largeurExcel: 18 },
+    { titre: 'Fournisseur', valeur: (d) => txt(d.fournisseur_nom), largeurExcel: 26 },
+    { titre: 'Dépôt de livraison', valeur: (d) => txt(d.entrepot_nom), largeurExcel: 20 },
+    {
+      titre: 'Statut',
+      valeur: (d) => STATUTS_COMMANDE[d.statut as StatutCommande]?.label ?? txt(d.statut),
+      rendu: (d) => {
+        const s = STATUTS_COMMANDE[d.statut as StatutCommande]
+        return s ? <Badge ton={s.ton}>{s.label}</Badge> : String(d.statut)
+      },
+      largeurExcel: 20,
+    },
+    { titre: 'Émis par', valeur: (d) => txt(d.cree_par_nom), largeurExcel: 20 },
+    { titre: 'Livraison prévue', valeur: (d) => texteDate(d.date_livraison_prevue) || null, largeurExcel: 14 },
+    { titre: 'Qté commandée', valeur: (d) => nb(d.quantite_commandee), droite: true, largeurExcel: 12 },
+    { titre: 'Qté reçue', valeur: (d) => nb(d.quantite_recue), droite: true, largeurExcel: 10 },
+    { titre: 'Montant', valeur: (d) => (d.montant == null ? null : Number(d.montant)), droite: true, largeurExcel: 14 },
+    { titre: 'Motif de clôture', valeur: (d) => txt(d.motif_cloture), largeurExcel: 28 },
+  ],
+  lignes: {
+    vue: 'v_commandes_fournisseurs_lignes',
+    colonneLien: 'commande_id',
+    colonnes: [
+      { titre: 'Référence', valeur: (l) => txt(l.produit_reference), mono: true, largeurExcel: 16 },
+      { titre: 'Désignation', valeur: (l) => txt(l.produit_designation), largeurExcel: 32 },
+      { titre: 'Qté commandée', valeur: (l) => nb(l.quantite_commandee), droite: true, largeurExcel: 12 },
+      { titre: 'Qté reçue', valeur: (l) => nb(l.quantite_recue), droite: true, largeurExcel: 10 },
+      { titre: 'Reste', valeur: (l) => nb(l.quantite_restante), droite: true, largeurExcel: 8 },
+      { titre: 'Prix unit.', valeur: (l) => (l.prix_unitaire == null ? null : Number(l.prix_unitaire)), droite: true, largeurExcel: 12 },
+      { titre: 'Montant', valeur: (l) => (l.montant == null ? null : Number(l.montant)), droite: true, largeurExcel: 14 },
+    ],
+  },
+  titreDetail: (d) => `Commande ${String(d.numero)} · ${String(d.fournisseur_nom)}`,
 }
 
 // --- Transferts ---------------------------------------------------------------

@@ -28,7 +28,7 @@ export function MouvementsRecents({ mouvements }: { mouvements: MouvementAffiche
   return (
     <SectionCard
       titre="Mouvements récents"
-      lienTout={{ label: 'Voir tous les mouvements', onClick: () => ouvrirOnglet('mouvements', 'Tous les mouvements') }}
+      lienTout={{ label: 'Voir tous les mouvements', onClick: () => ouvrirOnglet('mouvements', 'Historique des mouvements') }}
     >
       {mouvements.length === 0 ? (
         <p className="text-sm text-text-muted py-4 text-center">Aucun mouvement enregistré pour le moment.</p>

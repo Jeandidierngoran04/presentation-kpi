@@ -175,6 +175,16 @@ body {
   pointer-events: none;
 }
 
+/* Entree active : fond gris clair, liseré d'accent a gauche et legere lueur,
+   pour reperer d'un coup d'oeil l'ecran ouvert (et son dossier). */
+.nav-actif-lueur {
+  background: var(--nav-actif);
+  box-shadow:
+    inset 3px 0 0 var(--accent),
+    0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent),
+    0 2px 10px -4px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
 .defilement-fin {
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
@@ -236,6 +246,41 @@ body {
 }
 .tableau-dense tbody tr:first-child td {
   border-top: 0;
+}
+/* Largeurs fixées par <colgroup> : le tableau tient dans la largeur de l'écran,
+   le texte trop long est tronqué au lieu de provoquer un défilement horizontal. */
+.tableau-ajuste {
+  table-layout: fixed;
+}
+.tableau-ajuste th,
+.tableau-ajuste td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ============================================================
+   Bulle « Info » et fenêtre d'informations (components/ui/ItemInfo.tsx)
+   ============================================================ */
+/* Ligne dont la bulle ou la fenêtre est ouverte : léger fond + liseré d'accent. */
+.ligne-info-active > td {
+  background: color-mix(in srgb, var(--accent) 12%, var(--card));
+}
+.ligne-info-active > td:first-child {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+@keyframes apparition-bulle {
+  from { opacity: 0; scale: 0.92; }
+  to { opacity: 1; scale: 1; }
+}
+@keyframes apparition-panneau {
+  from { opacity: 0; scale: 0.98; }
+  to { opacity: 1; scale: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  [class*="apparition-"] {
+    animation: none !important;
+  }
 }
 
 /* ============================================================

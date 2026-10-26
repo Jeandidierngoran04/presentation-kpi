@@ -14,6 +14,7 @@ import { AlertesStock } from '../../pages/AlertesStock'
 import { NouvelleReception } from '../../pages/NouvelleReception'
 import { NouvelleSortie } from '../../pages/NouvelleSortie'
 import {
+  HistoriqueCommandes,
   HistoriqueEntrees,
   HistoriqueMouvements,
   HistoriqueNonConformites,
@@ -24,6 +25,8 @@ import {
 import { ToastProvider } from '../../context/ToastContext'
 import { Quarantaine } from '../../pages/Quarantaine'
 import { ComingSoon } from '../../pages/ComingSoon'
+import { CommandesFournisseurs } from '../../pages/CommandesFournisseurs'
+import { NouvelleCommande } from '../../pages/NouvelleCommande'
 
 const COMPOSANTS = {
   dashboard: Dashboard,
@@ -44,12 +47,51 @@ const COMPOSANTS = {
   'historique-transferts': HistoriqueTransferts,
   'historique-non-conformites': HistoriqueNonConformites,
   quarantaine: Quarantaine,
+  'commandes-fournisseurs': CommandesFournisseurs,
+  'nouvelle-commande': NouvelleCommande,
+  'historique-commandes': HistoriqueCommandes,
 } satisfies Record<EcranId, () => ReactElement>
+
+/** Raccourcis proposés quand aucun écran n'est ouvert. */
+const RACCOURCIS: { ecran: EcranId; titre: string; aide: string }[] = [
+  { ecran: 'dashboard', titre: 'Tableau de bord', aide: 'Indicateurs et activité du jour' },
+  { ecran: 'produits', titre: 'Produits', aide: 'Catalogue, stock et localisations' },
+  { ecran: 'nouvelle-reception', titre: 'Entrée manuelle', aide: 'Enregistrer des produits reçus' },
+  { ecran: 'sorties', titre: 'Sorties', aide: 'Bons de sortie du jour' },
+]
+
+function Accueil() {
+  const { ouvrirOnglet } = useTabs()
+  return (
+    <div className="h-full flex items-center justify-center p-[var(--content-padding)]">
+      <div className="max-w-xl w-full flex flex-col gap-4">
+        <div>
+          <h1 className="text-[length:var(--page-title-size)] font-semibold text-text">Aucun écran ouvert</h1>
+          <p className="text-[13px] text-text-muted mt-1">Choisis un écran dans le menu de gauche, ou ouvre directement :</p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {RACCOURCIS.map((r) => (
+            <button
+              key={r.ecran}
+              type="button"
+              onClick={() => ouvrirOnglet(r.ecran, r.titre)}
+              className="text-left rounded-lg border border-border px-3 py-2.5 hover:bg-muted transition-colors"
+            >
+              <span className="block text-[13px] font-semibold text-text">{r.titre}</span>
+              <span className="block text-xs text-text-muted">{r.aide}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function ZoneContenu() {
   const { onglets, ongletActifId } = useTabs()
   return (
     <main className="flex-1 min-h-0 overflow-hidden bg-card">
+      {onglets.length === 0 && <Accueil />}
       {onglets.map((o) => {
         const Composant = COMPOSANTS[o.id]
         return (

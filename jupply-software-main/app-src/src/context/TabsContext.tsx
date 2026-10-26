@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, type ReactNode } from 'react'
-import { GROUPE_PAR_DEFAUT, MODULE_PAR_ECRAN } from '../lib/modules'
+import { MODULE_PAR_ECRAN } from '../lib/modules'
 
 export type EcranId =
   | 'dashboard'
@@ -20,59 +20,64 @@ export type EcranId =
   | 'historique-transferts'
   | 'historique-non-conformites'
   | 'quarantaine'
+  | 'commandes-fournisseurs'
+  | 'nouvelle-commande'
+  | 'historique-commandes'
 
 export interface Onglet {
   id: EcranId
   titre: string
 }
 
-const ONGLET_DASHBOARD: Onglet = { id: 'dashboard', titre: 'Tableau de bord' }
-const MODULE_DEFAUT = GROUPE_PAR_DEFAUT
-
 interface TabsState {
   onglets: Onglet[]
-  ongletActifId: EcranId
-  /** Groupe de la barre laterale auquel appartient l'onglet actif. */
-  moduleActifId: string
-  definirModuleActif: (id: string) => void
+  /** Null quand aucun onglet n'est ouvert (écran d'accueil). */
+  ongletActifId: EcranId | null
+  /** Groupe de la barre latérale auquel appartient l'onglet actif. */
+  moduleActifId: string | null
+  /** Ouvre un écran ; s'il est déjà ouvert, son onglet passe simplement au premier plan. */
   ouvrirOnglet: (ecran: EcranId, titre: string) => void
   fermerOnglet: (id: EcranId) => void
   activerOnglet: (id: EcranId) => void
+  /** Déplace un onglet à la place d'un autre (glisser-déposer). */
+  deplacerOnglet: (id: EcranId, versId: EcranId) => void
 }
 
 const TabsContext = createContext<TabsState | undefined>(undefined)
 
+const groupeDe = (ecran: EcranId | null) => (ecran ? (MODULE_PAR_ECRAN[ecran] ?? null) : null)
+
 export function TabsProvider({ children }: { children: ReactNode }) {
-  const [onglets, setOnglets] = useState<Onglet[]>([ONGLET_DASHBOARD])
-  const [ongletActifId, setOngletActifId] = useState<EcranId>(ONGLET_DASHBOARD.id)
-  const [moduleActifId, setModuleActifId] = useState<string>(MODULE_DEFAUT)
+  // Aucun écran n'est ouvert d'office : on choisit dans la barre latérale.
+  const [onglets, setOnglets] = useState<Onglet[]>([])
+  const [ongletActifId, setOngletActifId] = useState<EcranId | null>(null)
 
   function ouvrirOnglet(ecran: EcranId, titre: string) {
-    setOnglets((prev) => {
-      if (prev.some((o) => o.id === ecran)) return prev
-      return [...prev, { id: ecran, titre }]
-    })
+    setOnglets((prev) => (prev.some((o) => o.id === ecran) ? prev : [...prev, { id: ecran, titre }]))
     setOngletActifId(ecran)
-    setModuleActifId(MODULE_PAR_ECRAN[ecran] ?? MODULE_DEFAUT)
   }
 
   function fermerOnglet(id: EcranId) {
-    if (id === ONGLET_DASHBOARD.id) return
     setOnglets((prev) => {
+      const index = prev.findIndex((o) => o.id === id)
       const suivant = prev.filter((o) => o.id !== id)
-      setOngletActifId((actif) => {
-        if (actif !== id) return actif
-        const prochain = suivant[suivant.length - 1]?.id ?? ONGLET_DASHBOARD.id
-        setModuleActifId(MODULE_PAR_ECRAN[prochain] ?? MODULE_DEFAUT)
-        return prochain
-      })
+      // L'onglet voisin prend le relais (celui de gauche, sinon celui de droite).
+      setOngletActifId((actif) => (actif !== id ? actif : (suivant[Math.max(0, index - 1)]?.id ?? null)))
       return suivant
     })
   }
 
-  function activerOnglet(id: EcranId) {
-    setOngletActifId(id)
-    setModuleActifId(MODULE_PAR_ECRAN[id] ?? MODULE_DEFAUT)
+  function deplacerOnglet(id: EcranId, versId: EcranId) {
+    if (id === versId) return
+    setOnglets((prev) => {
+      const depart = prev.findIndex((o) => o.id === id)
+      const arrivee = prev.findIndex((o) => o.id === versId)
+      if (depart < 0 || arrivee < 0) return prev
+      const copie = [...prev]
+      const [onglet] = copie.splice(depart, 1)
+      copie.splice(arrivee, 0, onglet)
+      return copie
+    })
   }
 
   return (
@@ -80,11 +85,11 @@ export function TabsProvider({ children }: { children: ReactNode }) {
       value={{
         onglets,
         ongletActifId,
-        moduleActifId,
-        definirModuleActif: setModuleActifId,
+        moduleActifId: groupeDe(ongletActifId),
         ouvrirOnglet,
         fermerOnglet,
-        activerOnglet,
+        activerOnglet: setOngletActifId,
+        deplacerOnglet,
       }}
     >
       {children}

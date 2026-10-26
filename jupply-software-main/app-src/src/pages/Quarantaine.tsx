@@ -266,7 +266,8 @@ export function Quarantaine() {
 
       {/* Liste des dossiers */}
       <div className="flex-1 min-h-[200px] bg-card rounded-lg border border-border overflow-auto">
-        <table className="tableau-dense min-w-[1200px]">
+        <table className="tableau-dense tableau-ajuste">
+          <colgroup><col style={{ width: '9%' }} /><col style={{ width: '10%' }} /><col style={{ width: '5%' }} /><col style={{ width: '8%' }} /><col style={{ width: '14%' }} /><col style={{ width: '7%' }} /><col style={{ width: '7%' }} /><col style={{ width: '10%' }} /><col style={{ width: '9%' }} /><col style={{ width: '7%' }} /><col style={{ width: '7%' }} /><col style={{ width: '7%' }} /></colgroup>
           <thead className="sticky top-0 z-10">
             <tr className="text-left text-[11px] text-text-muted uppercase tracking-wide bg-muted">
               <th className="font-semibold h-8 px-3">N° NC</th>

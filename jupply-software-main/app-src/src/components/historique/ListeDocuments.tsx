@@ -72,9 +72,22 @@ function afficher<R>(colonne: ColonneDocument<R>, ligne: R): ReactNode {
   return valeur
 }
 
+/** Largeur de chaque colonne, en proportion de sa largeur d'export : le tableau tient dans l'écran, sans défilement horizontal. */
+function Largeurs<R>({ colonnes }: { colonnes: ColonneDocument<R>[] }) {
+  const total = colonnes.reduce((somme, c) => somme + (c.largeurExcel ?? 14), 0)
+  return (
+    <colgroup>
+      {colonnes.map((c) => (
+        <col key={c.titre} style={{ width: `${(((c.largeurExcel ?? 14) / total) * 100).toFixed(2)}%` }} />
+      ))}
+    </colgroup>
+  )
+}
+
 function TableauLignes<R extends { id?: unknown }>({ colonnes, lignes }: { colonnes: ColonneDocument<R>[]; lignes: R[] }) {
   return (
-    <table className="tableau-dense">
+    <table className="tableau-dense tableau-ajuste">
+      <Largeurs colonnes={colonnes} />
       <thead className="sticky top-0 z-10">
         <tr className="text-left text-[11px] text-text-muted uppercase tracking-wide bg-muted">
           {colonnes.map((c) => (
@@ -301,7 +314,8 @@ export function ListeDocuments<D extends DocumentHistorique, L extends { id?: un
           if (elementsMenuTableau && elementsMenuTableau.length > 0) ouvrirMenu(e, elementsMenuTableau)
         }}
       >
-        <table className="tableau-dense">
+        <table className="tableau-dense tableau-ajuste">
+          <Largeurs colonnes={config.colonnes} />
           <thead className="sticky top-0 z-10">
             <tr className="text-left text-[11px] text-text-muted uppercase tracking-wide bg-muted">
               {config.colonnes.map((c) => (

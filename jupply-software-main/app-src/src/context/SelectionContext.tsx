@@ -20,6 +20,11 @@ export interface SortieValidee {
   jeton: number
 }
 
+interface DemandeRechercheProduit {
+  terme: string
+  jeton: number
+}
+
 interface SelectionState {
   /** Dernier produit sélectionné (clic simple) dans l'écran Produits. */
   produitSelectionneId: string | null
@@ -35,6 +40,9 @@ interface SelectionState {
   /** Dernière sortie validée : la liste des sorties la met en avant et propose d'imprimer le bon. */
   derniereSortie: SortieValidee | null
   signalerSortie: (sortie: Omit<SortieValidee, 'jeton'>) => void
+  /** Recherche de produit lancée depuis la barre du haut, appliquée par l'écran Produits. */
+  demandeRechercheProduit: DemandeRechercheProduit | null
+  demanderRechercheProduit: (terme: string) => void
 }
 
 const SelectionContext = createContext<SelectionState | undefined>(undefined)
@@ -44,6 +52,11 @@ export function SelectionProvider({ children }: { children: ReactNode }) {
   const [demandeSortieManuelle, setDemandeSortieManuelle] = useState<DemandeSortieManuelle | null>(null)
   const [demandeAffichageProduit, setDemandeAffichageProduit] = useState<DemandeAffichageProduit | null>(null)
   const [derniereSortie, setDerniereSortie] = useState<SortieValidee | null>(null)
+  const [demandeRechercheProduit, setDemandeRechercheProduit] = useState<DemandeRechercheProduit | null>(null)
+
+  function demanderRechercheProduit(terme: string) {
+    setDemandeRechercheProduit((prev) => ({ terme, jeton: (prev?.jeton ?? 0) + 1 }))
+  }
 
   function declencherSortieManuelle(produitId: string | null) {
     setDemandeSortieManuelle((prev) => ({ produitId, jeton: (prev?.jeton ?? 0) + 1 }))
@@ -73,6 +86,8 @@ export function SelectionProvider({ children }: { children: ReactNode }) {
         demanderAffichageProduit,
         derniereSortie,
         signalerSortie,
+        demandeRechercheProduit,
+        demanderRechercheProduit,
       }}
     >
       {children}

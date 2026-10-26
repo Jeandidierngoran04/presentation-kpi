@@ -239,7 +239,8 @@ export function AlertesStock() {
       ) : (
         <div className="flex-1 min-h-0 bg-card rounded-lg border border-border overflow-hidden flex flex-col">
           <div className="overflow-auto flex-1">
-            <table className="tableau-dense min-w-[980px]">
+            <table className="tableau-dense tableau-ajuste">
+              <colgroup><col style={{ width: '10%' }} /><col style={{ width: '22%' }} /><col style={{ width: '12%' }} /><col style={{ width: '7%' }} /><col style={{ width: '9%' }} /><col style={{ width: '7%' }} /><col style={{ width: '7%' }} /><col style={{ width: '8%' }} /><col style={{ width: '9%' }} /><col style={{ width: '9%' }} /></colgroup>
               <thead className="sticky top-0 z-10">
                 <tr className="bg-card">
                   <IndicateurFiltre colonne="reference" actif={colonneActive} valeur={filtres.reference} />

@@ -13,6 +13,8 @@ import type { EcranId } from '../context/TabsContext'
 export interface EntreeMenu {
   ecran: EcranId
   label: string
+  /** Titre de l'onglet s'il doit se distinguer d'un homonyme (ex. Sorties / Historique des sorties). */
+  titreOnglet?: string
   /** Écran prévu mais pas encore construit : affiché grisé, non cliquable. */
   bientot?: boolean
 }
@@ -49,9 +51,11 @@ export const MENU: GroupeMenu[] = [
     icone: ArrowLeftRight,
     entrees: [
       { ecran: 'entrees', label: 'Entrées' },
+      { ecran: 'nouvelle-reception', label: 'Créer une entrée manuelle', titreOnglet: 'Entrée manuelle' },
       { ecran: 'sorties', label: 'Sorties' },
       { ecran: 'reintegration', label: 'Réintégrations' },
       { ecran: 'transferts', label: 'Transferts' },
+      { ecran: 'commandes-fournisseurs', label: 'Commandes fournisseurs (PO)', titreOnglet: 'Commandes fournisseurs' },
     ],
   },
   { id: 'inventaires', label: 'Inventaires', icone: ClipboardList, ecran: 'inventaires' },
@@ -60,12 +64,13 @@ export const MENU: GroupeMenu[] = [
     label: 'Historiques',
     icone: History,
     entrees: [
-      { ecran: 'historique-sorties', label: 'Sorties' },
-      { ecran: 'historique-entrees', label: 'Entrées' },
-      { ecran: 'historique-reintegrations', label: 'Réintégrations' },
-      { ecran: 'historique-transferts', label: 'Transferts' },
-      { ecran: 'historique-non-conformites', label: 'Non-conformités' },
-      { ecran: 'mouvements', label: 'Tous les mouvements' },
+      { ecran: 'historique-sorties', label: 'Sorties', titreOnglet: 'Historique des sorties' },
+      { ecran: 'historique-entrees', label: 'Entrées', titreOnglet: 'Historique des entrées' },
+      { ecran: 'historique-commandes', label: 'Commandes fournisseurs', titreOnglet: 'Historique des commandes' },
+      { ecran: 'historique-reintegrations', label: 'Réintégrations', titreOnglet: 'Historique des réintégrations' },
+      { ecran: 'historique-transferts', label: 'Transferts', titreOnglet: 'Historique des transferts' },
+      { ecran: 'historique-non-conformites', label: 'Non-conformités', titreOnglet: 'Historique des non-conformités' },
+      { ecran: 'mouvements', label: 'Tous les mouvements', titreOnglet: 'Historique des mouvements' },
     ],
   },
 ]
@@ -79,8 +84,8 @@ export const MENU_PARAMETRE: GroupeMenu = {
 
 /** Écrans ouverts depuis un autre écran (absents du menu), rattachés à leur groupe. */
 const ECRANS_SECONDAIRES: Partial<Record<EcranId, string>> = {
-  'nouvelle-reception': 'mouvement',
   'nouvelle-sortie': 'mouvement',
+  'nouvelle-commande': 'mouvement',
 }
 
 /** Groupe du menu auquel appartient chaque écran (pour surligner et déplier le bon dossier). */
@@ -93,5 +98,3 @@ export const MODULE_PAR_ECRAN = {
   ),
   ...ECRANS_SECONDAIRES,
 } as Record<EcranId, string>
-
-export const GROUPE_PAR_DEFAUT = 'tableau-de-bord'
