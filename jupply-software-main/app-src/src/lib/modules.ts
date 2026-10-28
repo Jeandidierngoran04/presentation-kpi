@@ -51,7 +51,6 @@ export const MENU: GroupeMenu[] = [
     icone: ArrowLeftRight,
     entrees: [
       { ecran: 'entrees', label: 'Entrées' },
-      { ecran: 'nouvelle-reception', label: 'Créer une entrée manuelle', titreOnglet: 'Entrée manuelle' },
       { ecran: 'sorties', label: 'Sorties' },
       { ecran: 'reintegration', label: 'Réintégrations' },
       { ecran: 'transferts', label: 'Transferts' },
@@ -84,6 +83,7 @@ export const MENU_PARAMETRE: GroupeMenu = {
 
 /** Écrans ouverts depuis un autre écran (absents du menu), rattachés à leur groupe. */
 const ECRANS_SECONDAIRES: Partial<Record<EcranId, string>> = {
+  'nouvelle-reception': 'mouvement',
   'nouvelle-sortie': 'mouvement',
   'nouvelle-commande': 'mouvement',
   'fiche-stock': 'stock',

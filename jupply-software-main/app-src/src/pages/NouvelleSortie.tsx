@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, Plus, Search, Trash2 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import { useTabs } from '../context/TabsContext'
+import { useSaisieEnCours, useTabs } from '../context/TabsContext'
 import { useSelection } from '../context/SelectionContext'
 import { useToast } from '../context/ToastContext'
 import { messageErreur } from '../lib/erreurs'
@@ -108,6 +108,8 @@ export function NouvelleSortie() {
   const [dateMouvement, setDateMouvement] = useState(() => dateVersInput(new Date()))
   const [motif, setMotif] = useState('')
   const [recuPar, setRecuPar] = useState('')
+  // Panier non validé : confirmation avant de fermer l'onglet.
+  useSaisieEnCours('nouvelle-sortie', panier.length > 0)
   const [envoi, setEnvoi] = useState(false)
 
   const rechercheRef = useRef<HTMLInputElement>(null)

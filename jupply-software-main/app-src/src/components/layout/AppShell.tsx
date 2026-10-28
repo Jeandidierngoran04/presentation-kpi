@@ -58,7 +58,7 @@ const COMPOSANTS = {
 const RACCOURCIS: { ecran: EcranId; titre: string; aide: string }[] = [
   { ecran: 'dashboard', titre: 'Tableau de bord', aide: 'Indicateurs et activité du jour' },
   { ecran: 'produits', titre: 'Produits', aide: 'Catalogue, stock et localisations' },
-  { ecran: 'nouvelle-reception', titre: 'Entrée manuelle', aide: 'Enregistrer des produits reçus' },
+  { ecran: 'nouvelle-reception', titre: 'Nouvelle entrée', aide: 'Enregistrer des produits reçus' },
   { ecran: 'sorties', titre: 'Sorties', aide: 'Bons de sortie du jour' },
 ]
 

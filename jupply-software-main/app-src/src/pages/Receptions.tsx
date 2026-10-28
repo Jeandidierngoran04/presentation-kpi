@@ -9,8 +9,9 @@ import {
   getReceptions,
   validerReception,
   type ReceptionAffichee,
+  type ReceptionLigneAffichee,
 } from '../lib/api/receptions'
-import type { ProduitAvecStock, ReceptionLigne, StatutReception } from '../types/stock'
+import type { ProduitAvecStock, StatutReception } from '../types/stock'
 import { libelleMotif } from '../lib/api/quarantaine'
 import { useMenuContextuel } from '../components/ui/MenuContextuel'
 import { classeBadge, type TonBadge } from '../components/ui/Badge'
@@ -40,7 +41,7 @@ export function Receptions() {
   const { ongletActifId, ouvrirOnglet } = useTabs()
 
   const [selectionId, setSelectionId] = useState<string | null>(null)
-  const [lignes, setLignes] = useState<ReceptionLigne[]>([])
+  const [lignes, setLignes] = useState<ReceptionLigneAffichee[]>([])
   const [produits, setProduits] = useState<ProduitAvecStock[]>([])
   const [envoiValidation, setEnvoiValidation] = useState(false)
 
@@ -71,13 +72,17 @@ export function Receptions() {
   const receptionsFiltrees = useMemo(() => {
     if (!recherche.trim()) return receptions
     return receptions.filter((r) =>
-      [r.numero, r.entrepot_nom, r.fournisseur_nom ?? '', r.numero_po ?? ''].some((v) => texteFiltre(v, recherche)),
+      [r.numero, ...r.depots_noms, r.fournisseur_nom ?? '', r.numero_po ?? ''].some((v) => texteFiltre(v, recherche)),
     )
   }, [receptions, recherche])
   const produitParId = useMemo(() => new Map(produits.map((p) => [p.id, p])), [produits])
 
+  function creer() {
+    ouvrirOnglet('nouvelle-reception', 'Nouvelle entrée')
+  }
+
   function onClicDroitTableau(e: MouseEvent) {
-    ouvrirMenu(e, [{ label: 'Créer une entrée manuelle', onClick: () => ouvrirOnglet('nouvelle-reception', 'Entrée manuelle') }])
+    ouvrirMenu(e, [{ label: 'Créer', onClick: creer }])
   }
 
   async function onValider() {
@@ -109,21 +114,19 @@ export function Receptions() {
     <div className="h-full flex flex-col gap-2 p-4" onContextMenu={onClicDroitTableau}>
       <EnTetePage
         titre="Entrées de stock"
-        compteur={receptionsFiltrees.length}
         actions={
-          <button
-            type="button"
-            onClick={() => ouvrirOnglet('nouvelle-reception', 'Entrée manuelle')}
-            className="inline-flex items-center gap-1.5 bg-accent hover:bg-accent-strong text-accent-contrast text-xs font-semibold rounded-md px-3 h-8"
-          >
-            <Plus size={14} strokeWidth={1.75} /> Créer une entrée manuelle
-          </button>
+          <>
+            <ChampRecherche valeur={recherche} onChange={setRecherche} aide="N° d'entrée, dépôt, fournisseur ou n° de commande (* en tête = contient)" />
+            <button
+              type="button"
+              onClick={creer}
+              className="inline-flex items-center gap-1.5 bg-accent hover:bg-accent-strong text-accent-contrast text-xs font-semibold rounded-md px-3 h-8"
+            >
+              <Plus size={14} strokeWidth={1.75} /> Créer
+            </button>
+          </>
         }
       />
-
-      <div className="shrink-0">
-        <ChampRecherche valeur={recherche} onChange={setRecherche} aide="N° d'entrée, dépôt, fournisseur ou n° de commande (* en tête = contient)" />
-      </div>
 
       {chargement ? (
         <div className="text-sm text-text-muted py-12 text-center">Chargement...</div>
@@ -134,7 +137,7 @@ export function Receptions() {
             <thead className="sticky top-0 z-10">
               <tr className="text-left text-[11px] text-text-muted uppercase tracking-wide bg-muted">
                 <th className="font-medium py-1 px-2">Numéro</th>
-                <th className="font-medium py-1 px-2">Entrepôt</th>
+                <th className="font-medium py-1 px-2">Dépôt</th>
                 <th className="font-medium py-1 px-2">Fournisseur</th>
                 <th className="font-medium py-1 px-2">N° PO</th>
                 <th className="font-medium py-1 px-2">Statut</th>
@@ -152,7 +155,9 @@ export function Receptions() {
                   }`}
                 >
                   <td className="py-1 px-2 font-mono text-xs text-text-muted">{r.numero}</td>
-                  <td className="py-1 px-2 font-medium text-text">{r.entrepot_nom}</td>
+                  <td className="py-1 px-2 font-medium text-text" title={r.depots_noms.join(', ')}>
+                    {r.depots_noms.join(', ')}
+                  </td>
                   <td className="py-1 px-2 text-text-muted">{r.fournisseur_nom ?? '—'}</td>
                   <td className="py-1 px-2 text-text-muted">{r.numero_po ?? '—'}</td>
                   <td className="py-1 px-2">
@@ -171,7 +176,7 @@ export function Receptions() {
           </div>
           {receptionsFiltrees.length === 0 && (
             <p className="text-sm text-text-muted py-8 text-center">
-              {receptions.length === 0 ? 'Aucune réception. Clic droit pour en créer une.' : 'Aucune entrée ne correspond à la recherche.'}
+              {receptions.length === 0 ? 'Aucune entrée. Clique sur « Créer » pour en saisir une.' : 'Aucune entrée ne correspond à la recherche.'}
             </p>
           )}
         </div>
@@ -209,6 +214,8 @@ export function Receptions() {
             <thead>
               <tr className="text-left text-[10px] text-text-muted uppercase tracking-wide">
                 <th className="font-medium pb-1">Produit</th>
+                <th className="font-medium pb-1">Dépôt</th>
+                <th className="font-medium pb-1">Localisation</th>
                 <th className="font-medium pb-1">Attendu</th>
                 <th className="font-medium pb-1">Reçu</th>
                 <th className="font-medium pb-1">Lot / N° série</th>
@@ -222,6 +229,8 @@ export function Receptions() {
                   <td className="py-1 font-medium text-text">
                     {produitParId.get(l.produit_id)?.designation ?? l.produit_id}
                   </td>
+                  <td className="py-1 text-text-muted">{l.entrepot_nom ?? '—'}</td>
+                  <td className="py-1 text-text-muted font-mono text-[11px]">{l.emplacement_code ?? '—'}</td>
                   <td className="py-1 text-text-muted">{l.quantite_attendue}</td>
                   <td className="py-1 text-text-muted">{l.quantite_recue}</td>
                   <td className="py-1 text-text-muted font-mono text-[11px]">{l.numero_serie ?? l.lot ?? '—'}</td>

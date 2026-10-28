@@ -1,5 +1,6 @@
-import { createContext, useContext, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
 import { MODULE_PAR_ECRAN } from '../lib/modules'
+import { ConfirmationModal } from '../components/ui/ConfirmationModal'
 
 export type EcranId =
   | 'dashboard'
@@ -38,7 +39,12 @@ interface TabsState {
   moduleActifId: string | null
   /** Ouvre un écran ; s'il est déjà ouvert, son onglet passe simplement au premier plan. */
   ouvrirOnglet: (ecran: EcranId, titre: string) => void
+  /** Ferme immédiatement (après un enregistrement, par exemple). */
   fermerOnglet: (id: EcranId) => void
+  /** Fermeture demandée par l'utilisateur : confirmation si une saisie n'est pas enregistrée. */
+  demanderFermeture: (id: EcranId) => void
+  /** Une feuille de saisie signale qu'elle contient (ou plus) des données non enregistrées. */
+  signalerSaisie: (id: EcranId, enCours: boolean) => void
   activerOnglet: (id: EcranId) => void
   /** Déplace un onglet à la place d'un autre (glisser-déposer). */
   deplacerOnglet: (id: EcranId, versId: EcranId) => void
@@ -58,7 +64,31 @@ export function TabsProvider({ children }: { children: ReactNode }) {
     setOngletActifId(ecran)
   }
 
+  // Onglets dont la saisie n'est pas enregistrée, et fermeture en attente de confirmation.
+  const [saisiesEnCours, setSaisiesEnCours] = useState<EcranId[]>([])
+  const [fermetureAConfirmer, setFermetureAConfirmer] = useState<EcranId | null>(null)
+
+  const signalerSaisie = useCallback((id: EcranId, enCours: boolean) => {
+    setSaisiesEnCours((prev) => (enCours ? (prev.includes(id) ? prev : [...prev, id]) : prev.filter((x) => x !== id)))
+  }, [])
+
+  // Fermeture ou rechargement du navigateur avec une saisie en cours : avertissement du navigateur.
+  useEffect(() => {
+    if (saisiesEnCours.length === 0) return
+    function avantDeQuitter(e: BeforeUnloadEvent) {
+      e.preventDefault()
+    }
+    window.addEventListener('beforeunload', avantDeQuitter)
+    return () => window.removeEventListener('beforeunload', avantDeQuitter)
+  }, [saisiesEnCours])
+
+  function demanderFermeture(id: EcranId) {
+    if (saisiesEnCours.includes(id)) setFermetureAConfirmer(id)
+    else fermerOnglet(id)
+  }
+
   function fermerOnglet(id: EcranId) {
+    signalerSaisie(id, false)
     setOnglets((prev) => {
       const index = prev.findIndex((o) => o.id === id)
       const suivant = prev.filter((o) => o.id !== id)
@@ -89,13 +119,43 @@ export function TabsProvider({ children }: { children: ReactNode }) {
         moduleActifId: groupeDe(ongletActifId),
         ouvrirOnglet,
         fermerOnglet,
+        demanderFermeture,
+        signalerSaisie,
         activerOnglet: setOngletActifId,
         deplacerOnglet,
       }}
     >
       {children}
+      {fermetureAConfirmer && (
+        <ConfirmationModal
+          titre="Saisie non enregistrée"
+          libelleConfirmer="Fermer sans enregistrer"
+          libelleRetour="Continuer la saisie"
+          danger
+          focusSurRetour
+          onConfirmer={() => {
+            fermerOnglet(fermetureAConfirmer)
+            setFermetureAConfirmer(null)
+          }}
+          onFermer={() => setFermetureAConfirmer(null)}
+        >
+          <p>
+            L'onglet « {onglets.find((o) => o.id === fermetureAConfirmer)?.titre} » contient des données qui ne sont pas
+            enregistrées. Si tu le fermes, elles seront perdues.
+          </p>
+        </ConfirmationModal>
+      )}
     </TabsContext.Provider>
   )
+}
+
+/** À appeler dans une feuille de saisie : protège l'onglet tant que `enCours` est vrai. */
+export function useSaisieEnCours(id: EcranId, enCours: boolean) {
+  const { signalerSaisie } = useTabs()
+  useEffect(() => {
+    signalerSaisie(id, enCours)
+  }, [id, enCours, signalerSaisie])
+  useEffect(() => () => signalerSaisie(id, false), [id, signalerSaisie])
 }
 
 export function useTabs() {

@@ -15,11 +15,11 @@ function iconeDe(ecran: EcranId) {
  * au lieu de défiler), les notifications à droite. Chaque écran à liste a sa propre recherche.
  */
 export function BarreOnglets() {
-  const { onglets, ongletActifId, activerOnglet, fermerOnglet, deplacerOnglet } = useTabs()
+  const { onglets, ongletActifId, activerOnglet, demanderFermeture, deplacerOnglet } = useTabs()
   const [glisse, setGlisse] = useState<EcranId | null>(null)
   return (
     <div className="shrink-0 h-[var(--barre-haute-height)] flex items-end gap-3 bg-canvas pl-2 pr-3">
-      <div className="flex-1 min-w-0 h-full flex items-end gap-1 overflow-x-auto overflow-y-hidden pt-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="flex-1 min-w-0 h-full flex items-end gap-0.5 overflow-x-auto overflow-y-hidden pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {onglets.map((o) => {
           const actif = o.id === ongletActifId
           const Icone = iconeDe(o.id)
@@ -41,24 +41,24 @@ export function BarreOnglets() {
               onClick={() => activerOnglet(o.id)}
               onAuxClick={(e) => {
                 // Clic molette : ferme l'onglet, comme dans un navigateur.
-                if (e.button === 1) fermerOnglet(o.id)
+                if (e.button === 1) demanderFermeture(o.id)
               }}
               title={o.titre}
-              className={`group relative flex-[0_1_200px] min-w-[96px] flex items-center gap-1.5 pl-2.5 pr-1.5 h-8 text-[13px] font-medium whitespace-nowrap cursor-pointer rounded-t-[10px] transition-colors ${
+              className={`group relative flex-[0_1_auto] min-w-[72px] max-w-[160px] flex items-center gap-1 pl-2 pr-1 h-7 text-[11.5px] font-medium whitespace-nowrap cursor-pointer rounded-t-[10px] transition-colors ${
                 actif ? 'onglet-actif bg-card text-text' : 'text-text-muted hover:text-text hover:bg-card/50'
               } ${glisse === o.id ? 'opacity-60' : ''}`}
             >
-              {Icone && <Icone size={13} strokeWidth={1.75} className="shrink-0 opacity-70" />}
+              {Icone && <Icone size={11} strokeWidth={1.75} className="shrink-0 opacity-70" />}
               <span className="flex-1 min-w-0 truncate">{o.titre}</span>
               <button
                 onClick={(e) => {
                   e.stopPropagation()
-                  fermerOnglet(o.id)
+                  demanderFermeture(o.id)
                 }}
                 className={`shrink-0 rounded p-0.5 text-text-muted hover:text-danger ${actif ? '' : 'opacity-0 group-hover:opacity-100'}`}
                 title="Fermer l'onglet"
               >
-                <X size={13} />
+                <X size={12} />
               </button>
             </div>
           )

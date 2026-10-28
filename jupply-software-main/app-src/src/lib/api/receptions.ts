@@ -3,6 +3,8 @@ import type { Reception, ReceptionLigne } from '../../types/stock'
 
 export interface ReceptionAffichee extends Reception {
   entrepot_nom: string
+  /** Tous les dépôts concernés par les lignes (une entrée peut en couvrir plusieurs). */
+  depots_noms: string[]
   fournisseur_nom: string | null
   /** Opérateur qui a enregistré la réception dans le système. */
   cree_par_nom: string
@@ -19,18 +21,30 @@ interface LigneReceptionBrute {
 export async function getReceptions(): Promise<ReceptionAffichee[]> {
   // receptions a deux liens vers profiles (cree_par, valide_par) : les noms
   // sont résolus à part plutôt que par jointure imbriquée ambiguë.
-  const [{ data, error }, { data: profils, error: erreurProfils }] = await Promise.all([
+  const [{ data, error }, { data: profils, error: erreurProfils }, { data: lignesDepots, error: erreurLignes }] = await Promise.all([
     supabase.from('receptions').select('*, entrepots(nom), fournisseurs(nom)').order('cree_le', { ascending: false }),
     supabase.from('profiles').select('id, nom_complet'),
+    // Dépôt de chaque ligne = dépôt de sa localisation.
+    supabase.from('receptions_lignes').select('reception_id, emplacements(entrepots(nom))'),
   ])
   if (error) throw error
   if (erreurProfils) throw erreurProfils
+  if (erreurLignes) throw erreurLignes
   const nomParProfil = new Map((profils ?? []).map((p) => [p.id as string, p.nom_complet as string]))
+  const depotsParReception = new Map<string, Set<string>>()
+  for (const l of (lignesDepots ?? []) as unknown as { reception_id: string; emplacements: { entrepots: { nom: string } | null } | null }[]) {
+    const nom = l.emplacements?.entrepots?.nom
+    if (!nom) continue
+    const noms = depotsParReception.get(l.reception_id) ?? new Set<string>()
+    noms.add(nom)
+    depotsParReception.set(l.reception_id, noms)
+  }
   return ((data ?? []) as unknown as LigneReceptionBrute[]).map((r) => {
     const reception = r as unknown as Reception
     return {
       ...reception,
       entrepot_nom: r.entrepots?.nom ?? '',
+      depots_noms: [...(depotsParReception.get(reception.id) ?? [r.entrepots?.nom ?? ''])].sort((a, b) => a.localeCompare(b)),
       fournisseur_nom: r.fournisseurs?.nom ?? null,
       cree_par_nom: nomParProfil.get(reception.cree_par) ?? '—',
       valide_par_nom: reception.valide_par ? (nomParProfil.get(reception.valide_par) ?? '—') : null,
@@ -38,14 +52,22 @@ export async function getReceptions(): Promise<ReceptionAffichee[]> {
   })
 }
 
-export async function getLignesReception(receptionId: string): Promise<ReceptionLigne[]> {
+/** Ligne d'entrée avec sa localisation et son dépôt, pour le détail. */
+export interface ReceptionLigneAffichee extends ReceptionLigne {
+  emplacement_code: string | null
+  entrepot_nom: string | null
+}
+
+export async function getLignesReception(receptionId: string): Promise<ReceptionLigneAffichee[]> {
   const { data, error } = await supabase
     .from('receptions_lignes')
-    .select('*')
+    .select('*, emplacements(code, entrepots(nom))')
     .eq('reception_id', receptionId)
     .order('cree_le')
   if (error) throw error
-  return data as ReceptionLigne[]
+  return ((data ?? []) as unknown as (ReceptionLigne & { emplacements: { code: string; entrepots: { nom: string } | null } | null })[]).map(
+    ({ emplacements, ...l }) => ({ ...l, emplacement_code: emplacements?.code ?? null, entrepot_nom: emplacements?.entrepots?.nom ?? null }),
+  )
 }
 
 export interface NouvelleLigneReception {
@@ -64,6 +86,7 @@ export interface NouvelleLigneReception {
 }
 
 export interface NouvelleReception {
+  /** Dépôt principal (celui de la première ligne) ; chaque ligne va dans le dépôt de sa localisation. */
   entrepotId: string
   fournisseurId: string | null
   numeroPo: string | null

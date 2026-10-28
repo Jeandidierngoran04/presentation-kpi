@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import { useTabs } from '../context/TabsContext'
+import { useSaisieEnCours, useTabs } from '../context/TabsContext'
 import { useToast } from '../context/ToastContext'
 import { peutGererCatalogue, peutSaisirReception } from '../lib/permissions'
 import { getEntrepots } from '../lib/api/entrepots'
@@ -125,6 +125,8 @@ export function NouvelleCommande() {
   }
 
   const lignesRemplies = lignes.filter((l) => !estVide(l))
+  // Lignes non enregistrées : confirmation avant de fermer l'onglet.
+  useSaisieEnCours('nouvelle-commande', lignesRemplies.length > 0)
   const quantiteTotale = lignesRemplies.reduce((t, l) => t + Number(l.quantite || 0), 0)
   const montantTotal = lignesRemplies.reduce((t, l) => t + Number(l.quantite || 0) * Number(l.prixUnitaire || 0), 0)
   const fournisseur = fournisseurs.find((f) => f.id === fournisseurId)

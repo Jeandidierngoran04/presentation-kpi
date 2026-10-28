@@ -28,7 +28,7 @@ function ecrire(cle: string, valeur: unknown) {
   }
 }
 
-type MenuOuvert = { type: 'groupe'; groupe: GroupeMenu; ancre: DOMRect } | { type: 'compte'; ancre: DOMRect } | null
+type MenuOuvert = { type: 'compte'; ancre: DOMRect } | null
 
 // Hauteur et retrait communs : l'icône garde la même place, barre ouverte ou réduite.
 const CLASSE_LIGNE =
@@ -83,21 +83,29 @@ export function BarreLaterale() {
     ouvrirOnglet(entree.ecran, entree.titreOnglet ?? entree.label)
   }
 
-  function clicGroupe(groupe: GroupeMenu, e: MouseEvent<HTMLButtonElement>) {
+  function clicGroupe(groupe: GroupeMenu) {
     if (groupe.ecran) return ouvrirEcran({ ecran: groupe.ecran, label: groupe.label })
+    // Barre réduite : un clic sur un dossier déplie la barre avec ce dossier ouvert.
     if (reduite) {
-      const ancre = e.currentTarget.getBoundingClientRect()
-      setMenu((m) => (m?.type === 'groupe' && m.groupe.id === groupe.id ? null : { type: 'groupe', groupe, ancre }))
+      basculerReduite()
+      setOuverts((prev) => (prev.includes(groupe.id) ? prev : [...prev, groupe.id]))
       return
     }
     setOuverts((prev) => (prev.includes(groupe.id) ? prev.filter((id) => id !== groupe.id) : [...prev, groupe.id]))
+  }
+
+  // Barre réduite : un clic n'importe où sur la bande (hors bouton) la déplie.
+  function clicBande(e: MouseEvent<HTMLElement>) {
+    // contains() écarte les clics venus du menu du compte (affiché hors de la barre, via un portail).
+    const cible = e.target as HTMLElement
+    if (reduite && e.currentTarget.contains(cible) && !cible.closest('button')) basculerReduite()
   }
 
   const estActif = (ecran: EcranId) => ecran === ongletActifId
   const nom = profil?.nom_complet ?? 'Utilisateur'
   const initiale = nom.trim().charAt(0).toUpperCase() || '?'
 
-  function ligneGroupe(groupe: GroupeMenu, ancreEnBas = false) {
+  function ligneGroupe(groupe: GroupeMenu) {
     const ouvert = !reduite && ouverts.includes(groupe.id)
     const actif = groupe.id === moduleActifId
     const feuilleActive = groupe.ecran != null && estActif(groupe.ecran)
@@ -106,14 +114,7 @@ export function BarreLaterale() {
       <InfoBulle texte={groupe.label} actif={reduite}>
         <button
           type="button"
-          onClick={(e) => {
-            if (ancreEnBas && reduite) {
-              const ancre = e.currentTarget.getBoundingClientRect()
-              setMenu((m) => (m?.type === 'groupe' && m.groupe.id === groupe.id ? null : { type: 'groupe', groupe, ancre }))
-              return
-            }
-            clicGroupe(groupe, e)
-          }}
+          onClick={() => clicGroupe(groupe)}
           aria-expanded={groupe.entrees ? ouvert : undefined}
           className={`${CLASSE_LIGNE} ${
             feuilleActive || (reduite && actif) ? 'nav-actif-lueur text-text font-semibold' : 'text-text hover:bg-nav-survol'
@@ -155,8 +156,9 @@ export function BarreLaterale() {
 
   return (
     <aside
-      className="barre-laterale shrink-0 h-full flex flex-col bg-nav-fond border-r border-border overflow-hidden"
+      className={`barre-laterale shrink-0 h-full flex flex-col bg-nav-fond border-r border-border overflow-hidden ${reduite ? 'cursor-e-resize' : ''}`}
       data-reduite={reduite}
+      onClick={clicBande}
       aria-label="Navigation principale"
     >
       {/* Logo seul */}
@@ -201,7 +203,7 @@ export function BarreLaterale() {
         </InfoBulle>
 
         <div className={reduite ? 'flex flex-col gap-0.5' : 'flex items-center pr-2'}>
-          <div className={reduite ? '' : 'flex-1 min-w-0'}>{ligneGroupe(MENU_PARAMETRE, true)}</div>
+          <div className={reduite ? '' : 'flex-1 min-w-0'}>{ligneGroupe(MENU_PARAMETRE)}</div>
           <InfoBulle texte="Déplier le menu" actif={reduite}>
             <button
               type="button"
@@ -219,29 +221,8 @@ export function BarreLaterale() {
         )}
       </div>
 
-      {/* Sous-entrées d'un dossier quand la barre est réduite */}
-      {menu?.type === 'groupe' && (
-        <MenuFlottant ancre={menu.ancre} depuisLeBas={menu.groupe.id === MENU_PARAMETRE.id} onFermer={() => setMenu(null)}>
-          <div className="px-3 pt-1 pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-text-muted">{menu.groupe.label}</div>
-          {(menu.groupe.entrees ?? []).map((entree) => (
-            <button
-              key={entree.ecran}
-              type="button"
-              role="menuitem"
-              onClick={() => ouvrirEcran(entree)}
-              disabled={entree.bientot}
-              className={`w-full flex items-center px-3 h-8 text-[13px] text-left ${
-                estActif(entree.ecran) ? 'bg-nav-actif font-semibold' : 'hover:bg-nav-survol'
-              }`}
-            >
-              {entree.label}
-            </button>
-          ))}
-        </MenuFlottant>
-      )}
-
       {/* Menu du compte */}
-      {menu?.type === 'compte' && (
+      {menu && (
         <MenuFlottant ancre={menu.ancre} depuisLeBas onFermer={() => setMenu(null)}>
           <div className="px-3 py-2 flex items-center gap-2.5">
             <span className="w-8 h-8 shrink-0 rounded-full bg-accent-soft text-accent-deep flex items-center justify-center text-sm font-bold">

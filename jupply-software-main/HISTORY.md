@@ -113,6 +113,24 @@
   des passages en alerte / rupture (base testée), fiche de stock « Avancé »
   façon livre de compte. En attente des migrations et de la vérification locale.
 
+- **[2026-10-28] Remarques du 28/10 : place, filtres, alertes actionnables.**
+  Fiche de stock sur deux lignes fines avec panneau latéral « Filtres »
+  (mouvements, statuts, période, dépôts), menu réduit qui s'ouvre d'un
+  clic, Alertes stock avec colonne et filtres « Action » (commande en
+  cours ou non) et bulle Info (date d'alerte, commandes, livraison
+  prévue), titres de colonnes jamais coupés, onglets serrés. Aucune
+  migration. Code complet, en attente de vérification locale.
+
+- **[2026-10-28] Mouvements : Entrées.** Une seule entrée « Entrées » dans
+  le menu, liste avec loupe + « Créer ». Feuille « Nouvelle entrée »
+  allégée (note sur case à cocher), dépôt et localisation par ligne : une
+  entrée (un seul numéro REC) peut alimenter plusieurs dépôts. Doublons
+  bloqués, import Excel / CSV avec modèle téléchargeable, colonnes NC
+  retirées. Confirmation avant de fermer un onglet de saisie non
+  enregistrée. Loupe sur toutes les listes, onglets en plus petit.
+  Migration `2026-10-28-entree-multi-depots.sql` testée sur base de test,
+  en attente d'exécution dans Supabase et de la vérification locale.
+
 ## Terminé
 
 - **[2026-08-30 → 2026-08-31] Sorties de stock et Réintégrations.** Voir

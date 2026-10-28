@@ -60,7 +60,7 @@
   --nav-icon-size: 18px;
   /* Decalage de l'icone : identique barre ouverte ou reduite, l'icone ne bouge pas pendant l'animation */
   --nav-icon-gap: 23px;
-  --barre-haute-height: 40px;
+  --barre-haute-height: 34px;
 
   --page-title-size: 18px;
   --table-font-size: 12.5px;
@@ -68,7 +68,7 @@
   --table-row-height: 34px;
   --table-head-height: 32px;
   --table-cell-padding-x: 12px;
-  --content-padding: 16px;
+  --content-padding: 12px;
 }
 
 .dark {
@@ -258,6 +258,13 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Un titre de colonne n'est jamais coupé par « … » : trop long, il passe sur deux lignes. */
+.tableau-ajuste thead tr:last-child th {
+  white-space: normal;
+  text-overflow: clip;
+  line-height: 1.15;
+  overflow-wrap: normal;
+}
 
 /* ============================================================
    Bulle « Info » et fenêtre d'informations (components/ui/ItemInfo.tsx)
@@ -276,6 +283,27 @@ body {
 @keyframes apparition-panneau {
   from { opacity: 0; scale: 0.98; }
   to { opacity: 1; scale: 1; }
+}
+/* Loupe qui s'ouvre en champ de recherche (components/ui/ChampRecherche.tsx) */
+@keyframes ouverture-recherche {
+  from { opacity: 0; clip-path: inset(0 0 0 85% round 6px); }
+  to { opacity: 1; clip-path: inset(0 0 0 0 round 6px); }
+}
+/* Panneau latéral « Filtres » (components/ui/PanneauFiltres.tsx) */
+@keyframes glissement-panneau {
+  from { translate: 100% 0; }
+  to { translate: 0 0; }
+}
+@keyframes apparition-voile {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  [class*="glissement-panneau"],
+  [class*="apparition-voile"],
+  [class*="ouverture-recherche"] {
+    animation: none !important;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   [class*="apparition-"] {

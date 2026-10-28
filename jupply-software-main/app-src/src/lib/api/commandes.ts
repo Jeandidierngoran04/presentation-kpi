@@ -114,13 +114,24 @@ export interface CommandeEnCoursProduit {
 
 /** Commandes non terminées qui attendent encore ce produit, de la livraison la plus proche à la plus lointaine. */
 export async function getCommandesEnCoursProduit(produitId: string): Promise<CommandeEnCoursProduit[]> {
-  const { data: lignes, error } = await supabase
+  return (await chargerCommandesEnCours(produitId)).get(produitId) ?? []
+}
+
+/** Commandes en cours de tous les produits, regroupées par produit (écran Alertes stock). */
+export function getCommandesEnCoursParProduit(): Promise<Map<string, CommandeEnCoursProduit[]>> {
+  return chargerCommandesEnCours()
+}
+
+async function chargerCommandesEnCours(produitId?: string): Promise<Map<string, CommandeEnCoursProduit[]>> {
+  let requete = supabase
     .from('v_commandes_fournisseurs_lignes')
-    .select('commande_id, quantite_commandee, quantite_recue, quantite_restante')
-    .eq('produit_id', produitId)
+    .select('produit_id, commande_id, quantite_commandee, quantite_recue, quantite_restante')
     .gt('quantite_restante', 0)
+  if (produitId) requete = requete.eq('produit_id', produitId)
+  const { data: lignes, error } = await requete
   if (error) throw error
-  if (!lignes || lignes.length === 0) return []
+  const resultat = new Map<string, CommandeEnCoursProduit[]>()
+  if (!lignes || lignes.length === 0) return resultat
   const { data: commandes, error: erreurCommandes } = await supabase
     .from('v_commandes_fournisseurs')
     .select('id, numero, fournisseur_nom, statut, date_livraison_prevue')
@@ -128,22 +139,26 @@ export async function getCommandesEnCoursProduit(produitId: string): Promise<Com
     .in('statut', ['fait', 'envoye', 'en_transit', 'en_cours_reception'])
   if (erreurCommandes) throw erreurCommandes
   const parId = new Map((commandes ?? []).map((c) => [c.id as string, c]))
-  return lignes
-    .filter((l) => parId.has(l.commande_id as string))
-    .map((l) => {
-      const c = parId.get(l.commande_id as string)!
-      return {
-        commande_id: c.id as string,
-        numero: c.numero as string,
-        fournisseur_nom: c.fournisseur_nom as string,
-        statut: c.statut as StatutCommande,
-        date_livraison_prevue: (c.date_livraison_prevue as string | null) ?? null,
-        quantite_commandee: l.quantite_commandee as number,
-        quantite_recue: l.quantite_recue as number,
-        quantite_restante: l.quantite_restante as number,
-      }
+  for (const l of lignes) {
+    const c = parId.get(l.commande_id as string)
+    if (!c) continue
+    const liste = resultat.get(l.produit_id as string) ?? []
+    liste.push({
+      commande_id: c.id as string,
+      numero: c.numero as string,
+      fournisseur_nom: c.fournisseur_nom as string,
+      statut: c.statut as StatutCommande,
+      date_livraison_prevue: (c.date_livraison_prevue as string | null) ?? null,
+      quantite_commandee: l.quantite_commandee as number,
+      quantite_recue: l.quantite_recue as number,
+      quantite_restante: l.quantite_restante as number,
     })
-    .sort((a, b) => (a.date_livraison_prevue ?? '9999').localeCompare(b.date_livraison_prevue ?? '9999'))
+    resultat.set(l.produit_id as string, liste)
+  }
+  for (const liste of resultat.values()) {
+    liste.sort((a, b) => (a.date_livraison_prevue ?? '9999').localeCompare(b.date_livraison_prevue ?? '9999'))
+  }
+  return resultat
 }
 
 export interface NouvelleLigneCommande {

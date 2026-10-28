@@ -1440,6 +1440,329 @@ défilement interne) affiche toutes les informations de l'élément.
 - [ ] Exécuter les migrations dans Supabase (commandes fournisseurs, puis suivi des statuts)
 - [ ] Vérification en local par Jean Didier
 
+# Remarques du 28/10 : fiche de stock, menu, alertes, onglets
+
+**Statut :** validé, code complet, en attente de vérification locale
+**Démarré le :** 28/10/2026
+
+## Objectif
+
+Retours de Jean Didier (document « Remarque Jupply ») : gagner de la place
+partout, simplifier la fiche de stock, ouvrir le menu plus facilement,
+rendre les alertes « actionnables » (savoir ce qui est déjà traité) et
+rendre les tableaux lisibles sans explication.
+
+## Analyse de l'existant
+
+- **Fenêtre Info > Stock** (`components/produits/SuiviStatut.tsx`) : sous
+  les 4 champs (statut actuel, passé en alerte le, en rupture le, de
+  l'alerte à la rupture), une liste des 8 derniers changements
+  (« RUPTURE → EN ALERTE, stock 8, REC-00003, par..., reconstitué »). C'est
+  la partie jugée inutile.
+- **Fiche de stock** (`pages/FicheStock.tsx`) : 3 blocs empilés (bandeau
+  sombre, 4 grandes tuiles, bloc de filtres sur 2 lignes avec Excel en
+  bas à droite) : environ 200 px avant la première ligne du journal.
+- **Barre latérale réduite** (`components/layout/BarreLaterale.tsx`) : un
+  clic sur une icône ouvre un petit menu flottant ; pour déplier la barre,
+  il faut viser la flèche tout en bas.
+- **Alertes stock** (`pages/AlertesStock.tsx`) : bouton « Actualiser »
+  inutile (l'écran se recharge déjà à chaque retour sur l'onglet). Aucune
+  information sur l'action en cours : seule la quantité « Commandé »
+  s'affiche. 10 colonnes, titres tronqués (« Stock d'al… », « Comma… »,
+  « Localisati… »).
+- Les données nécessaires existent déjà en base (aucune migration) : le
+  journal des statuts (`v_historique_statuts_stock`) donne la date du
+  passage en alerte, les lignes de commande (`v_commandes_fournisseurs_lignes`)
+  donnent les commandes en cours, le reste à recevoir et la livraison prévue.
+- **Onglets** (`components/layout/BarreOnglets.tsx`) : largeur cible fixe
+  de 200 px par onglet (`flex-[0_1_200px]`), d'où des onglets larges et
+  espacés même quand le titre est court.
+
+## Plan détaillé
+
+### 1. Fenêtre Info > Stock
+- Retirer la liste des derniers changements. Garder les 4 champs.
+
+### 2. Fiche de stock : tout tient sur deux lignes fines
+- **Ligne 1 (bandeau réduit, ~40 px)** : produit (référence + désignation),
+  statut, seuil d'alerte, champ de choix du produit.
+- **Ligne 2** : Stock initial · Entrées · Sorties · Stock final en chiffres
+  compacts sur une seule ligne, puis à droite le bouton **Filtre** (icône
+  entonnoir, avec un compteur de filtres actifs) et le bouton **Excel**.
+- **Panneau latéral « Filtres »** qui glisse depuis la droite, sections
+  dépliables comme dans ton exemple, bouton **Appliquer** en bas
+  (+ « Réinitialiser ») :
+  - **Mouvements** : cases à cocher Entrée, Sortie, Réintégration,
+    Transfert, Quarantaine, Inventaire, Ajustement.
+  - **Statuts** : afficher les passages en alerte, en rupture, les retours
+    à la normale (remplace la case « Changements de statut »).
+  - **Période** : raccourcis (7 jours, 30 jours, 3 mois, Cette année,
+    Tout) + Du / Au avec calendrier.
+  - **Dépôts** : Tous, ou un dépôt précis.
+- Le journal gagne toute la hauteur libérée.
+
+### 3. Menu latéral réduit : un clic suffit pour l'ouvrir
+- Clic sur une icône de dossier : la barre se déplie **et** le dossier
+  s'ouvre directement.
+- Clic n'importe où sur la bande vide du rail : la barre se déplie.
+- Icône d'un écran direct (Tableau de bord) : ouvre l'écran, la barre reste
+  réduite.
+- Le petit menu flottant disparaît.
+
+### 4. Alertes stock : savoir si l'alerte est déjà prise en charge
+- Bouton « Actualiser » supprimé.
+- **Nouvelle colonne « Action »** : badge bleu « Commandé » (une commande
+  fournisseur en cours couvre ce produit) ou badge rouge « Aucune ».
+- **Nouveaux filtres rapides** à côté de Toutes / Rupture / En alerte :
+  « Commande en cours (n) » et « Sans action (n) ».
+- **Bulle Info** au clic sur une ligne (même composant que Produits),
+  fenêtre avec :
+  - En alerte depuis le (date, durée), en rupture depuis le ;
+  - Commandes en cours : N° PO, fournisseur, statut, quantité restant à
+    recevoir, **livraison prévue** (en rouge si dépassée) ;
+  - Si aucune commande : « Aucune action en cours ».
+  - Double-clic et clic droit inchangés.
+
+### 5. Titres de colonnes lisibles sans explication
+Règle : aucun titre tronqué, mots simples. Pour Alertes stock :
+
+| Avant | Après |
+|---|---|
+| Référence | Code |
+| Désignation | Produit |
+| Catégorie | Catégorie |
+| Stock | En stock |
+| Stock d'alerte | Seuil |
+| Écart | Manque |
+| Stock min | (retirée, visible dans la fenêtre Info) |
+| Commandé | Commandé |
+| Statut | Statut |
+| Localisation | Emplacement |
+| (nouveau) | Action |
+
+« Manque » affiche la quantité à rattraper pour revenir au seuil (nombre
+positif), plus parlant qu'un écart négatif. Même passe sur les autres
+tableaux où un titre est coupé (Produits en priorité).
+
+### 6. Onglets plus serrés, hauteur réduite
+- Largeur ajustée au titre (entre 80 et 160 px), marges intérieures et
+  espacement réduits, barre des onglets un peu moins haute.
+- Espace entre la barre des onglets et le contenu réduit.
+
+## Décisions actées avec Jean Didier (28/10/2026)
+
+1. **Action entreprise = commande fournisseur en cours uniquement.** Les
+   transferts ne comptent pas.
+2. **Aucun titre de colonne n'est renommé, aucune colonne retirée** (le
+   tableau du point 5 est abandonné). La troncature se règle par la
+   largeur des colonnes, et un titre trop long passe sur deux lignes au
+   lieu d'être coupé par « … ».
+3. Règle du menu (point 3) validée.
+
+## Avancement
+
+- [x] Plan validé par Jean Didier
+- [x] 1. Fenêtre Info > Stock : liste des derniers changements retirée
+      (`SuiviStatut.tsx`)
+- [x] 2. Fiche de stock : bandeau sur une ligne de 40 px, chiffres clés en
+      pastilles compactes sur une ligne avec Filtre et Excel à droite
+      (+ rappel des filtres actifs), nouveau panneau réutilisable
+      `components/ui/PanneauFiltres.tsx` (Mouvements, Statuts, Période,
+      Dépôts ; Réinitialiser / Appliquer). Le filtre par type masque des
+      lignes et ajuste les totaux Entrées / Sorties, mais le stock de
+      chaque ligne et le stock final restent réels.
+- [x] 3. Menu latéral réduit : clic sur un dossier = barre dépliée + dossier
+      ouvert ; clic sur la bande vide = barre dépliée ; menu flottant des
+      dossiers supprimé
+- [x] 4. Alertes stock : « Actualiser » retiré, colonne « Action »
+      (Commande en cours / Aucune), filtres « Commande en cours » et « Sans
+      action », bulle Info (dates de passage en alerte / rupture, commandes
+      en cours avec livraison prévue). Nouvelles lectures groupées
+      `getCommandesEnCoursParProduit` et `getDerniersPassagesAlerte` ;
+      liste des commandes partagée avec Produits
+      (`components/commandes/CommandesEnCoursListe.tsx`). Aucune migration.
+- [x] 5. Titres de colonnes : noms inchangés ; largeurs en pixels dans
+      Alertes stock, et règle globale `tableau-ajuste` : un titre trop long
+      passe sur deux lignes au lieu de « … »
+- [x] 6. Onglets ajustés au titre (72 à 160 px), plus serrés ; barre des
+      onglets 34 px au lieu de 40 ; marge du contenu 12 px au lieu de 16
+- [x] `tsc -b` + `vite build` OK
+- [x] Retours de Jean Didier (28/10/2026) sur Alertes stock :
+      - Désignation illisible (écrasée par les largeurs en pixels, écran
+        zoomé) : largeurs repassées en pourcentages, Désignation à 24 % ;
+      - colonne « Action » retirée : la colonne « Commandé » suffit (elle
+        compte les reliquats des commandes fournisseurs une fois la
+        migration exécutée) ; le détail reste dans la bulle Info ;
+      - pastilles du haut retirées, remplacées par un bouton « Filtre »
+        ouvrant le panneau latéral (Statut, Commande, Catégorie, avec
+        compteurs) ; rappel des filtres actifs à côté du bouton.
+- [x] Bouton « Historique » sur la ligne de recherche de Produits : ouvre
+      la fiche de stock du produit sélectionné, ou la fiche vide avec le
+      curseur dans le champ produit pour choisir la référence.
+- [ ] Vérification en local par Jean Didier (Light + Dark), notamment le
+      raccord arrondi de l'onglet actif maintenant que les onglets sont
+      collés
+
+# Mouvements : écran Entrées et feuille de saisie
+
+**Statut :** en cours de conception
+**Démarré le :** 28/10/2026
+
+## Objectif
+
+Retours de Jean Didier (28/10) : simplifier l'écran Entrées et sa feuille
+de saisie, permettre l'import d'une liste depuis un fichier modèle, éviter
+les doublons, et ne plus perdre une saisie en fermant un onglet par erreur.
+
+## Analyse de l'existant
+
+- Menu Mouvement : deux entrées « Entrées » (liste) et « Créer une entrée
+  manuelle » (feuille) qui font doublon (`lib/modules.ts`).
+- Liste (`pages/Receptions.tsx`) : en-tête « Entrées de stock [10] »,
+  bouton « Créer une entrée manuelle », champ Recherche sur sa propre ligne.
+- Feuille (`pages/NouvelleReception.tsx`) : en-tête de 3 colonnes (Dépôt,
+  Fournisseur, Opérateur, Bon de réception, Date, grand bloc Notes), puis le
+  tableau avec Qté NC, Motif NC, Constat. **Un seul dépôt pour toute
+  l'entrée** : la base enregistre une entrée par dépôt
+  (`creer_reception(p_entrepot_id, ...)`).
+- Aucun contrôle de doublon : la même référence peut être saisie deux fois.
+- Pas d'import. `write-excel-file` est installé (export), aucune
+  bibliothèque de lecture Excel.
+- **Fermeture d'onglet** (`TabsContext.fermerOnglet`) : immédiate, sans
+  vérifier si une saisie est en cours. Seul le bouton « Annuler » de la
+  feuille demande confirmation. Même risque pour Nouvelle sortie et Nouvelle
+  commande.
+
+## Plan détaillé
+
+### 1. Menu et liste des Entrées
+- Menu Mouvement : une seule entrée **« Entrées »** (« Créer une entrée
+  manuelle » supprimée). Elle ouvre la liste.
+- En-tête : « Entrées de stock » **sans le nombre entre crochets** ; à
+  droite, une **loupe** puis le bouton **« Créer »**.
+- Clic sur la loupe : le champ de recherche s'ouvre à côté (curseur dedans) ;
+  il se referme quand on le vide et qu'on clique ailleurs, ou avec Échap.
+  La ligne de recherche séparée disparaît.
+- « Créer » ouvre l'onglet **« Nouvelle entrée »** (feuille).
+
+### 2. Feuille « Nouvelle entrée »
+- En-tête réduit à une ligne : **Fournisseur** (+ Créer), **Date du
+  mouvement**, case **« Ajouter une note »**. Cochée, une petite zone de
+  texte apparaît juste en dessous. Retirés : Dépôt, Opérateur, Bon de
+  réception, grand bloc Notes (l'opérateur et le numéro restent enregistrés
+  automatiquement et visibles dans la liste).
+- À droite de la même ligne : **Annuler**, **Enregistrer**, et le bouton
+  **Import** avec, juste en dessous, le lien **« Télécharger le modèle »**.
+- Tableau : Référence, Désignation, Quantité, Prix unit., **Dépôt**,
+  **Localisation** (limitée aux emplacements du dépôt choisi sur la ligne),
+  Lot, N° série, Expiration, suppression. **Colonnes Qté NC, Motif NC et
+  Constat supprimées** (une non-conformité se déclare depuis l'écran
+  Quarantaine, bouton « Déclaration », qui existe déjà).
+- **Dépôt par ligne** : à l'enregistrement, les lignes sont regroupées par
+  dépôt et une entrée est créée **par dépôt** (ex. 2 dépôts = 2 numéros
+  REC). Aucune modification de la base. Chaque dépôt valide ensuite sa
+  propre entrée, comme aujourd'hui.
+- **Doublons** : une ligne identique à une ligne déjà saisie (voir point à
+  trancher 2) est refusée avec le message « Déjà saisi ligne n », et le
+  curseur va sur la ligne existante.
+
+### 3. Import d'une liste
+- **Modèle Excel** (« Télécharger le modèle ») : colonnes Référence*,
+  Quantité*, Prix unitaire, Dépôt*, Localisation*, Lot, N° série, Date
+  d'expiration (jj/mm/aaaa) ; une ligne d'exemple ; une seconde feuille
+  « Aide » qui explique chaque colonne et liste les dépôts et localisations
+  existants (avec leur code exact).
+- **Import** : on choisit le fichier (Excel ou CSV) ; le tableau se remplit
+  tout seul (désignation, localisation reconnues par leur code ou leur
+  nom). Les lignes importées s'ajoutent à celles déjà saisies.
+- Contrôle : un résumé indique « 18 lignes importées, 2 à corriger » ; les
+  cellules en erreur (référence inconnue, dépôt ou localisation inconnu,
+  quantité manquante, doublon) sont surlignées en rouge pour être corrigées
+  à la main. Rien n'est enregistré tant que l'utilisateur ne clique pas sur
+  « Enregistrer ».
+- Nouvelle bibliothèque : `read-excel-file` (même auteur que
+  `write-excel-file`, déjà utilisée pour l'export), chargée seulement au
+  moment de l'import.
+
+### 4. Ne plus perdre une saisie en fermant un onglet
+- `TabsContext` : chaque feuille de saisie signale si elle contient des
+  données non enregistrées.
+- Fermeture d'un tel onglet (croix, clic molette) : fenêtre de confirmation
+  « Des données ne sont pas enregistrées. Fermer quand même ? » avec
+  **Continuer la saisie** / **Fermer sans enregistrer**.
+- Fermeture ou rechargement du navigateur : avertissement standard du
+  navigateur.
+- Branché sur Nouvelle entrée, Nouvelle sortie et Nouvelle commande.
+
+## Décisions actées avec Jean Didier (28/10/2026)
+
+1. **Une entrée = un seul numéro REC, même avec plusieurs dépôts.** Le
+   stock de chaque ligne est mis à jour dans le dépôt indiqué en face du
+   produit. (Remplace la proposition « une entrée par dépôt ».)
+2. **Doublon** = même référence + même dépôt + même localisation + même
+   lot. Un même produit peut figurer deux fois s'il arrive en deux lots ou
+   va à deux endroits.
+3. **Loupe sur toutes les listes** (Entrées, Sorties, Transferts, Commandes
+   fournisseurs, Quarantaine, Alertes stock, Produits, Historiques).
+4. En plus : **police des onglets réduite**.
+
+## Base de données (conséquence de la décision 1)
+
+- Chaque ligne d'entrée porte déjà sa localisation, et une localisation
+  appartient à un dépôt : **le dépôt de la ligne se déduit de sa
+  localisation**, aucune nouvelle colonne.
+- Migration `2026-10-28-entree-multi-depots.sql` (mêmes signatures, rien à
+  changer pour les commandes fournisseurs) :
+  - `creer_reception` : chaque localisation doit exister et appartenir à
+    un dépôt visible par l'utilisateur ; le dépôt de l'en-tête
+    (`receptions.entrepot_id`) devient le « dépôt principal » (celui de la
+    première ligne).
+  - `valider_reception` : stock, lots, mouvements et quarantaine passent
+    dans le dépôt de chaque ligne, et non plus celui de l'en-tête.
+- Liste des entrées : la colonne Dépôt affiche tous les dépôts concernés ;
+  le détail affiche le dépôt de chaque ligne.
+- Limite connue : une entrée reste rattachée à son dépôt principal pour la
+  visibilité et la validation. Un utilisateur limité au dépôt secondaire ne
+  la voit pas, et un validateur doit avoir accès à tous les dépôts de
+  l'entrée. Sans effet tant que l'on travaille avec un administrateur ; à
+  revoir avec le module Utilisateurs.
+
+## Avancement
+
+- [x] Plan validé par Jean Didier
+- [x] Migration `2026-10-28-entree-multi-depots.sql` + `schema.sql` aligné.
+      Testée sur base de test (PGlite) : 20 contrôles (entrée sur deux
+      dépôts, stock / lots / mouvements / PMP par dépôt, quarantaine et
+      dossier NC dans le dépôt de la ligne, localisation inconnue, dépôt
+      non autorisé pour un gestionnaire), depuis la base actuelle avec
+      migration exécutée deux fois et depuis le nouveau `schema.sql` ;
+      tests des commandes fournisseurs repassés sans régression.
+- [x] 1. Menu : « Créer une entrée manuelle » retirée. Liste : sans
+      compteur, loupe + « Créer » à droite, colonne Dépôt = tous les dépôts
+      de l'entrée, détail avec Dépôt et Localisation par ligne.
+- [x] 2. Feuille « Nouvelle entrée » réécrite : en-tête sur une ligne
+      (Fournisseur, Date, case « Ajouter une note »), Annuler / Enregistrer /
+      Import + « Télécharger le modèle » ; colonnes Dépôt et Localisation
+      par ligne (Quarantaine exclue) ; colonnes NC retirées ; doublons
+      refusés à la saisie (curseur sur la ligne existante) et signalés en
+      rouge ; nouvelle ligne avec le dépôt de la précédente.
+- [x] 3. Import (`lib/import/entrees.ts`, bibliothèque `read-excel-file`) :
+      Excel ou CSV, colonnes reconnues par leur titre dans n'importe quel
+      ordre, dates JJ/MM/AAAA, cellules en erreur en rouge avec le motif au
+      survol. Modèle Excel avec feuille « Aide » (dépôts et localisations
+      existants). Lecture testée (12 contrôles).
+- [x] 4. Confirmation « Saisie non enregistrée » (Continuer la saisie /
+      Fermer sans enregistrer) à la fermeture d'un onglet de saisie (croix,
+      clic molette) et avertissement du navigateur : Nouvelle entrée,
+      Nouvelle sortie, Nouvelle commande.
+- [x] Loupe repliable sur toutes les listes (composant `ChampRecherche`),
+      y compris Sorties du jour et Historiques (recherche dans toutes les
+      colonnes) ; police des onglets 11,5 px.
+- [x] `tsc -b` + `vite build` OK
+- [ ] **Exécuter la migration `2026-10-28-entree-multi-depots.sql` dans
+      Supabase** (après les migrations précédentes)
+- [ ] Vérification en local par Jean Didier
+
 ## Format utilisé pour chaque plan
 
 ```

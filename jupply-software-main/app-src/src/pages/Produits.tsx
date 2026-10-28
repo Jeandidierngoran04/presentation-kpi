@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent, type MouseEvent } from 'react'
+import { History } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useTabs } from '../context/TabsContext'
 import { useSelection } from '../context/SelectionContext'
@@ -341,6 +342,18 @@ export function Produits() {
         <span className="text-xs text-text-muted">
           <span className="font-semibold text-text tabular-nums">{produitsFiltres.length}</span> / {produits.length} produit(s)
         </span>
+        {/* Historique : ouvre la fiche de stock, sur le produit sélectionné s'il y en a un, sinon on y choisit la référence. */}
+        <button
+          type="button"
+          onClick={() => {
+            if (selectionId) demanderFicheStock(selectionId)
+            ouvrirOnglet('fiche-stock', 'Fiche de stock')
+          }}
+          title={selectionId ? 'Fiche de stock du produit sélectionné' : 'Fiche de stock : historique des mouvements d’un produit'}
+          className="ml-auto inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-card border border-border text-xs font-semibold text-text hover:bg-muted transition-colors"
+        >
+          <History size={14} strokeWidth={1.75} className="text-info-deep" /> Historique
+        </button>
       </div>
       {chargement ? (
         <div className="text-sm text-text-muted py-12 text-center">Chargement...</div>

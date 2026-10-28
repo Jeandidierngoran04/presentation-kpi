@@ -6,7 +6,8 @@ import { getChangementsStatut, type ChangementStatut } from '../../lib/api/suivi
 import { SuiviStatut } from './SuiviStatut'
 import { getFournisseursProduit, getMouvementsProduit } from '../../lib/api/produits'
 import { getStockLots } from '../../lib/api/lots'
-import { getCommandesEnCoursProduit, STATUTS_COMMANDE, type CommandeEnCoursProduit } from '../../lib/api/commandes'
+import { getCommandesEnCoursProduit, type CommandeEnCoursProduit } from '../../lib/api/commandes'
+import { CommandesEnCoursListe } from '../commandes/CommandesEnCoursListe'
 import type {
   Fournisseur,
   LocalisationProduit,
@@ -17,7 +18,6 @@ import type {
   TypeProduit,
 } from '../../types/stock'
 import { StatutBadge } from '../dashboard/StatutBadge'
-import { Badge } from '../ui/Badge'
 import { InfoChamps, InfoSection, InfoVide, ItemInfoPanel } from '../ui/ItemInfo'
 
 const LABEL_TYPE: Record<TypeProduit, string> = {
@@ -238,30 +238,7 @@ export function ProduitInfoPanel({ produit, enCommande, localisations, equivalen
           {commandesEnCours.length === 0 ? (
             <InfoVide>Aucune commande fournisseur en cours pour ce produit.</InfoVide>
           ) : (
-            <ul className="flex flex-col">
-              {commandesEnCours.map((c) => {
-                const enRetard = c.date_livraison_prevue != null && c.date_livraison_prevue < aujourdhui
-                return (
-                  <li key={c.commande_id} className="py-1.5 border-t border-border first:border-t-0 flex flex-col gap-0.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-mono font-semibold text-info-deep">{c.numero}</span>
-                      <Badge ton={STATUTS_COMMANDE[c.statut].ton}>{STATUTS_COMMANDE[c.statut].label}</Badge>
-                    </div>
-                    <div className="flex items-baseline justify-between gap-2">
-                      <span className="truncate">{c.fournisseur_nom}</span>
-                      <span className="shrink-0 tabular-nums">
-                        reste <span className="font-semibold">{nombre(c.quantite_restante)}</span> / {nombre(c.quantite_commandee)}
-                      </span>
-                    </div>
-                    <div className={enRetard ? 'text-danger-deep font-semibold' : 'text-text-muted'}>
-                      {c.date_livraison_prevue
-                        ? `Livraison prévue le ${dateCourte(c.date_livraison_prevue)}${enRetard ? ' (en retard)' : ''}`
-                        : 'Pas de date de livraison prévue'}
-                    </div>
-                  </li>
-                )
-              })}
-            </ul>
+            <CommandesEnCoursListe commandes={commandesEnCours} />
           )}
         </InfoSection>
       </>

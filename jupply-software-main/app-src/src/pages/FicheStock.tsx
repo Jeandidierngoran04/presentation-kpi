@@ -1,8 +1,8 @@
 // Fiche de stock d'un produit : tout son historique, comme un livre de compte.
 // Stock initial, puis chaque entrée / sortie ajuste le stock ligne après
 // ligne, avec les changements de statut intercalés. Lecture seule.
-import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react'
-import { ArrowDownToLine, ArrowUpFromLine, CalendarRange, FileSpreadsheet, Flag, Package, Scale } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { ArrowDownToLine, ArrowUpFromLine, FileSpreadsheet, Filter, Flag, Package, Scale } from 'lucide-react'
 import { useTabs } from '../context/TabsContext'
 import { useSelection } from '../context/SelectionContext'
 import { messageErreur } from '../lib/erreurs'
@@ -14,6 +14,7 @@ import { exporterExcel, nomFichierSur, type ValeurExport } from '../lib/export/f
 import type { LocalisationProduit, ProduitAvecStock, StatutStock } from '../types/stock'
 import { StatutBadge, STYLES_STATUT_STOCK } from '../components/dashboard/StatutBadge'
 import { CLASSE_CHAMP_COMPACT, CLASSE_LABEL } from '../components/ui/styles'
+import { CaseFiltre, PanneauFiltres, SectionFiltre } from '../components/ui/PanneauFiltres'
 
 type Periode = 'tout' | '7' | '30' | '90' | 'annee'
 
@@ -24,6 +25,74 @@ const PERIODES: { id: Periode; label: string }[] = [
   { id: 'annee', label: 'Cette année' },
   { id: 'tout', label: 'Tout' },
 ]
+
+/** Famille de mouvement proposée dans le filtre (la quarantaine regroupe les mises et libérations). */
+type CategorieMvt = 'entree' | 'sortie' | 'reintegration' | 'transfert' | 'quarantaine' | 'deplacement' | 'ajustement' | 'inventaire'
+
+const CATEGORIES: { id: CategorieMvt; label: string }[] = [
+  { id: 'entree', label: 'Entrée' },
+  { id: 'sortie', label: 'Sortie' },
+  { id: 'reintegration', label: 'Réintégration' },
+  { id: 'transfert', label: 'Transfert' },
+  { id: 'quarantaine', label: 'Quarantaine' },
+  { id: 'deplacement', label: 'Déplacement interne' },
+  { id: 'ajustement', label: 'Ajustement' },
+  { id: 'inventaire', label: 'Inventaire' },
+]
+
+function categorie(l: LigneJournal): CategorieMvt {
+  if (l.type === 'deplacement') return l.delta === 0 ? 'deplacement' : 'quarantaine'
+  if ((l.type === 'entree' || l.type === 'sortie') && l.delta === 0) return 'quarantaine'
+  return l.type
+}
+
+const STATUTS_FILTRE: { id: StatutStock; label: string }[] = [
+  { id: 'faible', label: 'Passage en alerte' },
+  { id: 'rupture', label: 'Passage en rupture' },
+  { id: 'normal', label: 'Retour à la normale' },
+]
+
+interface FiltresFiche {
+  periode: Periode
+  du: string
+  au: string
+  entrepotId: string
+  types: CategorieMvt[]
+  statuts: StatutStock[]
+}
+
+const FILTRES_DEFAUT: FiltresFiche = {
+  periode: 'tout',
+  du: '',
+  au: '',
+  entrepotId: '',
+  types: CATEGORIES.map((c) => c.id),
+  statuts: STATUTS_FILTRE.map((s) => s.id),
+}
+
+/** Dates du / au correspondant à un raccourci de période. */
+function datesPeriode(p: Periode): { du: string; au: string } {
+  if (p === 'tout') return { du: '', au: '' }
+  const aujourdhui = new Date()
+  const debut = new Date(aujourdhui)
+  if (p === 'annee') debut.setMonth(0, 1)
+  else debut.setDate(debut.getDate() - Number(p) + 1)
+  return { du: dateVersInput(debut), au: dateVersInput(aujourdhui) }
+}
+
+const dateFr = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateString('fr-FR')
+
+function libellePeriode(f: FiltresFiche): string {
+  if (f.du && f.au) return f.periode !== 'tout' ? PERIODES.find((p) => p.id === f.periode)!.label : `${dateFr(f.du)} au ${dateFr(f.au)}`
+  if (f.du) return `depuis le ${dateFr(f.du)}`
+  if (f.au) return `jusqu'au ${dateFr(f.au)}`
+  return 'Tout'
+}
+
+/** Ajoute ou retire une valeur d'une liste de cases cochées. */
+function basculerValeur<T>(liste: T[], valeur: T, coche: boolean): T[] {
+  return coche ? (liste.includes(valeur) ? liste : [...liste, valeur]) : liste.filter((v) => v !== valeur)
+}
 
 /** Libellé clair de l'opération, selon le type et son effet sur le stock disponible. */
 function libelleOperation(l: LigneJournal): string {
@@ -79,15 +148,15 @@ export function FicheStock() {
   const [localisations, setLocalisations] = useState<Map<string, LocalisationProduit[]>>(new Map())
   const [produitId, setProduitId] = useState<string | null>(null)
   const [saisieProduit, setSaisieProduit] = useState('')
+  const champProduitRef = useRef<HTMLInputElement>(null)
   const [journal, setJournal] = useState<LigneJournal[] | null>(null)
   const [changements, setChangements] = useState<ChangementStatut[]>([])
   const [statutsIndisponibles, setStatutsIndisponibles] = useState(false)
   const [erreur, setErreur] = useState<string | null>(null)
-  const [periode, setPeriode] = useState<Periode>('tout')
-  const [du, setDu] = useState('')
-  const [au, setAu] = useState('')
-  const [entrepotId, setEntrepotId] = useState('')
-  const [afficherStatuts, setAfficherStatuts] = useState(true)
+  const [filtres, setFiltres] = useState<FiltresFiche>(FILTRES_DEFAUT)
+  // Filtres en cours de modification dans le panneau (null = panneau fermé) : appliqués au clic sur « Appliquer ».
+  const [brouillon, setBrouillon] = useState<FiltresFiche | null>(null)
+  const { du, au, entrepotId, types, statuts } = filtres
   // Rejoue l'animation d'apparition des lignes quand le contenu change.
   const [cleAnimation, setCleAnimation] = useState(0)
 
@@ -142,20 +211,10 @@ export function FicheStock() {
     if (produit) setSaisieProduit(produit.reference)
   }, [produit])
 
-  function choisirPeriode(p: Periode) {
-    setPeriode(p)
-    const aujourdhui = new Date()
-    if (p === 'tout') {
-      setDu('')
-      setAu('')
-      return
-    }
-    const debut = new Date(aujourdhui)
-    if (p === 'annee') debut.setMonth(0, 1)
-    else debut.setDate(debut.getDate() - Number(p) + 1)
-    setDu(dateVersInput(debut))
-    setAu(dateVersInput(aujourdhui))
-  }
+  // Ouverte sans produit (bouton Historique de Produits) : le curseur attend la référence.
+  useEffect(() => {
+    if (ongletActifId === 'fiche-stock' && !produitId) champProduitRef.current?.focus()
+  }, [ongletActifId, produitId])
 
   function onSaisieProduit(texte: string) {
     setSaisieProduit(texte)
@@ -194,24 +253,26 @@ export function FicheStock() {
           ? stockApres(lignesDepot[0]) - lignesDepot[0].delta
           : stockActuel
     const stockFinal = periodeLignes.length > 0 ? stockApres(periodeLignes[periodeLignes.length - 1]) : stockInitial
-    const totalEntrees = periodeLignes.reduce((t, l) => t + l.entree, 0)
-    const totalSorties = periodeLignes.reduce((t, l) => t + l.sortie, 0)
+    // Le filtre par type masque des lignes, mais le stock de chaque ligne et le stock final restent réels.
+    const visibles = types.length === CATEGORIES.length ? periodeLignes : periodeLignes.filter((l) => types.includes(categorie(l)))
+    const totalEntrees = visibles.reduce((t, l) => t + l.entree, 0)
+    const totalSorties = visibles.reduce((t, l) => t + l.sortie, 0)
 
     // Changements de statut (tous dépôts), avec le temps passé dans le statut précédent.
     const chrono = [...changements].sort((a, b) => a.date_changement.localeCompare(b.date_changement))
-    const statuts: Ligne[] = chrono.map((c, i) => ({
+    const lignesStatut: Ligne[] = chrono.map((c, i) => ({
       genre: 'statut',
       date: c.date_changement,
       c,
       duree: i > 0 ? new Date(c.date_changement).getTime() - new Date(chrono[i - 1].date_changement).getTime() : null,
     }))
     const lignes: Ligne[] = [
-      ...periodeLignes.map((m): Ligne => ({ genre: 'mouvement', date: m.cree_le, m })),
-      ...(afficherStatuts ? statuts.filter((s) => dansPeriode(s.date)) : []),
+      ...visibles.map((m): Ligne => ({ genre: 'mouvement', date: m.cree_le, m })),
+      ...lignesStatut.filter((s) => s.genre === 'statut' && statuts.includes(s.c.nouveau_statut) && dansPeriode(s.date)),
     ].sort((a, b) => a.date.localeCompare(b.date) || (a.genre === 'mouvement' ? -1 : 1))
 
-    return { parDepot, stockApres, stockInitial, stockFinal, totalEntrees, totalSorties, lignes, nbMouvements: periodeLignes.length }
-  }, [journal, produitId, entrepotId, du, au, changements, afficherStatuts, localisations])
+    return { parDepot, stockApres, stockInitial, stockFinal, totalEntrees, totalSorties, lignes, nbMouvements: visibles.length }
+  }, [journal, produitId, entrepotId, du, au, types, statuts, changements, localisations])
 
   function exporter() {
     if (!calcul || !produit) return
@@ -268,56 +329,61 @@ export function FicheStock() {
 
   const nomDepot = depots.find((d) => d.id === entrepotId)?.nom
 
+  // Rappel des filtres actifs à côté du bouton Filtre.
+  const partiesFiltre = [
+    du || au ? libellePeriode(filtres) : null,
+    nomDepot ?? null,
+    types.length < CATEGORIES.length ? `${types.length} type(s) de mouvement` : null,
+    statuts.length < STATUTS_FILTRE.length ? (statuts.length === 0 ? 'statuts masqués' : `${statuts.length} statut(s)`) : null,
+  ].filter((p): p is string => p != null)
+  const nbFiltresActifs = partiesFiltre.length
+  const resumeFiltres = partiesFiltre.join(' · ')
+
   return (
-    <div className="h-full flex flex-col gap-3 p-[var(--content-padding)] overflow-hidden">
-      {/* Bandeau produit */}
-      <div className="fiche-bandeau shrink-0 rounded-xl px-4 py-3 flex items-center gap-4 flex-wrap">
-        <div className="w-10 h-10 shrink-0 rounded-lg bg-white/10 flex items-center justify-center">
-          <Package size={20} strokeWidth={1.75} className="text-accent" />
-        </div>
-        <div className="flex-1 min-w-[200px]">
-          <p className="text-[11px] uppercase tracking-wide text-topbar-muted">Fiche de stock</p>
-          <h1 className="text-[17px] font-semibold text-topbar-text leading-tight truncate">
-            {produit ? (
-              <>
-                <span className="font-mono">{produit.reference}</span>
-                <span className="text-topbar-muted font-normal"> · {produit.designation}</span>
-              </>
-            ) : (
-              'Choisis un produit'
-            )}
-          </h1>
-        </div>
+    <div className="h-full flex flex-col gap-2 p-[var(--content-padding)] overflow-hidden">
+      {/* Ligne 1 : bandeau produit, une seule ligne fine */}
+      <div className="fiche-bandeau shrink-0 rounded-lg h-10 px-3 flex items-center gap-3">
+        <Package size={16} strokeWidth={1.75} className="shrink-0 text-accent" />
+        <h1 className="flex-1 min-w-0 text-[14px] font-semibold text-topbar-text truncate">
+          <span className="text-topbar-muted font-normal">Fiche de stock · </span>
+          {produit ? (
+            <>
+              <span className="font-mono">{produit.reference}</span>
+              <span className="text-topbar-muted font-normal"> · {produit.designation}</span>
+            </>
+          ) : (
+            'choisis un produit'
+          )}
+        </h1>
         {produit && (
-          <div className="flex items-center gap-2 text-[12px] text-topbar-muted">
+          <div className="shrink-0 flex items-center gap-2 text-[12px] text-topbar-muted">
             <StatutBadge statut={produit.statut} />
             <span>
               Seuil d'alerte <span className="text-topbar-text font-semibold">{produit.seuil_reappro ?? produit.stock_min}</span>
             </span>
           </div>
         )}
-        <label className="flex flex-col gap-1 w-[200px]">
-          <span className="text-[10px] font-semibold uppercase tracking-wide text-topbar-muted">Produit</span>
-          <input
-            list="fiche-stock-produits"
-            value={saisieProduit}
-            onChange={(e) => onSaisieProduit(e.target.value)}
-            placeholder="Référence..."
-            className="h-[26px] rounded-md bg-white/10 border border-white/15 px-2 text-xs font-mono text-topbar-text outline-none placeholder:text-topbar-muted focus:border-accent focus:ring-2 focus:ring-accent/40"
-          />
-          <datalist id="fiche-stock-produits">
-            {produits.map((p) => (
-              <option key={p.id} value={p.reference} label={p.designation} />
-            ))}
-          </datalist>
-        </label>
+        <input
+          ref={champProduitRef}
+          list="fiche-stock-produits"
+          value={saisieProduit}
+          onChange={(e) => onSaisieProduit(e.target.value)}
+          placeholder="Produit (référence)..."
+          aria-label="Produit"
+          className="shrink-0 w-[170px] h-[26px] rounded-md bg-white/10 border border-white/15 px-2 text-xs font-mono text-topbar-text outline-none placeholder:text-topbar-muted focus:border-accent focus:ring-2 focus:ring-accent/40"
+        />
+        <datalist id="fiche-stock-produits">
+          {produits.map((p) => (
+            <option key={p.id} value={p.reference} label={p.designation} />
+          ))}
+        </datalist>
       </div>
 
       {erreur && <div className="shrink-0 text-xs bg-danger-soft text-danger-deep rounded-lg px-3 py-2">{erreur}</div>}
 
       {!produitId ? (
         <div className="flex-1 flex items-center justify-center text-sm text-text-muted">
-          Ouvre la fiche depuis la fenêtre Info d'un produit (bouton « Avancé »), ou tape une référence ci-dessus.
+          Choisis le code ou la référence du produit en haut à droite pour afficher son historique.
         </div>
       ) : !calcul ? (
         <div className="flex-1 flex items-center justify-center text-sm text-text-muted">
@@ -325,118 +391,181 @@ export function FicheStock() {
         </div>
       ) : (
         <>
-          {/* Chiffres clés de la période */}
-          <div key={`tuiles-${cleAnimation}`} className="shrink-0 grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+          {/* Ligne 2 : chiffres clés sur une ligne, Filtre et Excel à droite */}
+          <div key={`tuiles-${cleAnimation}`} className="shrink-0 flex items-center gap-2 flex-wrap">
             <Tuile
               couleur="var(--text-muted)"
-              icone={<Flag size={15} strokeWidth={1.75} />}
+              icone={<Flag size={13} strokeWidth={1.75} />}
               titre="Stock initial"
               valeur={calcul.stockInitial}
-              aide={du ? `au ${new Date(du).toLocaleDateString('fr-FR')}` : 'avant le 1er mouvement'}
+              aide={du ? `Stock au ${new Date(du).toLocaleDateString('fr-FR')}` : 'Stock avant le 1er mouvement'}
               index={0}
             />
             <Tuile
               couleur="var(--accent)"
-              icone={<ArrowDownToLine size={15} strokeWidth={1.75} />}
+              icone={<ArrowDownToLine size={13} strokeWidth={1.75} />}
               titre="Entrées"
               valeur={calcul.totalEntrees}
               signe="+"
-              aide={`${calcul.nbMouvements} mouvement(s) sur la période`}
+              aide={`${calcul.nbMouvements} mouvement(s) affiché(s) sur la période`}
               index={1}
             />
             <Tuile
               couleur="var(--danger)"
-              icone={<ArrowUpFromLine size={15} strokeWidth={1.75} />}
+              icone={<ArrowUpFromLine size={13} strokeWidth={1.75} />}
               titre="Sorties"
               valeur={calcul.totalSorties}
               signe="-"
-              aide="y compris mises en quarantaine"
+              aide="Y compris les mises en quarantaine"
               index={2}
             />
             <Tuile
               couleur="var(--info)"
-              icone={<Scale size={15} strokeWidth={1.75} />}
+              icone={<Scale size={13} strokeWidth={1.75} />}
               titre="Stock final"
               valeur={calcul.stockFinal}
-              aide={nomDepot ? `dépôt ${nomDepot}` : 'tous dépôts, hors quarantaine'}
+              aide={nomDepot ? `Dépôt ${nomDepot}` : 'Tous dépôts, hors quarantaine'}
               index={3}
             />
-          </div>
 
-          {/* Filtres avancés */}
-          <div className="shrink-0 flex items-end gap-3 flex-wrap bg-muted/60 border border-border rounded-lg px-3 py-2">
-            <div className="flex flex-col gap-1">
-              <span className={`${CLASSE_LABEL} inline-flex items-center gap-1`}>
-                <CalendarRange size={11} /> Période
-              </span>
-              <div className="flex items-center gap-1">
-                {PERIODES.map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => choisirPeriode(p.id)}
-                    className={`h-[26px] px-2.5 rounded-md text-xs font-medium border transition-all ${
-                      periode === p.id ? 'fiche-pastille-active border-accent/60 text-text' : 'border-border bg-card text-text-muted hover:text-text'
-                    }`}
-                  >
-                    {p.label}
-                  </button>
-                ))}
-              </div>
+            <div className="ml-auto flex items-center gap-1.5">
+              {resumeFiltres && (
+                <span className="text-[11.5px] text-text-muted truncate max-w-[260px]" title={resumeFiltres}>
+                  {resumeFiltres}
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => setBrouillon(filtres)}
+                className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-md border text-xs font-semibold transition-colors ${
+                  nbFiltresActifs > 0 ? 'bg-accent-soft border-accent/50 text-accent-deep' : 'bg-card border-border text-text hover:bg-muted'
+                }`}
+              >
+                <Filter size={13} strokeWidth={1.75} /> Filtre
+                {nbFiltresActifs > 0 && (
+                  <span className="inline-flex items-center justify-center min-w-4 h-4 rounded-full bg-accent text-accent-contrast text-[10px] font-bold px-1">
+                    {nbFiltresActifs}
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={exporter}
+                className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-card border border-border text-xs font-semibold text-text hover:bg-muted"
+              >
+                <FileSpreadsheet size={13} strokeWidth={1.75} className="text-accent-deep" /> Excel
+              </button>
             </div>
-            <label className="flex flex-col gap-1">
-              <span className={CLASSE_LABEL}>Du</span>
-              <input
-                type="date"
-                value={du}
-                max={au || undefined}
-                onChange={(e) => {
-                  setDu(e.target.value)
-                  setPeriode('tout')
-                }}
-                className={`${CLASSE_CHAMP_COMPACT} w-[140px]`}
-              />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className={CLASSE_LABEL}>Au</span>
-              <input
-                type="date"
-                value={au}
-                min={du || undefined}
-                onChange={(e) => {
-                  setAu(e.target.value)
-                  setPeriode('tout')
-                }}
-                className={`${CLASSE_CHAMP_COMPACT} w-[140px]`}
-              />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className={CLASSE_LABEL}>Dépôt</span>
-              <select value={entrepotId} onChange={(e) => setEntrepotId(e.target.value)} className={`${CLASSE_CHAMP_COMPACT} w-[170px]`}>
-                <option value="">Tous les dépôts</option>
-                {depots.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.nom}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex items-center gap-1.5 h-[26px] text-xs text-text cursor-pointer select-none">
-              <input type="checkbox" checked={afficherStatuts} onChange={(e) => setAfficherStatuts(e.target.checked)} className="accent-[var(--accent)]" />
-              Changements de statut
-            </label>
-            <button
-              type="button"
-              onClick={exporter}
-              className="ml-auto inline-flex items-center gap-1.5 h-[26px] px-3 rounded-md bg-card border border-border text-xs font-semibold text-text hover:bg-muted"
-            >
-              <FileSpreadsheet size={13} strokeWidth={1.75} className="text-accent-deep" /> Excel
-            </button>
           </div>
           {statutsIndisponibles && (
             <p className="shrink-0 text-xs text-warn-deep">
               Les changements de statut s'afficheront après l'exécution de la migration « suivi des statuts » dans Supabase.
             </p>
+          )}
+
+          {brouillon && (
+            <PanneauFiltres
+              onFermer={() => setBrouillon(null)}
+              onReinitialiser={() => setBrouillon(FILTRES_DEFAUT)}
+              onAppliquer={() => {
+                setFiltres(brouillon)
+                setBrouillon(null)
+              }}
+            >
+              <SectionFiltre
+                titre="Mouvements"
+                resume={brouillon.types.length === CATEGORIES.length ? 'Tous' : `${brouillon.types.length} sur ${CATEGORIES.length}`}
+                ouvertParDefaut
+              >
+                <CaseFiltre
+                  libelle={<span className="font-medium">Tous les mouvements</span>}
+                  coche={brouillon.types.length === CATEGORIES.length}
+                  onChange={(c) => setBrouillon({ ...brouillon, types: c ? CATEGORIES.map((x) => x.id) : [] })}
+                />
+                {CATEGORIES.map((c) => (
+                  <CaseFiltre
+                    key={c.id}
+                    libelle={c.label}
+                    coche={brouillon.types.includes(c.id)}
+                    onChange={(coche) => setBrouillon({ ...brouillon, types: basculerValeur(brouillon.types, c.id, coche) })}
+                  />
+                ))}
+              </SectionFiltre>
+              <SectionFiltre
+                titre="Statuts"
+                resume={
+                  brouillon.statuts.length === STATUTS_FILTRE.length
+                    ? 'Tous'
+                    : brouillon.statuts.length === 0
+                      ? 'Masqués'
+                      : `${brouillon.statuts.length} sur ${STATUTS_FILTRE.length}`
+                }
+              >
+                <p className="text-[11.5px] text-text-muted">Changements de statut affichés dans le journal, à leur date.</p>
+                {STATUTS_FILTRE.map((s) => (
+                  <CaseFiltre
+                    key={s.id}
+                    libelle={s.label}
+                    coche={brouillon.statuts.includes(s.id)}
+                    onChange={(coche) => setBrouillon({ ...brouillon, statuts: basculerValeur(brouillon.statuts, s.id, coche) })}
+                  />
+                ))}
+              </SectionFiltre>
+              <SectionFiltre titre="Période" resume={libellePeriode(brouillon)}>
+                <div className="flex flex-wrap gap-1">
+                  {PERIODES.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => setBrouillon({ ...brouillon, periode: p.id, ...datesPeriode(p.id) })}
+                      className={`h-[26px] px-2.5 rounded-md text-xs font-medium border transition-all ${
+                        brouillon.periode === p.id && (p.id !== 'tout' || (!brouillon.du && !brouillon.au))
+                          ? 'fiche-pastille-active border-accent/60 text-text'
+                          : 'border-border bg-card text-text-muted hover:text-text'
+                      }`}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <label className="flex flex-col gap-1">
+                    <span className={CLASSE_LABEL}>Du</span>
+                    <input
+                      type="date"
+                      value={brouillon.du}
+                      max={brouillon.au || undefined}
+                      onChange={(e) => setBrouillon({ ...brouillon, du: e.target.value, periode: 'tout' })}
+                      className={CLASSE_CHAMP_COMPACT}
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className={CLASSE_LABEL}>Au</span>
+                    <input
+                      type="date"
+                      value={brouillon.au}
+                      min={brouillon.du || undefined}
+                      onChange={(e) => setBrouillon({ ...brouillon, au: e.target.value, periode: 'tout' })}
+                      className={CLASSE_CHAMP_COMPACT}
+                    />
+                  </label>
+                </div>
+              </SectionFiltre>
+              <SectionFiltre titre="Dépôts" resume={depots.find((d) => d.id === brouillon.entrepotId)?.nom ?? 'Tous'}>
+                {[{ id: '', nom: 'Tous les dépôts' }, ...depots].map((d) => (
+                  <label key={d.id || 'tous'} className="flex items-center gap-2 h-7 cursor-pointer select-none">
+                    <input
+                      type="radio"
+                      name="fiche-stock-depot"
+                      checked={brouillon.entrepotId === d.id}
+                      onChange={() => setBrouillon({ ...brouillon, entrepotId: d.id })}
+                      className="accent-[var(--accent)]"
+                    />
+                    {d.nom}
+                  </label>
+                ))}
+              </SectionFiltre>
+            </PanneauFiltres>
           )}
 
           {/* Journal */}
@@ -538,16 +667,17 @@ function Tuile({
   index: number
 }) {
   return (
-    <div className="fiche-tuile rounded-xl bg-card px-3.5 py-2.5" style={{ '--c': couleur, '--i': index } as CSSProperties}>
-      <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-text-muted">
-        <span className="fiche-tuile-icone">{icone}</span>
-        {titre}
-      </div>
-      <div className="mt-1 text-[22px] font-semibold tabular-nums text-text leading-none">
+    <div
+      className="fiche-tuile rounded-lg bg-card h-8 px-2.5 flex items-center gap-1.5 whitespace-nowrap"
+      style={{ '--c': couleur, '--i': index } as CSSProperties}
+      title={aide}
+    >
+      <span className="fiche-tuile-icone">{icone}</span>
+      <span className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">{titre}</span>
+      <span className="text-[15px] font-semibold tabular-nums text-text">
         {signe && valeur > 0 ? signe : ''}
         {nombre(valeur)}
-      </div>
-      <div className="mt-1 text-[11px] text-text-muted truncate">{aide}</div>
+      </span>
     </div>
   )
 }

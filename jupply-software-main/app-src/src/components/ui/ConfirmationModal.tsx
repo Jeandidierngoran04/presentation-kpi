@@ -13,6 +13,10 @@ interface ConfirmationModalProps {
   danger?: boolean
   /** Bloque la confirmation (ex. motif obligatoire non saisi). */
   confirmationImpossible?: boolean
+  /** Libellé du bouton qui renonce (par défaut « Retour »). */
+  libelleRetour?: string
+  /** Focus sur le bouton qui renonce : Entrée ne déclenche pas l'action par mégarde. */
+  focusSurRetour?: boolean
   onConfirmer: () => Promise<void> | void
   onFermer: () => void
 }
@@ -27,6 +31,8 @@ export function ConfirmationModal({
   libelleConfirmer,
   danger = false,
   confirmationImpossible = false,
+  libelleRetour = 'Retour',
+  focusSurRetour = false,
   onConfirmer,
   onFermer,
 }: ConfirmationModalProps) {
@@ -53,15 +59,15 @@ export function ConfirmationModal({
         </div>
         {erreur && <div className="text-xs bg-danger-soft text-danger-deep rounded-lg px-3 py-2">{erreur}</div>}
         <div className="flex justify-end gap-2 pt-1">
-          <Bouton variante="secondaire" taille="sm" onClick={onFermer} disabled={envoi}>
-            Retour
+          <Bouton variante="secondaire" taille="sm" onClick={onFermer} disabled={envoi} autoFocus={focusSurRetour}>
+            {libelleRetour}
           </Bouton>
           <Bouton
             variante={danger ? 'danger' : 'primaire'}
             taille="sm"
             onClick={confirmer}
             disabled={envoi || confirmationImpossible}
-            autoFocus
+            autoFocus={!focusSurRetour}
           >
             {envoi ? 'Patiente...' : libelleConfirmer}
           </Bouton>

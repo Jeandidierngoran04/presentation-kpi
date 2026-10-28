@@ -1,6 +1,5 @@
 // Section « Suivi du statut » de la fenêtre Info d'un produit : quand le
 // produit est passé en alerte, en rupture, et le temps écoulé entre les deux.
-import { ArrowRight } from 'lucide-react'
 import type { ChangementStatut } from '../../lib/api/suiviStock'
 import { dureeLisible } from '../../lib/dates'
 import type { StatutStock } from '../../types/stock'
@@ -82,36 +81,6 @@ export function SuiviStatut({ statutActuel, changements }: Props) {
           },
         ]}
       />
-
-      {changements.length === 0 ? (
-        <InfoVide>Aucun changement de statut enregistré.</InfoVide>
-      ) : (
-        <ul className="flex flex-col mt-1">
-          {changements.slice(0, 8).map((c) => (
-            <li key={c.id} className="py-1.5 border-t border-border flex flex-col gap-0.5">
-              <div className="flex items-center gap-1.5 flex-wrap">
-                {c.ancien_statut && <StatutBadge statut={c.ancien_statut} />}
-                <ArrowRight size={11} className="text-text-muted" />
-                <StatutBadge statut={c.nouveau_statut} />
-                <span className="ml-auto tabular-nums text-text-muted">stock {c.stock.toLocaleString('fr-FR')}</span>
-              </div>
-              <div className="text-text-muted">
-                {dateHeure(c.date_changement)}
-                {c.reference && (
-                  <>
-                    {' · '}
-                    <span className="text-text">{c.reference}</span>
-                  </>
-                )}
-                {c.utilisateur_nom && <> · par {c.utilisateur_nom}</>}
-                {c.origine === 'reprise' && (
-                  <span title="Reconstitué à partir des anciens mouvements, avec les seuils actuels du produit"> · reconstitué</span>
-                )}
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
     </InfoSection>
   )
 }

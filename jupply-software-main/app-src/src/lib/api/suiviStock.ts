@@ -59,6 +59,32 @@ export async function getChangementsStatut(produitId: string, limite = 50): Prom
   return (data ?? []) as ChangementStatut[]
 }
 
+/** Dernier passage en alerte et en rupture de chaque produit demandé (écran Alertes stock). */
+export interface PassagesAlerte {
+  alerte: string | null
+  rupture: string | null
+}
+
+export async function getDerniersPassagesAlerte(produitIds: string[]): Promise<Map<string, PassagesAlerte>> {
+  const resultat = new Map<string, PassagesAlerte>()
+  if (produitIds.length === 0) return resultat
+  const { data, error } = await supabase
+    .from('v_historique_statuts_stock')
+    .select('produit_id, nouveau_statut, date_changement')
+    .in('produit_id', produitIds)
+    .in('nouveau_statut', ['faible', 'rupture'])
+    .order('date_changement', { ascending: false })
+  if (error) throw error
+  // Du plus récent au plus ancien : la première date rencontrée est la dernière.
+  for (const c of data ?? []) {
+    const p = resultat.get(c.produit_id as string) ?? { alerte: null, rupture: null }
+    if (c.nouveau_statut === 'faible') p.alerte ??= c.date_changement as string
+    else p.rupture ??= c.date_changement as string
+    resultat.set(c.produit_id as string, p)
+  }
+  return resultat
+}
+
 /** Tous les mouvements d'un produit, du plus ancien au plus récent, avec le stock après chacun. */
 export async function getJournalStock(produitId: string): Promise<LigneJournal[]> {
   const { data, error } = await supabase

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { FileDown, FileSpreadsheet, FileText, Search, X } from 'lucide-react'
 import { messageErreur } from '../../lib/erreurs'
 import { dateVersInput } from '../../lib/dates'
@@ -12,6 +12,8 @@ import { Modal } from '../ui/Modal'
 import { useMenuContextuel, type ElementMenuContextuel } from '../ui/MenuContextuel'
 import { CLASSE_CHAMP_COMPACT, CLASSE_LABEL } from '../ui/styles'
 import { EnTetePage } from '../ui/EnTetePage'
+import { ChampRecherche } from '../ui/ChampRecherche'
+import { texteFiltre } from '../../lib/filtreTexte'
 
 export interface ColonneDocument<R> {
   titre: string
@@ -149,6 +151,7 @@ export function ListeDocuments<D extends DocumentHistorique, L extends { id?: un
   const [au, setAu] = useState(aujourdhui)
   const [numero, setNumero] = useState('')
   const [documents, setDocuments] = useState<D[]>([])
+  const [recherche, setRecherche] = useState('')
   const [chargement, setChargement] = useState(true)
   const [erreur, setErreur] = useState<string | null>(null)
   const [selectionId, setSelectionId] = useState<string | null>(null)
@@ -212,6 +215,16 @@ export function ListeDocuments<D extends DocumentHistorique, L extends { id?: un
     if (saisieNumero) setTimeout(() => saisieRef.current?.focus(), 0)
   }, [saisieNumero])
 
+  // Recherche dans toutes les colonnes affichées de la liste.
+  const documentsAffiches = useMemo(() => {
+    if (!recherche.trim()) return documents
+    return documents.filter((d) =>
+      config.colonnes.some((c) => {
+        const v = c.valeur(d)
+        return v != null && texteFiltre(v instanceof Date ? v.toLocaleDateString('fr-FR') : String(v), recherche)
+      }),
+    )
+  }, [documents, recherche, config.colonnes])
   const selection = documents.find((d) => d.id === selectionId) ?? null
   const lignesDetail = detail && detail.id === selectionId ? lignesSelection : []
 
@@ -229,7 +242,7 @@ export function ListeDocuments<D extends DocumentHistorique, L extends { id?: un
 
   function exporterListe(format: 'excel' | 'csv') {
     const colonnes = config.colonnes.map((c) => ({ titre: c.titre, largeur: c.largeurExcel }))
-    const lignes = documents.map((d) => config.colonnes.map((c) => c.valeur(d)))
+    const lignes = documentsAffiches.map((d) => config.colonnes.map((c) => c.valeur(d)))
     const nom = nomFichierSur(
       numero ? `${config.libelle}_${numero}` : duJourSeulement ? `${config.libelle}_${borneDu}` : `${config.libelle}_${borneDu}_au_${borneAu}`,
     )
@@ -258,9 +271,10 @@ export function ListeDocuments<D extends DocumentHistorique, L extends { id?: un
       {/* En-tête compact : titre [nombre] à gauche, exports et actions à droite */}
       <EnTetePage
         titre={titre ?? config.libelle}
-        compteur={documents.length}
+        compteur={documentsAffiches.length}
         actions={
           <>
+            <ChampRecherche valeur={recherche} onChange={setRecherche} aide="Dans toutes les colonnes de la liste (* en tête = contient)" />
             <BoutonExport icone={FileSpreadsheet} label="Excel" onClick={() => exporterListe('excel')} />
             <BoutonExport icone={FileDown} label="CSV" onClick={() => exporterListe('csv')} />
             {actions}
@@ -334,7 +348,7 @@ export function ListeDocuments<D extends DocumentHistorique, L extends { id?: un
             </tr>
           </thead>
           <tbody>
-            {documents.map((d) => (
+            {documentsAffiches.map((d) => (
               <tr
                 key={d.id}
                 onClick={() => setSelectionId(d.id)}
@@ -371,6 +385,9 @@ export function ListeDocuments<D extends DocumentHistorique, L extends { id?: un
           <p className="text-sm text-text-muted py-10 text-center">
             {numero ? `Aucun document ne correspond à "${numero}".` : 'Aucun document sur cette période.'}
           </p>
+        )}
+        {!chargement && documents.length > 0 && documentsAffiches.length === 0 && (
+          <p className="text-sm text-text-muted py-10 text-center">Aucun document ne correspond à la recherche.</p>
         )}
         {chargement && <p className="text-sm text-text-muted py-10 text-center">Chargement...</p>}
       </div>

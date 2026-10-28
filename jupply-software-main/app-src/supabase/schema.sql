@@ -1665,13 +1665,26 @@ declare
   v_quantite_recue integer;
   v_quantite_nc integer;
   v_motif_nc text;
+  v_entrepot_principal uuid;
+  v_entrepot_ligne uuid;
 begin
-  select entreprise_id into v_entreprise_id from entrepots where id = p_entrepot_id;
-  if v_entreprise_id is null then
-    raise exception 'Entrepot introuvable.';
-  end if;
   if jsonb_array_length(p_lignes) = 0 then
     raise exception 'Une reception doit contenir au moins une ligne.';
+  end if;
+
+  -- Une entree peut couvrir plusieurs depots : le depot de chaque ligne est
+  -- celui de sa localisation. L'en-tete garde un depot "principal" (celui
+  -- passe en parametre, sinon celui de la premiere ligne).
+  v_entrepot_principal := coalesce(
+    p_entrepot_id,
+    (select e.entrepot_id from emplacements e where e.id = (p_lignes->0->>'emplacement_id')::uuid)
+  );
+  if v_entrepot_principal is null then
+    raise exception 'Ligne 1 : localisation introuvable ou depot non autorise.';
+  end if;
+  select entreprise_id into v_entreprise_id from entrepots where id = v_entrepot_principal;
+  if v_entreprise_id is null then
+    raise exception 'Entrepot introuvable.';
   end if;
 
   v_date := coalesce(p_date_mouvement, now());
@@ -1679,7 +1692,7 @@ begin
 
   insert into receptions (entreprise_id, numero, entrepot_id, fournisseur_id, numero_po, statut, cree_par, notes, cree_le)
   values (
-    v_entreprise_id, v_numero, p_entrepot_id, p_fournisseur_id, nullif(p_numero_po, ''), 'en_attente', auth.uid(),
+    v_entreprise_id, v_numero, v_entrepot_principal, p_fournisseur_id, nullif(p_numero_po, ''), 'en_attente', auth.uid(),
     nullif(p_notes, ''), v_date
   )
   returning id into v_reception_id;
@@ -1688,6 +1701,19 @@ begin
   loop
     select gere_expiration, reference into v_gere_expiration, v_reference
       from produits where id = (v_ligne->>'produit_id')::uuid;
+
+    select e.entrepot_id into v_entrepot_ligne
+      from emplacements e where e.id = nullif(v_ligne->>'emplacement_id', '')::uuid;
+    -- Une localisation d'un depot non attribue est invisible (securite) : meme message.
+    if v_entrepot_ligne is null then
+      raise exception 'Produit % : localisation introuvable ou depot non autorise.', v_reference;
+    end if;
+    if v_entrepot_ligne not in (select entrepots_visibles()) then
+      raise exception 'Produit % : vous n''avez pas acces au depot de cette localisation.', v_reference;
+    end if;
+    if not exists (select 1 from entrepots where id = v_entrepot_ligne and entreprise_id = v_entreprise_id) then
+      raise exception 'Produit % : le depot n''appartient pas a votre entreprise.', v_reference;
+    end if;
 
     if coalesce(v_gere_expiration, false) and nullif(v_ligne->>'date_expiration', '') is null then
       raise exception 'Produit % : la date d''expiration est obligatoire.', v_reference;
@@ -1775,6 +1801,7 @@ declare
   v_une_ligne_anomalie boolean := false;
   v_statut text;
   v_numero_nc text;
+  v_entrepot_ligne uuid;
 begin
   select entreprise_id, entrepot_id, numero, cree_le, fournisseur_id, numero_po
     into v_entreprise_id, v_entrepot_id, v_numero, v_date_entree, v_fournisseur_id, v_numero_po
@@ -1784,10 +1811,15 @@ begin
     raise exception 'Reception introuvable.';
   end if;
 
-  select id into v_quarantaine_id from emplacements where entrepot_id = v_entrepot_id and est_quarantaine;
-
   for v_ligne in select * from receptions_lignes where reception_id = p_reception_id
   loop
+    -- Depot de la ligne = depot de sa localisation (une entree peut couvrir
+    -- plusieurs depots) ; a defaut, le depot de l'en-tete.
+    v_entrepot_ligne := coalesce(
+      (select e.entrepot_id from emplacements e where e.id = v_ligne.emplacement_id),
+      v_entrepot_id
+    );
+    select id into v_quarantaine_id from emplacements where entrepot_id = v_entrepot_ligne and est_quarantaine;
     if v_ligne.quantite_recue < v_ligne.quantite_attendue then
       v_une_ligne_incomplete := true;
     end if;
@@ -1811,18 +1843,18 @@ begin
 
     if v_qte_normale > 0 then
       select quantite into v_stock_avant from stock_produits
-        where produit_id = v_ligne.produit_id and entrepot_id = v_entrepot_id and emplacement_id = v_ligne.emplacement_id;
+        where produit_id = v_ligne.produit_id and entrepot_id = v_entrepot_ligne and emplacement_id = v_ligne.emplacement_id;
       v_stock_avant := coalesce(v_stock_avant, 0);
       v_stock_apres := v_stock_avant + v_qte_normale;
 
       -- Le lot d'abord, le stock ensuite (voir synchroniser_lots).
       perform ajouter_lot(
-        v_ligne.produit_id, v_entrepot_id, v_ligne.emplacement_id, v_ligne.lot, v_ligne.numero_serie,
+        v_ligne.produit_id, v_entrepot_ligne, v_ligne.emplacement_id, v_ligne.lot, v_ligne.numero_serie,
         v_ligne.date_expiration, v_date_entree, v_ligne.prix_unitaire, v_qte_normale
       );
 
       insert into stock_produits (produit_id, entrepot_id, emplacement_id, quantite)
-      values (v_ligne.produit_id, v_entrepot_id, v_ligne.emplacement_id, v_qte_normale)
+      values (v_ligne.produit_id, v_entrepot_ligne, v_ligne.emplacement_id, v_qte_normale)
       on conflict (produit_id, entrepot_id, emplacement_id)
       do update set quantite = stock_produits.quantite + excluded.quantite;
 
@@ -1831,7 +1863,7 @@ begin
         stock_avant, stock_apres, utilisateur_id, reference, motif, lot, numero_serie, prix_unitaire
       )
       values (
-        v_entreprise_id, v_ligne.produit_id, v_entrepot_id, v_ligne.emplacement_id, 'entree', v_qte_normale,
+        v_entreprise_id, v_ligne.produit_id, v_entrepot_ligne, v_ligne.emplacement_id, 'entree', v_qte_normale,
         v_stock_avant, v_stock_apres, auth.uid(), v_numero, 'Réception validée',
         v_ligne.lot, v_ligne.numero_serie, v_ligne.prix_unitaire
       );
@@ -1841,17 +1873,17 @@ begin
       v_numero_nc := 'NC-' || to_char(now(), 'YYYY') || '-' || lpad(nextval('non_conformites_numero_seq')::text, 5, '0');
 
       select quantite into v_stock_avant from stock_produits
-        where produit_id = v_ligne.produit_id and entrepot_id = v_entrepot_id and emplacement_id = v_quarantaine_id;
+        where produit_id = v_ligne.produit_id and entrepot_id = v_entrepot_ligne and emplacement_id = v_quarantaine_id;
       v_stock_avant := coalesce(v_stock_avant, 0);
       v_stock_apres := v_stock_avant + v_qte_quarantaine;
 
       perform ajouter_lot(
-        v_ligne.produit_id, v_entrepot_id, v_quarantaine_id, v_ligne.lot, v_ligne.numero_serie,
+        v_ligne.produit_id, v_entrepot_ligne, v_quarantaine_id, v_ligne.lot, v_ligne.numero_serie,
         v_ligne.date_expiration, v_date_entree, v_ligne.prix_unitaire, v_qte_quarantaine
       );
 
       insert into stock_produits (produit_id, entrepot_id, emplacement_id, quantite)
-      values (v_ligne.produit_id, v_entrepot_id, v_quarantaine_id, v_qte_quarantaine)
+      values (v_ligne.produit_id, v_entrepot_ligne, v_quarantaine_id, v_qte_quarantaine)
       on conflict (produit_id, entrepot_id, emplacement_id)
       do update set quantite = stock_produits.quantite + excluded.quantite;
 
@@ -1860,7 +1892,7 @@ begin
         stock_avant, stock_apres, utilisateur_id, reference, motif, lot, numero_serie, prix_unitaire
       )
       values (
-        v_entreprise_id, v_ligne.produit_id, v_entrepot_id, v_quarantaine_id, 'entree', v_qte_quarantaine,
+        v_entreprise_id, v_ligne.produit_id, v_entrepot_ligne, v_quarantaine_id, 'entree', v_qte_quarantaine,
         v_stock_avant, v_stock_apres, auth.uid(), v_numero, 'Non-conformité à réception - Quarantaine (' || v_numero_nc || ')',
         v_ligne.lot, v_ligne.numero_serie, v_ligne.prix_unitaire
       );
@@ -1871,7 +1903,7 @@ begin
         quantite_initiale, quantite_restante, declare_par
       )
       values (
-        v_entreprise_id, v_numero_nc, v_entrepot_id, v_quarantaine_id, v_ligne.produit_id, v_ligne.lot,
+        v_entreprise_id, v_numero_nc, v_entrepot_ligne, v_quarantaine_id, v_ligne.produit_id, v_ligne.lot,
         v_ligne.numero_serie, v_ligne.date_expiration, v_date_entree, v_ligne.prix_unitaire, 'reception',
         p_reception_id, v_fournisseur_id, v_numero_po, coalesce(v_ligne.motif_non_conformite, 'autre'),
         v_ligne.constat_non_conformite, v_qte_quarantaine, v_qte_quarantaine, auth.uid()
