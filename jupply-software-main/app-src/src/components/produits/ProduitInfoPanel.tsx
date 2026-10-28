@@ -1,8 +1,12 @@
 // Fenêtre « Info » d'un produit (tableau Produits, et plus tard Alertes stock).
 // Lecture seule : affiche les informations déjà présentes dans l'application.
 import { useEffect, useState } from 'react'
+import { History } from 'lucide-react'
+import { getChangementsStatut, type ChangementStatut } from '../../lib/api/suiviStock'
+import { SuiviStatut } from './SuiviStatut'
 import { getFournisseursProduit, getMouvementsProduit } from '../../lib/api/produits'
 import { getStockLots } from '../../lib/api/lots'
+import { getCommandesEnCoursProduit, STATUTS_COMMANDE, type CommandeEnCoursProduit } from '../../lib/api/commandes'
 import type {
   Fournisseur,
   LocalisationProduit,
@@ -13,6 +17,7 @@ import type {
   TypeProduit,
 } from '../../types/stock'
 import { StatutBadge } from '../dashboard/StatutBadge'
+import { Badge } from '../ui/Badge'
 import { InfoChamps, InfoSection, InfoVide, ItemInfoPanel } from '../ui/ItemInfo'
 
 const LABEL_TYPE: Record<TypeProduit, string> = {
@@ -43,21 +48,33 @@ interface Props {
   equivalents: ProduitAvecStock[]
   onFermer: () => void
   elementRetour?: HTMLElement | null
+  /** Ouvre la fiche de stock complète du produit (bouton « Avancé »). */
+  onAvance?: () => void
 }
 
-export function ProduitInfoPanel({ produit, enCommande, localisations, equivalents, onFermer, elementRetour }: Props) {
+export function ProduitInfoPanel({ produit, enCommande, localisations, equivalents, onFermer, elementRetour, onAvance }: Props) {
   const [mouvements, setMouvements] = useState<MouvementAffiche[] | null>(null)
   const [fournisseurs, setFournisseurs] = useState<Fournisseur[] | null>(null)
   const [lots, setLots] = useState<StockLot[] | null>(null)
+  const [commandesEnCours, setCommandesEnCours] = useState<CommandeEnCoursProduit[] | null>(null)
+  const [changements, setChangements] = useState<ChangementStatut[] | null | 'indisponible'>(null)
 
   useEffect(() => {
     let actif = true
     setMouvements(null)
     setFournisseurs(null)
     setLots(null)
+    setCommandesEnCours(null)
+    setChangements(null)
+    getChangementsStatut(produit.id)
+      .then((c) => actif && setChangements(c))
+      .catch(() => actif && setChangements('indisponible'))
     getMouvementsProduit(produit.id, 10).then((m) => actif && setMouvements(m)).catch(() => actif && setMouvements([]))
     getFournisseursProduit(produit.id).then((f) => actif && setFournisseurs(f)).catch(() => actif && setFournisseurs([]))
     getStockLots(produit.id).then((l) => actif && setLots(l?.get(produit.id) ?? [])).catch(() => actif && setLots([]))
+    getCommandesEnCoursProduit(produit.id)
+      .then((c) => actif && setCommandesEnCours(c))
+      .catch(() => actif && setCommandesEnCours([]))
     return () => {
       actif = false
     }
@@ -126,6 +143,7 @@ export function ProduitInfoPanel({ produit, enCommande, localisations, equivalen
           ]}
         />
       </InfoSection>
+      <SuiviStatut statutActuel={produit.statut} changements={changements} />
       <InfoSection titre="Répartition par emplacement">
         {localisations.length === 0 ? (
           <InfoVide>Aucun stock rangé pour ce produit.</InfoVide>
@@ -199,6 +217,56 @@ export function ProduitInfoPanel({ produit, enCommande, localisations, equivalen
     </>
   )
 
+  const totalCommandes = (commandesEnCours ?? []).reduce((t, c) => t + c.quantite_restante, 0)
+  const commandes =
+    commandesEnCours == null ? (
+      <InfoVide>Chargement...</InfoVide>
+    ) : (
+      <>
+        <InfoSection titre="Résumé">
+          <InfoChamps
+            champs={[
+              { label: 'Commandé, pas encore reçu', valeur: <span className="font-semibold tabular-nums">{nombre(enCommande)}</span> },
+              { label: 'Sur des commandes fournisseurs', valeur: <span className="tabular-nums">{nombre(totalCommandes)}</span> },
+              ...(enCommande > totalCommandes
+                ? [{ label: 'Sur des entrées manuelles en attente', valeur: <span className="tabular-nums">{nombre(enCommande - totalCommandes)}</span> }]
+                : []),
+            ]}
+          />
+        </InfoSection>
+        <InfoSection titre="Commandes en cours">
+          {commandesEnCours.length === 0 ? (
+            <InfoVide>Aucune commande fournisseur en cours pour ce produit.</InfoVide>
+          ) : (
+            <ul className="flex flex-col">
+              {commandesEnCours.map((c) => {
+                const enRetard = c.date_livraison_prevue != null && c.date_livraison_prevue < aujourdhui
+                return (
+                  <li key={c.commande_id} className="py-1.5 border-t border-border first:border-t-0 flex flex-col gap-0.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-mono font-semibold text-info-deep">{c.numero}</span>
+                      <Badge ton={STATUTS_COMMANDE[c.statut].ton}>{STATUTS_COMMANDE[c.statut].label}</Badge>
+                    </div>
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="truncate">{c.fournisseur_nom}</span>
+                      <span className="shrink-0 tabular-nums">
+                        reste <span className="font-semibold">{nombre(c.quantite_restante)}</span> / {nombre(c.quantite_commandee)}
+                      </span>
+                    </div>
+                    <div className={enRetard ? 'text-danger-deep font-semibold' : 'text-text-muted'}>
+                      {c.date_livraison_prevue
+                        ? `Livraison prévue le ${dateCourte(c.date_livraison_prevue)}${enRetard ? ' (en retard)' : ''}`
+                        : 'Pas de date de livraison prévue'}
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </InfoSection>
+      </>
+    )
+
   const historique =
     mouvements == null ? (
       <InfoVide>Chargement...</InfoVide>
@@ -265,9 +333,22 @@ export function ProduitInfoPanel({ produit, enCommande, localisations, equivalen
       sousTitre={produit.designation}
       onFermer={onFermer}
       elementRetour={elementRetour}
+      actions={
+        onAvance && (
+          <button
+            type="button"
+            onClick={onAvance}
+            title="Fiche de stock : tout l'historique du produit, comme un livre de compte"
+            className="inline-flex items-center gap-1 h-6 px-2 rounded-md bg-topbar-hover text-topbar-text text-[11.5px] font-semibold hover:bg-accent hover:text-accent-contrast transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            <History size={12} strokeWidth={2} /> Avancé
+          </button>
+        )
+      }
       onglets={[
         { id: 'details', label: 'Détails', contenu: details },
         { id: 'stock', label: 'Stock', contenu: stock },
+        { id: 'commandes', label: 'Commandes', contenu: commandes },
         { id: 'historique', label: 'Historique', contenu: historique },
         { id: 'fournisseur', label: 'Fournisseur', contenu: fournisseur },
       ]}

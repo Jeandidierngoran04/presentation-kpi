@@ -36,6 +36,7 @@ import { Modal } from '../components/ui/Modal'
 import { useMenuContextuel } from '../components/ui/MenuContextuel'
 import { classeBadge, type TonBadge } from '../components/ui/Badge'
 import { EnTetePage } from '../components/ui/EnTetePage'
+import { ChampRecherche } from '../components/ui/ChampRecherche'
 
 const CLASSE_INPUT = 'border border-border rounded-lg px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30'
 const CLASSE_BOUTON_PRIMAIRE =
@@ -62,6 +63,7 @@ export function Transferts() {
   const [modalReceptionOuvert, setModalReceptionOuvert] = useState(false)
 
   const [selectionId, setSelectionId] = useState<string | null>(null)
+  const [recherche, setRecherche] = useState('')
   const [lignes, setLignes] = useState<TransfertLigneAffichee[]>([])
   const [envoiValidation, setEnvoiValidation] = useState(false)
 
@@ -88,6 +90,12 @@ export function Transferts() {
   }, [selectionId])
 
   const selection = transferts.find((t) => t.id === selectionId) ?? null
+  const transfertsFiltres = useMemo(() => {
+    if (!recherche.trim()) return transferts
+    return transferts.filter((t) =>
+      [t.numero_suivi, t.entrepot_source_nom, t.entrepot_destination_nom].some((v) => texteFiltre(v ?? '', recherche)),
+    )
+  }, [transferts, recherche])
 
   function onClicDroitTableau(e: MouseEvent) {
     if (!peutDemanderTransfert(profil?.role)) return
@@ -124,7 +132,10 @@ export function Transferts() {
 
   return (
     <div className="h-full flex flex-col gap-2 p-4" onContextMenu={onClicDroitTableau}>
-      <EnTetePage titre="Transferts entre entrepôts" compteur={transferts.length} />
+      <EnTetePage titre="Transferts entre entrepôts" compteur={transfertsFiltres.length} />
+      <div className="shrink-0">
+        <ChampRecherche valeur={recherche} onChange={setRecherche} aide="N° de suivi, dépôt de départ ou d'arrivée (* en tête = contient)" />
+      </div>
 
       {chargement ? (
         <div className="text-sm text-text-muted py-12 text-center">Chargement...</div>
@@ -142,7 +153,7 @@ export function Transferts() {
                 </tr>
               </thead>
               <tbody>
-                {transferts.map((t) => (
+                {transfertsFiltres.map((t) => (
                   <tr
                     key={t.id}
                     onClick={() => setSelectionId(t.id)}
@@ -164,8 +175,10 @@ export function Transferts() {
               </tbody>
             </table>
           </div>
-          {transferts.length === 0 && (
-            <p className="text-sm text-text-muted py-8 text-center">Aucun transfert. Clic droit pour en créer un.</p>
+          {transfertsFiltres.length === 0 && (
+            <p className="text-sm text-text-muted py-8 text-center">
+              {transferts.length === 0 ? 'Aucun transfert. Clic droit pour en créer un.' : 'Aucun transfert ne correspond à la recherche.'}
+            </p>
           )}
         </div>
       )}

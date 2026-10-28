@@ -141,12 +141,14 @@ interface ItemInfoPanelProps {
   onFermer: () => void
   /** Élément qui reprend le focus à la fermeture (la ligne cliquée). */
   elementRetour?: HTMLElement | null
+  /** Boutons ajoutés dans l'en-tête, à gauche du « × » (ex. « Avancé »). */
+  actions?: ReactNode
 }
 
 const SELECTEUR_FOCUSABLE =
   'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
-export function ItemInfoPanel({ titre, sousTitre, onglets, onFermer, elementRetour }: ItemInfoPanelProps) {
+export function ItemInfoPanel({ titre, sousTitre, onglets, onFermer, elementRetour, actions }: ItemInfoPanelProps) {
   const ref = useRef<HTMLDivElement>(null)
   const boutonFermerRef = useRef<HTMLButtonElement>(null)
   const idTitre = useId()
@@ -223,6 +225,7 @@ export function ItemInfoPanel({ titre, sousTitre, onglets, onFermer, elementReto
           </h2>
           {sousTitre && <p className="text-[11.5px] text-topbar-muted truncate">{sousTitre}</p>}
         </div>
+        {actions && <div className="shrink-0 flex items-center gap-1.5">{actions}</div>}
         <button
           ref={boutonFermerRef}
           type="button"

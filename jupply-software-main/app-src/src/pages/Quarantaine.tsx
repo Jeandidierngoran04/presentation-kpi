@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type MouseEvent } from 'react'
-import { ClipboardCheck, Clock, FileDown, FileSpreadsheet, PackageX, Plus, Search, ShieldAlert, Wallet } from 'lucide-react'
+import { ClipboardCheck, Clock, FileDown, FileSpreadsheet, PackageX, Plus, ShieldAlert, Wallet } from 'lucide-react'
 import { useTabs } from '../context/TabsContext'
 import { useToast } from '../context/ToastContext'
 import { messageErreur } from '../lib/erreurs'
@@ -22,6 +22,7 @@ import { useMenuContextuel } from '../components/ui/MenuContextuel'
 import { CLASSE_BOUTON_PRIMAIRE_PETIT, CLASSE_CHAMP_COMPACT, CLASSE_LABEL } from '../components/ui/styles'
 import { TraitementModal } from '../components/quarantaine/TraitementModal'
 import { RechercheTraitementModal } from '../components/quarantaine/RechercheTraitementModal'
+import { ChampRecherche } from '../components/ui/ChampRecherche'
 import { DeclarationModal } from '../components/quarantaine/DeclarationModal'
 
 type FiltreStatut = 'actifs' | 'clotures' | 'tous'
@@ -224,15 +225,7 @@ export function Quarantaine() {
               ))}
             </select>
           </label>
-          <div className="flex items-center gap-2 border border-border rounded-lg px-2.5 h-[26px] w-[260px] focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/30">
-            <Search size={13} strokeWidth={1.75} className="text-text-muted shrink-0" />
-            <input
-              value={recherche}
-              onChange={(e) => setRecherche(e.target.value)}
-              placeholder="Commande, référence, fournisseur, lot..."
-              className="text-xs bg-transparent text-text placeholder:text-text-muted outline-none w-full"
-            />
-          </div>
+          <ChampRecherche valeur={recherche} onChange={setRecherche} aide="Dossier, commande, référence, fournisseur, lot..." />
         </div>
         <div className="flex items-center gap-2">
           <button

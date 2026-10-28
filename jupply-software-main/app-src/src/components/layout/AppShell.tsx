@@ -27,6 +27,7 @@ import { Quarantaine } from '../../pages/Quarantaine'
 import { ComingSoon } from '../../pages/ComingSoon'
 import { CommandesFournisseurs } from '../../pages/CommandesFournisseurs'
 import { NouvelleCommande } from '../../pages/NouvelleCommande'
+import { FicheStock } from '../../pages/FicheStock'
 
 const COMPOSANTS = {
   dashboard: Dashboard,
@@ -50,6 +51,7 @@ const COMPOSANTS = {
   'commandes-fournisseurs': CommandesFournisseurs,
   'nouvelle-commande': NouvelleCommande,
   'historique-commandes': HistoriqueCommandes,
+  'fiche-stock': FicheStock,
 } satisfies Record<EcranId, () => ReactElement>
 
 /** Raccourcis proposés quand aucun écran n'est ouvert. */

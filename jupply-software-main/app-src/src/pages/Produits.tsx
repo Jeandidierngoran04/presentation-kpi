@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState, type FormEvent, type MouseEvent } from 'react'
-import { Search, X } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useTabs } from '../context/TabsContext'
 import { useSelection } from '../context/SelectionContext'
@@ -40,6 +39,7 @@ import { useMenuContextuel, type ElementMenuContextuel } from '../components/ui/
 import { StatutBadge } from '../components/dashboard/StatutBadge'
 import { CLASSE_LIGNE_INFO, ItemInfoPopover, useItemInfo } from '../components/ui/ItemInfo'
 import { ProduitInfoPanel } from '../components/produits/ProduitInfoPanel'
+import { ChampRecherche } from '../components/ui/ChampRecherche'
 
 const CLASSE_INPUT = 'border border-border rounded-lg px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30'
 const CLASSE_BOUTON_PRIMAIRE =
@@ -125,8 +125,8 @@ function IndicateurFiltre({
 
 export function Produits() {
   const { profil } = useAuth()
-  const { ongletActifId } = useTabs()
-  const { definirProduitSelectionne, demandeAffichageProduit, demandeRechercheProduit } = useSelection()
+  const { ongletActifId, ouvrirOnglet } = useTabs()
+  const { definirProduitSelectionne, demandeAffichageProduit, demanderFicheStock } = useSelection()
   const [produits, setProduits] = useState<ProduitAvecStock[]>([])
   const [categories, setCategories] = useState<Categorie[]>([])
   const [fournisseurs, setFournisseurs] = useState<Fournisseur[]>([])
@@ -199,14 +199,6 @@ export function Produits() {
     definirProduitSelectionne(produitId)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [demandeAffichageProduit])
-
-  // Recherche lancée depuis la barre du haut.
-  useEffect(() => {
-    if (!demandeRechercheProduit) return
-    setRecherche(demandeRechercheProduit.terme)
-    setFiltres(FILTRES_VIDES)
-    setColonneActive(null)
-  }, [demandeRechercheProduit])
 
   useEffect(() => {
     if (!demandeAffichageProduit || chargement) return
@@ -345,20 +337,7 @@ export function Produits() {
     <div className="h-full flex flex-col gap-2 p-[var(--content-padding)]" onContextMenu={onClicDroitTableau}>
       {/* Ligne de recherche : code ou nom, * = "contient" */}
       <div className="shrink-0 flex items-center gap-2 flex-wrap">
-        <div className="flex items-center gap-2 bg-card border border-border rounded-md px-2.5 h-[30px] w-[320px] max-w-full focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/30">
-          <Search size={14} strokeWidth={1.75} className="text-text-muted shrink-0" />
-          <input
-            value={recherche}
-            onChange={(e) => setRecherche(e.target.value)}
-            placeholder="Code ou nom du produit (* = contient)"
-            className="bg-transparent outline-none text-[12.5px] w-full text-text placeholder:text-text-muted"
-          />
-          {recherche && (
-            <button type="button" onClick={() => setRecherche('')} className="text-text-muted hover:text-text" title="Effacer la recherche">
-              <X size={13} strokeWidth={1.75} />
-            </button>
-          )}
-        </div>
+        <ChampRecherche valeur={recherche} onChange={setRecherche} aide="Code ou nom du produit. Commence par * pour chercher un texte contenu dans le nom." className="w-[320px]" />
         <span className="text-xs text-text-muted">
           <span className="font-semibold text-text tabular-nums">{produitsFiltres.length}</span> / {produits.length} produit(s)
         </span>
@@ -369,7 +348,7 @@ export function Produits() {
         <div className="flex-1 min-h-0 bg-card rounded-lg border border-border overflow-hidden flex flex-col">
           <div className="overflow-auto flex-1">
             <table className="tableau-dense tableau-ajuste">
-              <colgroup><col style={{ width: '4%' }} /><col style={{ width: '11%' }} /><col style={{ width: '25%' }} /><col style={{ width: '14%' }} /><col style={{ width: '10%' }} /><col style={{ width: '7%' }} /><col style={{ width: '10%' }} /><col style={{ width: '8%' }} /><col style={{ width: '11%' }} /></colgroup>
+              <colgroup><col style={{ width: '3.5%' }} /><col style={{ width: '11%' }} /><col style={{ width: '25.5%' }} /><col style={{ width: '13%' }} /><col style={{ width: '9%' }} /><col style={{ width: '7%' }} /><col style={{ width: '9.5%' }} /><col style={{ width: '9.5%' }} /><col style={{ width: '12%' }} /></colgroup>
               <thead className="sticky top-0 z-10">
                 <tr className="bg-card">
                   <th className="px-2 py-0.5" />
@@ -383,17 +362,17 @@ export function Produits() {
                   <IndicateurFiltre colonne="localisation" actif={colonneActive} valeur={filtres.localisation} />
                 </tr>
                 <tr className="text-left text-[11px] text-text-muted uppercase tracking-wide bg-muted">
-                  <th className="font-medium py-1 px-2" title="Produits équivalents">
+                  <th style={{ padding: '0 2px', textAlign: 'center' }} title="Produits équivalents : d'autres références qui peuvent remplacer celle-ci (avec leur stock)">
                     É
                   </th>
-                  <th className="font-medium py-1 px-2">Référence</th>
-                  <th className="font-medium py-1 px-2">Désignation</th>
-                  <th className="font-medium py-1 px-2">Catégorie</th>
-                  <th className="font-medium py-1 px-2">Type</th>
-                  <th className="font-medium py-1 px-2">Stock</th>
-                  <th className="font-medium py-1 px-2">Statut</th>
-                  <th className="font-medium py-1 px-2">Commande</th>
-                  <th className="font-medium py-1 px-2">Localisation</th>
+                  <th title="Code unique du produit">Référence</th>
+                  <th title="Nom du produit">Désignation</th>
+                  <th title="Famille de produits">Catégorie</th>
+                  <th title="Consommable (s'use), outillage (se prête et revient) ou rotable (se répare)">Type</th>
+                  <th title="Quantité disponible, hors quarantaine">Stock</th>
+                  <th title="Normal, en alerte (il faut recommander) ou en rupture (plus rien)">Statut</th>
+                  <th title="Quantité commandée au fournisseur et pas encore reçue">Commandé</th>
+                  <th title="Emplacement(s) où le produit est rangé">Localisation</th>
                 </tr>
               </thead>
               <tbody>
@@ -421,6 +400,7 @@ export function Produits() {
                     >
                       <td
                         className="py-1 px-2 text-xs text-text-muted"
+                        style={{ padding: '0 2px', textAlign: 'center' }}
                         onDoubleClick={(e) => {
                           e.stopPropagation()
                           if (liesEquivalents.length > 0) setPopupEquivalentsId(p.id)
@@ -512,6 +492,12 @@ export function Produits() {
           equivalents={equivalentsDe(info.element.id)}
           onFermer={info.fermer}
           elementRetour={info.ligne}
+          onAvance={() => {
+            const id = info.element!.id
+            info.fermer()
+            demanderFicheStock(id)
+            ouvrirOnglet('fiche-stock', 'Fiche de stock')
+          }}
         />
       )}
 

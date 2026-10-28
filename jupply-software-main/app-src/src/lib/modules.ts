@@ -86,6 +86,7 @@ export const MENU_PARAMETRE: GroupeMenu = {
 const ECRANS_SECONDAIRES: Partial<Record<EcranId, string>> = {
   'nouvelle-sortie': 'mouvement',
   'nouvelle-commande': 'mouvement',
+  'fiche-stock': 'stock',
 }
 
 /** Groupe du menu auquel appartient chaque écran (pour surligner et déplier le bon dossier). */

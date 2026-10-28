@@ -107,6 +107,12 @@
   Historique, Fournisseur). Panneau du bas retiré. Composant réutilisable,
   à étendre aux autres tableaux après vérification locale.
 
+- **[2026-10-27] Recherche, suivi des statuts et fiche de stock.** Zone
+  « Recherche » par écran (plus dans la barre du haut), colonnes Produits
+  resserrées (« Commandé »), onglet Commandes dans la fenêtre Info, journal
+  des passages en alerte / rupture (base testée), fiche de stock « Avancé »
+  façon livre de compte. En attente des migrations et de la vérification locale.
+
 ## Terminé
 
 - **[2026-08-30 → 2026-08-31] Sorties de stock et Réintégrations.** Voir

@@ -15,6 +15,8 @@ import { libelleMotif } from '../lib/api/quarantaine'
 import { useMenuContextuel } from '../components/ui/MenuContextuel'
 import { classeBadge, type TonBadge } from '../components/ui/Badge'
 import { EnTetePage } from '../components/ui/EnTetePage'
+import { ChampRecherche } from '../components/ui/ChampRecherche'
+import { texteFiltre } from '../lib/filtreTexte'
 import { useTabs } from '../context/TabsContext'
 
 // Vert = terminé, bleu = en cours, gris = en attente, rouge = problème.
@@ -34,6 +36,7 @@ export function Receptions() {
   const [receptions, setReceptions] = useState<ReceptionAffichee[]>([])
   const [chargement, setChargement] = useState(true)
   const [erreur, setErreur] = useState<string | null>(null)
+  const [recherche, setRecherche] = useState('')
   const { ongletActifId, ouvrirOnglet } = useTabs()
 
   const [selectionId, setSelectionId] = useState<string | null>(null)
@@ -65,6 +68,12 @@ export function Receptions() {
   }, [selectionId])
 
   const selection = receptions.find((r) => r.id === selectionId) ?? null
+  const receptionsFiltrees = useMemo(() => {
+    if (!recherche.trim()) return receptions
+    return receptions.filter((r) =>
+      [r.numero, r.entrepot_nom, r.fournisseur_nom ?? '', r.numero_po ?? ''].some((v) => texteFiltre(v, recherche)),
+    )
+  }, [receptions, recherche])
   const produitParId = useMemo(() => new Map(produits.map((p) => [p.id, p])), [produits])
 
   function onClicDroitTableau(e: MouseEvent) {
@@ -100,7 +109,7 @@ export function Receptions() {
     <div className="h-full flex flex-col gap-2 p-4" onContextMenu={onClicDroitTableau}>
       <EnTetePage
         titre="Entrées de stock"
-        compteur={receptions.length}
+        compteur={receptionsFiltrees.length}
         actions={
           <button
             type="button"
@@ -111,6 +120,10 @@ export function Receptions() {
           </button>
         }
       />
+
+      <div className="shrink-0">
+        <ChampRecherche valeur={recherche} onChange={setRecherche} aide="N° d'entrée, dépôt, fournisseur ou n° de commande (* en tête = contient)" />
+      </div>
 
       {chargement ? (
         <div className="text-sm text-text-muted py-12 text-center">Chargement...</div>
@@ -130,7 +143,7 @@ export function Receptions() {
               </tr>
             </thead>
             <tbody>
-              {receptions.map((r) => (
+              {receptionsFiltrees.map((r) => (
                 <tr
                   key={r.id}
                   onClick={() => setSelectionId(r.id)}
@@ -156,8 +169,10 @@ export function Receptions() {
             </tbody>
           </table>
           </div>
-          {receptions.length === 0 && (
-            <p className="text-sm text-text-muted py-8 text-center">Aucune réception. Clic droit pour en créer une.</p>
+          {receptionsFiltrees.length === 0 && (
+            <p className="text-sm text-text-muted py-8 text-center">
+              {receptions.length === 0 ? 'Aucune réception. Clic droit pour en créer une.' : 'Aucune entrée ne correspond à la recherche.'}
+            </p>
           )}
         </div>
       )}

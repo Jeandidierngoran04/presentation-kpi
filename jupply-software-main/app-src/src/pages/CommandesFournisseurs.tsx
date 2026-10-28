@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type MouseEvent } from 'react'
-import { Lock, PackageCheck, Plus, Search, Send, Truck, X } from 'lucide-react'
+import { Lock, PackageCheck, Plus, Send, Truck } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useTabs } from '../context/TabsContext'
 import { useToast } from '../context/ToastContext'
@@ -25,6 +25,7 @@ import { classeBadge } from '../components/ui/Badge'
 import { EnTetePage } from '../components/ui/EnTetePage'
 import { ConfirmationModal } from '../components/ui/ConfirmationModal'
 import { ReceptionCommandeModal } from '../components/commandes/ReceptionCommandeModal'
+import { ChampRecherche } from '../components/ui/ChampRecherche'
 import { CLASSE_BOUTON_PRIMAIRE_PETIT } from '../components/ui/styles'
 
 type Filtre = 'actives' | 'toutes' | StatutCommande
@@ -173,20 +174,7 @@ export function CommandesFournisseurs() {
             </button>
           ))}
         </div>
-        <div className="ml-auto relative">
-          <Search size={13} className="absolute left-2 top-1/2 -translate-y-1/2 text-text-muted" />
-          <input
-            value={recherche}
-            onChange={(e) => setRecherche(e.target.value)}
-            placeholder="N° PO, fournisseur, dépôt (* = contient)"
-            className="h-7 w-56 pl-7 pr-6 bg-card border border-border rounded-md text-xs text-text outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
-          />
-          {recherche && (
-            <button type="button" onClick={() => setRecherche('')} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-text-muted hover:text-text" title="Effacer">
-              <X size={12} />
-            </button>
-          )}
-        </div>
+        <ChampRecherche valeur={recherche} onChange={setRecherche} aide="N° de commande, fournisseur ou dépôt (* en tête = contient)" className="ml-auto w-[260px]" />
       </div>
 
       {chargement ? (

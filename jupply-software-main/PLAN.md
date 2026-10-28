@@ -1406,6 +1406,40 @@ défilement interne) affiche toutes les informations de l'élément.
 - [ ] Vérification en local par Jean Didier
 - [ ] Extension aux autres tableaux
 
+# Recherche, colonnes Produits, suivi des statuts et fiche de stock
+
+**Statut :** validé, exécution en cours
+
+## Décisions actées (27/10/2026)
+
+1. Zone de recherche : texte « Recherche » seul (aide au survol).
+2. Plus de recherche dans la barre du haut : chaque écran à liste a la
+   sienne (Produits, Alertes stock, Quarantaine, Entrées, Transferts,
+   Commandes fournisseurs, Historiques).
+3. Journal des changements de statut (Normal / En alerte / Rupture) en
+   base : date, ancien et nouveau statut, stock, document responsable. Le
+   passé est reconstitué une fois depuis les mouvements, avec les seuils
+   actuels (dates anciennes approximatives si un seuil a changé). Fenêtre
+   Info > Stock : « Suivi du statut » (passé en alerte le, en rupture le,
+   temps écoulé, derniers changements).
+4. Tableau Produits : colonne « É » étroite, titres courts avec explication
+   au survol, « Commande » devient « Commandé ». Fenêtre Info : onglet
+   « Commandes » (commandes en cours, reste à recevoir, livraison prévue).
+5. Bouton « Avancé » dans la fenêtre Info : onglet « Fiche de stock »,
+   journal façon livre de compte (stock initial, entrées, sorties, stock
+   ligne après ligne), changements de statut intercalés, filtre de dates
+   et de dépôt, totaux, export Excel, présentation soignée (lueurs,
+   animations discrètes).
+
+## Avancement
+
+- [x] Points 1, 2 et 4
+- [x] Point 3 : migration `2026-10-27-suivi-statuts-stock.sql` (journal des statuts, reprise du passé, vue `v_journal_stock`), testée sur base de test, `schema.sql` aligné
+- [x] Point 3 : section « Suivi du statut » dans la fenêtre Info
+- [x] Point 5 : écran Fiche de stock (bouton « Avancé »)
+- [ ] Exécuter les migrations dans Supabase (commandes fournisseurs, puis suivi des statuts)
+- [ ] Vérification en local par Jean Didier
+
 ## Format utilisé pour chaque plan
 
 ```

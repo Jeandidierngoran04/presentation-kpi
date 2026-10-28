@@ -23,6 +23,7 @@ export type EcranId =
   | 'commandes-fournisseurs'
   | 'nouvelle-commande'
   | 'historique-commandes'
+  | 'fiche-stock'
 
 export interface Onglet {
   id: EcranId

@@ -9,6 +9,7 @@ import { compterDossiersOuverts } from '../lib/api/quarantaine'
 import type { LocalisationProduit, ProduitAvecStock } from '../types/stock'
 import { useMenuContextuel } from '../components/ui/MenuContextuel'
 import { StatutBadge } from '../components/dashboard/StatutBadge'
+import { ChampRecherche } from '../components/ui/ChampRecherche'
 
 type Vue = 'toutes' | 'rupture' | 'faible'
 
@@ -77,6 +78,7 @@ export function AlertesStock() {
   const [actualisation, setActualisation] = useState(false)
   const [erreur, setErreur] = useState<string | null>(null)
   const [vue, setVue] = useState<Vue>('toutes')
+  const [recherche, setRecherche] = useState('')
   const [filtres, setFiltres] = useState<Filtres>(FILTRES_VIDES)
   const [colonneActive, setColonneActive] = useState<ColonneFiltrable | null>(null)
   const [selectionId, setSelectionId] = useState<string | null>(null)
@@ -152,8 +154,14 @@ export function AlertesStock() {
   const nbRupture = alertes.filter((p) => p.statut === 'rupture').length
   const nbFaible = alertes.length - nbRupture
   const lignes = useMemo(
-    () => alertes.filter((p) => (vue === 'toutes' || p.statut === vue) && correspond(p, filtres)),
-    [alertes, vue, filtres],
+    () =>
+      alertes.filter(
+        (p) =>
+          (vue === 'toutes' || p.statut === vue) &&
+          correspond(p, filtres) &&
+          (!recherche.trim() || texteFiltre(p.reference, recherche) || texteFiltre(p.designation, recherche)),
+      ),
+    [alertes, vue, filtres, recherche],
   )
 
   function voirDansProduits(produit: ProduitAvecStock) {
@@ -201,6 +209,7 @@ export function AlertesStock() {
               </button>
             ))}
           </div>
+          <ChampRecherche valeur={recherche} onChange={setRecherche} aide="Code ou nom du produit (* en tête = contient)" />
         </div>
         <div className="flex items-center gap-2">
         <button
@@ -256,7 +265,7 @@ export function AlertesStock() {
                   <th className="font-semibold h-8 px-2 text-right">Stock d'alerte</th>
                   <th className="font-semibold h-8 px-2 text-right">Écart</th>
                   <th className="font-semibold h-8 px-2 text-right">Stock min</th>
-                  <th className="font-semibold h-8 px-2 text-right">En commande</th>
+                  <th className="font-semibold h-8 px-2 text-right" title="Quantité commandée au fournisseur et pas encore reçue">Commandé</th>
                   <th className="font-semibold h-8 px-2">Statut</th>
                   <th className="font-semibold h-8 px-2">Localisation</th>
                 </tr>
