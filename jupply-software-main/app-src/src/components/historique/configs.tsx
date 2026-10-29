@@ -313,9 +313,12 @@ const TYPES_MOUVEMENT: Record<string, { label: string; ton: TonBadge }> = {
 export const CONFIG_MOUVEMENTS: ConfigDocuments<DocumentHistorique, never> = {
   vue: 'v_historique_mouvements',
   libelle: 'Mouvements',
+  typesFiltre: Object.entries(TYPES_MOUVEMENT).map(([id, t]) => ({ id, label: t.label })),
   colonneNumero: { cle: 'reference', titre: 'Document' },
+  // À l'écran : Date, Type, Référence, Désignation, Dépôt, Localisation, Lot, Opérateur.
+  // Document, Quantité, Stock avant / après et Motif restent dans les exports.
   colonnes: [
-    { titre: 'Date', valeur: (d) => dateHeure(d.cree_le), rendu: (d) => texteDateHeure(d.cree_le), largeurExcel: 18 },
+    { titre: 'Date', valeur: (d) => dateHeure(d.cree_le), rendu: (d) => texteDateHeure(d.cree_le), largeurExcel: 17 },
     {
       titre: 'Type',
       valeur: (d) => TYPES_MOUVEMENT[String(d.type)]?.label ?? txt(d.type),
@@ -323,12 +326,12 @@ export const CONFIG_MOUVEMENTS: ConfigDocuments<DocumentHistorique, never> = {
         const t = TYPES_MOUVEMENT[String(d.type)]
         return t ? <Badge ton={t.ton}>{t.label}</Badge> : String(d.type)
       },
-      largeurExcel: 14,
+      largeurExcel: 15,
     },
-    { titre: 'Document', valeur: (d) => txt(d.reference), mono: true, largeurExcel: 18 },
-    { titre: 'Référence', valeur: (d) => txt(d.produit_reference), mono: true, largeurExcel: 16 },
-    { titre: 'Désignation', valeur: (d) => txt(d.produit_designation), largeurExcel: 30 },
-    { titre: 'Dépôt', valeur: (d) => txt(d.entrepot_nom), largeurExcel: 18 },
+    { titre: 'Document', valeur: (d) => txt(d.reference), mono: true, largeurExcel: 18, masqueEcran: true },
+    { titre: 'Référence', valeur: (d) => txt(d.produit_reference), mono: true, largeurExcel: 13 },
+    { titre: 'Désignation', valeur: (d) => txt(d.produit_designation), largeurExcel: 28 },
+    { titre: 'Dépôt', valeur: (d) => txt(d.entrepot_nom), largeurExcel: 19 },
     {
       titre: 'Localisation',
       valeur: (d) => (d.emplacement_origine_code ? `${String(d.emplacement_origine_code)} → ${String(d.emplacement_code ?? '')}` : txt(d.emplacement_code)),
@@ -336,10 +339,10 @@ export const CONFIG_MOUVEMENTS: ConfigDocuments<DocumentHistorique, never> = {
       largeurExcel: 16,
     },
     { titre: 'Lot / N° série', valeur: (d) => txt(d.lot ?? d.numero_serie), mono: true, largeurExcel: 16 },
-    { titre: 'Quantité', valeur: (d) => nb(d.quantite), droite: true, largeurExcel: 10 },
-    { titre: 'Stock avant', valeur: (d) => nb(d.stock_avant), droite: true, largeurExcel: 10 },
-    { titre: 'Stock après', valeur: (d) => nb(d.stock_apres), droite: true, largeurExcel: 10 },
-    { titre: 'Motif', valeur: (d) => txt(d.motif), largeurExcel: 24 },
-    { titre: 'Opérateur', valeur: (d) => txt(d.utilisateur_nom), largeurExcel: 22 },
+    { titre: 'Quantité', valeur: (d) => nb(d.quantite), droite: true, largeurExcel: 10, masqueEcran: true },
+    { titre: 'Stock avant', valeur: (d) => nb(d.stock_avant), droite: true, largeurExcel: 10, masqueEcran: true },
+    { titre: 'Stock après', valeur: (d) => nb(d.stock_apres), droite: true, largeurExcel: 10, masqueEcran: true },
+    { titre: 'Motif', valeur: (d) => txt(d.motif), largeurExcel: 24, masqueEcran: true },
+    { titre: 'Opérateur', valeur: (d) => txt(d.utilisateur_nom), largeurExcel: 18 },
   ],
 }

@@ -189,8 +189,9 @@ export function AlertesStock() {
     () =>
       alertes.filter(
         (p) =>
-          panneau.statuts.includes(p.statut) &&
-          panneau.commande.includes((commandes.get(p.id) ?? 0) > 0 ? 'oui' : 'non') &&
+          // Rien de coché = aucun filtre.
+          (panneau.statuts.length === 0 || panneau.statuts.includes(p.statut)) &&
+          (panneau.commande.length === 0 || panneau.commande.includes((commandes.get(p.id) ?? 0) > 0 ? 'oui' : 'non')) &&
           !panneau.categoriesExclues.includes(p.categorie_nom ?? SANS_CATEGORIE) &&
           correspond(p, filtres) &&
           (!recherche.trim() || texteFiltre(p.reference, recherche) || texteFiltre(p.designation, recherche)),
@@ -200,8 +201,8 @@ export function AlertesStock() {
 
   // Rappel des filtres actifs à côté du bouton Filtre.
   const partiesFiltre = [
-    panneau.statuts.length === 1 ? (panneau.statuts[0] === 'rupture' ? 'Rupture' : 'En alerte') : panneau.statuts.length === 0 ? 'aucun statut' : null,
-    panneau.commande.length === 1 ? (panneau.commande[0] === 'oui' ? 'Commandé' : 'Non commandé') : panneau.commande.length === 0 ? 'aucune commande' : null,
+    panneau.statuts.length === 1 ? (panneau.statuts[0] === 'rupture' ? 'Rupture' : 'En alerte') : null,
+    panneau.commande.length === 1 ? (panneau.commande[0] === 'oui' ? 'Commandé' : 'Non commandé') : null,
     panneau.categoriesExclues.some((c) => categories.includes(c))
       ? `${categories.filter((c) => !panneau.categoriesExclues.includes(c)).length} catégorie(s) sur ${categories.length}`
       : null,
@@ -392,7 +393,7 @@ export function AlertesStock() {
         >
           <SectionFiltre
             titre="Statut"
-            resume={brouillon.statuts.length === 2 ? 'Tous' : brouillon.statuts.length === 0 ? 'Aucun' : 'Un sur deux'}
+            resume={brouillon.statuts.length === 1 ? (brouillon.statuts[0] === 'rupture' ? 'Rupture' : 'En alerte') : 'Tous'}
             ouvertParDefaut
           >
             <CaseFiltre
@@ -408,7 +409,7 @@ export function AlertesStock() {
           </SectionFiltre>
           <SectionFiltre
             titre="Commande"
-            resume={brouillon.commande.length === 2 ? 'Tous' : brouillon.commande.length === 0 ? 'Aucun' : brouillon.commande[0] === 'oui' ? 'Commandé' : 'Non commandé'}
+            resume={brouillon.commande.length === 1 ? (brouillon.commande[0] === 'oui' ? 'Commandé' : 'Non commandé') : 'Tous'}
             ouvertParDefaut
           >
             <p className="text-[11.5px] text-text-muted">Selon la colonne « Commandé » : quantité commandée et pas encore reçue.</p>

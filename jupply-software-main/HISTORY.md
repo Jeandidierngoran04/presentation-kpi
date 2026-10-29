@@ -146,7 +146,10 @@
   corrections, icône Import, marge du haut réduite. Puis : une seule
   modification à la fois, confirmation avant toute action qui fait bouger
   le stock, avant la déconnexion et avant de fermer une fenêtre remplie,
-  lueur qui relie l'onglet actif à son entrée du menu. Migration
+  lueur qui relie l'onglet actif à son entrée du menu. Puis (filtres) :
+  « Tous les statuts » et « rien de coché = tout » dans la fiche de stock,
+  filtre avancé (période, types, produit, dépôts) et export Excel / CSV /
+  PDF dans toutes les listes de l'Historique. Migration
   `2026-10-29-entree-annuler-modifier.sql` testée sur base de test, en
   attente d'exécution dans Supabase et de la vérification locale.
 

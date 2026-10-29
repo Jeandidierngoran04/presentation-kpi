@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
-import { FileDown, FileSpreadsheet, FileText, Search, X } from 'lucide-react'
+import { Filter, Upload } from 'lucide-react'
+import { CaseFiltre, PanneauFiltres, SectionFiltre } from '../ui/PanneauFiltres'
+import { exporterListePdf } from '../../lib/export/listePdf'
+import { FileDown, FileSpreadsheet, FileText, X } from 'lucide-react'
 import { messageErreur } from '../../lib/erreurs'
 import { dateVersInput } from '../../lib/dates'
 import {
@@ -24,6 +27,8 @@ export interface ColonneDocument<R> {
   droite?: boolean
   mono?: boolean
   largeurExcel?: number
+  /** Colonne absente du tableau à l'écran, mais gardée dans les exports (Excel, CSV, PDF). */
+  masqueEcran?: boolean
 }
 
 export interface ConfigDocuments<D extends DocumentHistorique, L> {
@@ -44,6 +49,61 @@ export interface ConfigDocuments<D extends DocumentHistorique, L> {
   titreDetail?: (document: D) => string
   /** Export PDF du document (ex. bon de sortie). */
   exportPdf?: (document: D, lignes: L[]) => Promise<void>
+  /** Types proposés dans le filtre avancé (champ `type` des documents), ex. types de mouvement. */
+  typesFiltre?: { id: string; label: string }[]
+}
+
+// --- Filtre avancé ------------------------------------------------------------
+
+type Periode = 'jour' | '7' | '30' | '90' | 'annee' | 'tout' | 'perso'
+
+const PERIODES: { id: Exclude<Periode, 'perso'>; label: string }[] = [
+  { id: 'jour', label: "Aujourd'hui" },
+  { id: '7', label: '7 jours' },
+  { id: '30', label: '30 jours' },
+  { id: '90', label: '3 mois' },
+  { id: 'annee', label: 'Cette année' },
+  { id: 'tout', label: 'Tout' },
+]
+
+interface FiltreAvance {
+  periode: Periode
+  du: string
+  au: string
+  /** Rien de coché = tous. */
+  depots: string[]
+  types: string[]
+  /** Code ou nom du produit (* en tête = contient). */
+  produit: string
+}
+
+function datesPeriode(p: Exclude<Periode, 'perso'>): { du: string; au: string } {
+  const aujourdhui = new Date()
+  if (p === 'tout') return { du: '', au: '' }
+  const debut = new Date(aujourdhui)
+  if (p === 'annee') debut.setMonth(0, 1)
+  else if (p !== 'jour') debut.setDate(debut.getDate() - Number(p) + 1)
+  return { du: dateVersInput(debut), au: dateVersInput(aujourdhui) }
+}
+
+const dateFr = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateString('fr-FR')
+
+function libellePeriode(f: FiltreAvance): string {
+  const raccourci = PERIODES.find((p) => p.id === f.periode)
+  if (raccourci) return raccourci.label
+  if (f.du && f.au) return f.du === f.au ? `le ${dateFr(f.du)}` : `du ${dateFr(f.du)} au ${dateFr(f.au)}`
+  if (f.du) return `depuis le ${dateFr(f.du)}`
+  if (f.au) return `jusqu'au ${dateFr(f.au)}`
+  return 'Tout'
+}
+
+/** Dépôts d'un document (un transfert en a deux : départ et arrivée). */
+function depotsDe(d: DocumentHistorique): string[] {
+  return [d.entrepot_nom, d.entrepot_source_nom, d.entrepot_destination_nom].filter((v): v is string => typeof v === 'string' && v !== '')
+}
+
+function basculer<T>(liste: T[], valeur: T, coche: boolean): T[] {
+  return coche ? (liste.includes(valeur) ? liste : [...liste, valeur]) : liste.filter((v) => v !== valeur)
 }
 
 interface ListeDocumentsProps<D extends DocumentHistorique, L> {
@@ -117,7 +177,7 @@ function TableauLignes<R extends { id?: unknown }>({ colonnes, lignes }: { colon
   )
 }
 
-function BoutonExport({ icone: Icone, label, onClick }: { icone: typeof FileText; label: string; onClick: () => void }) {
+function BoutonExport({ icone: Icone, label, onClick }: { icone: typeof FileText; label: string; onClick: (e: MouseEvent) => void }) {
   return (
     <button
       type="button"
@@ -145,10 +205,17 @@ export function ListeDocuments<D extends DocumentHistorique, L extends { id?: un
   elementsMenuTableau,
 }: ListeDocumentsProps<D, L>) {
   const aujourdhui = dateVersInput(new Date())
-  const [du, setDu] = useState(() =>
-    duJourSeulement ? aujourdhui : dateVersInput(new Date(Date.now() - JOURS_PAR_DEFAUT * 86_400_000)),
-  )
-  const [au, setAu] = useState(aujourdhui)
+  const [filtre, setFiltre] = useState<FiltreAvance>(() => ({
+    periode: duJourSeulement ? 'jour' : '30',
+    du: duJourSeulement ? aujourdhui : dateVersInput(new Date(Date.now() - (JOURS_PAR_DEFAUT - 1) * 86_400_000)),
+    au: aujourdhui,
+    depots: [],
+    types: [],
+    produit: '',
+  }))
+  // Filtre en cours de modification dans le panneau (null = panneau fermé).
+  const [brouillon, setBrouillon] = useState<FiltreAvance | null>(null)
+  const { du, au } = filtre
   const [numero, setNumero] = useState('')
   const [documents, setDocuments] = useState<D[]>([])
   const [recherche, setRecherche] = useState('')
@@ -215,16 +282,40 @@ export function ListeDocuments<D extends DocumentHistorique, L extends { id?: un
     if (saisieNumero) setTimeout(() => saisieRef.current?.focus(), 0)
   }, [saisieNumero])
 
-  // Recherche dans toutes les colonnes affichées de la liste.
+  // Ce que le filtre avancé peut proposer pour cette liste.
+  const depotsDisponibles = useMemo(() => [...new Set(documents.flatMap(depotsDe))].sort((a, b) => a.localeCompare(b)), [documents])
+  const avecProduit = documents.some((d) => d.produit_reference != null)
+
+  // Filtre avancé (dépôts, types, produit) puis recherche dans toutes les colonnes affichées.
   const documentsAffiches = useMemo(() => {
-    if (!recherche.trim()) return documents
-    return documents.filter((d) =>
-      config.colonnes.some((c) => {
+    return documents.filter((d) => {
+      if (filtre.depots.length > 0 && !depotsDe(d).some((n) => filtre.depots.includes(n))) return false
+      if (filtre.types.length > 0 && !filtre.types.includes(String(d.type))) return false
+      if (
+        filtre.produit.trim() &&
+        !texteFiltre(String(d.produit_reference ?? ''), filtre.produit) &&
+        !texteFiltre(String(d.produit_designation ?? ''), filtre.produit)
+      ) {
+        return false
+      }
+      if (!recherche.trim()) return true
+      return config.colonnes.some((c) => {
         const v = c.valeur(d)
         return v != null && texteFiltre(v instanceof Date ? v.toLocaleDateString('fr-FR') : String(v), recherche)
-      }),
-    )
-  }, [documents, recherche, config.colonnes])
+      })
+    })
+  }, [documents, recherche, config.colonnes, filtre])
+
+  // Rappel des filtres actifs à côté du bouton.
+  const partiesFiltre = [
+    libellePeriode(filtre),
+    filtre.depots.length > 0 ? filtre.depots.join(', ') : null,
+    filtre.types.length > 0
+      ? filtre.types.map((t) => config.typesFiltre?.find((o) => o.id === t)?.label ?? t).join(', ')
+      : null,
+    filtre.produit.trim() ? `produit « ${filtre.produit.trim()} »` : null,
+  ].filter((x): x is string => x != null)
+  const nbFiltresActifs = partiesFiltre.length - 1 + (filtre.periode === '30' ? 0 : 1)
   const selection = documents.find((d) => d.id === selectionId) ?? null
   const lignesDetail = detail && detail.id === selectionId ? lignesSelection : []
 
@@ -240,14 +331,35 @@ export function ListeDocuments<D extends DocumentHistorique, L extends { id?: un
     setSaisieNumero(null)
   }
 
-  function exporterListe(format: 'excel' | 'csv') {
+  function exporterListe(format: 'excel' | 'csv' | 'pdf') {
     const colonnes = config.colonnes.map((c) => ({ titre: c.titre, largeur: c.largeurExcel }))
     const lignes = documentsAffiches.map((d) => config.colonnes.map((c) => c.valeur(d)))
     const nom = nomFichierSur(
-      numero ? `${config.libelle}_${numero}` : duJourSeulement ? `${config.libelle}_${borneDu}` : `${config.libelle}_${borneDu}_au_${borneAu}`,
+      numero
+        ? `${config.libelle}_${numero}`
+        : duJourSeulement
+          ? `${config.libelle}_${borneDu}`
+          : `${config.libelle}_${borneDu || 'debut'}_au_${borneAu || 'aujourdhui'}`,
     )
     if (format === 'csv') exporterCsv(nom, colonnes, lignes)
-    else exporterExcel(nom, colonnes, lignes, config.libelle).catch((e) => setErreur(messageErreur(e)))
+    else if (format === 'excel') exporterExcel(nom, colonnes, lignes, config.libelle).catch((e) => setErreur(messageErreur(e)))
+    else
+      exporterListePdf({
+        nomFichier: nom,
+        titre: titre ?? config.libelle,
+        sousTitre: numero ? `${config.colonneNumero?.titre ?? 'Numéro'} : ${numero}` : partiesFiltre.join(' · '),
+        colonnes,
+        lignes,
+        colonnesADroite: config.colonnes.flatMap((c, i) => (c.droite ? [i] : [])),
+      }).catch((e) => setErreur(messageErreur(e)))
+  }
+
+  function ouvrirExport(e: MouseEvent) {
+    ouvrirMenu(e, [
+      { label: 'Excel (.xlsx)', onClick: () => exporterListe('excel') },
+      { label: 'CSV (.csv)', onClick: () => exporterListe('csv') },
+      { label: 'PDF (.pdf)', onClick: () => exporterListe('pdf') },
+    ])
   }
 
   function exporterDetail(format: 'pdf' | 'excel' | 'csv') {
@@ -265,6 +377,7 @@ export function ListeDocuments<D extends DocumentHistorique, L extends { id?: un
   }
 
   const numeroEstColonne = (c: ColonneDocument<D>) => config.colonneNumero && c.titre === config.colonneNumero.titre
+  const colonnesEcran = config.colonnes.filter((c) => !c.masqueEcran)
 
   return (
     <div className="h-full flex flex-col gap-2 p-[var(--content-padding)] pt-2 min-h-0">
@@ -275,49 +388,48 @@ export function ListeDocuments<D extends DocumentHistorique, L extends { id?: un
         actions={
           <>
             <ChampRecherche valeur={recherche} onChange={setRecherche} aide="Dans toutes les colonnes de la liste (* en tête = contient)" />
-            <BoutonExport icone={FileSpreadsheet} label="Excel" onClick={() => exporterListe('excel')} />
-            <BoutonExport icone={FileDown} label="CSV" onClick={() => exporterListe('csv')} />
+            {!duJourSeulement && (
+              <button
+                type="button"
+                onClick={() => setBrouillon(filtre)}
+                className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border text-xs font-semibold transition-colors ${
+                  nbFiltresActifs > 0 ? 'bg-accent-soft border-accent/50 text-accent-deep' : 'bg-card border-border text-text hover:bg-muted'
+                }`}
+                title={`Filtres appliqués : ${partiesFiltre.join(' · ')}`}
+              >
+                <Filter size={14} strokeWidth={1.75} /> Filtre avancé
+                {nbFiltresActifs > 0 && (
+                  <span className="inline-flex items-center justify-center min-w-4 h-4 rounded-full bg-accent text-accent-contrast text-[10px] font-bold px-1">
+                    {nbFiltresActifs}
+                  </span>
+                )}
+              </button>
+            )}
+            <BoutonExport icone={Upload} label="Export" onClick={(e) => ouvrirExport(e)} />
             {actions}
           </>
         }
       />
 
-      {/* Ligne de filtres */}
-      <div className="shrink-0 flex items-center gap-2 flex-wrap">
-        {duJourSeulement ? (
-          <span className="h-[26px] flex items-center rounded-md border border-border bg-muted px-2.5 text-xs text-text-muted">
-            Aujourd'hui, {new Date().toLocaleDateString('fr-FR')}
-          </span>
-        ) : (
-          <>
-            <label className="flex items-center gap-1.5 text-xs text-text-muted">
-              Du
-              <input type="date" value={du} max={au || undefined} onChange={(e) => setDu(e.target.value)} className={`${CLASSE_CHAMP_COMPACT} w-[140px]`} />
-            </label>
-            <label className="flex items-center gap-1.5 text-xs text-text-muted">
-              au
-              <input type="date" value={au} min={du || undefined} onChange={(e) => setAu(e.target.value)} className={`${CLASSE_CHAMP_COMPACT} w-[140px]`} />
-            </label>
-          </>
-        )}
-        {config.colonneNumero && !numero && (
-          <button
-            type="button"
-            onClick={(e) => setSaisieNumero({ x: e.currentTarget.getBoundingClientRect().left, y: e.currentTarget.getBoundingClientRect().bottom + 4, valeur: '' })}
-            className="h-[26px] inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 text-xs text-text-muted hover:text-text"
-          >
-            <Search size={12} strokeWidth={1.75} /> {config.colonneNumero.titre}
-          </button>
-        )}
-        {numero && (
-          <span className="inline-flex items-center gap-1.5 h-[26px] rounded-full border border-accent bg-accent-soft px-2.5 text-xs font-semibold text-accent-deep">
-            {config.colonneNumero?.titre} : {numero} <span className="font-normal">(toutes dates)</span>
-            <button onClick={() => setNumero('')} title="Retirer le filtre" className="hover:text-danger">
-              <X size={13} strokeWidth={1.75} />
-            </button>
-          </span>
-        )}
-      </div>
+      {/* Ligne de filtres : seulement quand elle apporte quelque chose (liste du jour, numéro recherché).
+          La période et les filtres appliqués s'affichent au survol de « Filtre avancé », pour garder la place au tableau. */}
+      {(duJourSeulement || numero) && (
+        <div className="shrink-0 flex items-center gap-2 flex-wrap">
+          {duJourSeulement && (
+            <span className="h-[26px] flex items-center rounded-md border border-border bg-muted px-2.5 text-xs text-text-muted">
+              Aujourd'hui, {new Date().toLocaleDateString('fr-FR')}
+            </span>
+          )}
+          {numero && (
+            <span className="inline-flex items-center gap-1.5 h-[26px] rounded-full border border-accent bg-accent-soft px-2.5 text-xs font-semibold text-accent-deep">
+              {config.colonneNumero?.titre} : {numero} <span className="font-normal">(toutes dates)</span>
+              <button onClick={() => setNumero('')} title="Retirer le filtre" className="hover:text-danger">
+                <X size={13} strokeWidth={1.75} />
+              </button>
+            </span>
+          )}
+        </div>
+      )}
 
       {erreur && <div className="shrink-0 text-xs bg-danger-soft text-danger-deep rounded-lg px-3 py-2">{erreur}</div>}
 
@@ -329,10 +441,10 @@ export function ListeDocuments<D extends DocumentHistorique, L extends { id?: un
         }}
       >
         <table className="tableau-dense tableau-ajuste">
-          <Largeurs colonnes={config.colonnes} />
+          <Largeurs colonnes={colonnesEcran} />
           <thead className="sticky top-0 z-10">
             <tr className="text-left text-[11px] text-text-muted uppercase tracking-wide bg-muted">
-              {config.colonnes.map((c) => (
+              {colonnesEcran.map((c) => (
                 <th
                   key={c.titre}
                   onContextMenu={numeroEstColonne(c) ? ouvrirSaisieNumero : undefined}
@@ -342,12 +454,12 @@ export function ListeDocuments<D extends DocumentHistorique, L extends { id?: un
                   }`}
                 >
                   {c.titre}
-                  {numeroEstColonne(c) && <Search size={11} strokeWidth={1.75} className="inline ml-1 -mt-0.5" />}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody>
+          {/* Lignes qui « roulent » comme une roue en entrant et en sortant de la zone visible. */}
+          <tbody className="defilement-roue">
             {documentsAffiches.map((d) => (
               <tr
                 key={d.id}
@@ -361,7 +473,7 @@ export function ListeDocuments<D extends DocumentHistorique, L extends { id?: un
                   selectionId === d.id ? 'bg-accent-soft' : 'hover:bg-black/5 dark:hover:bg-white/5'
                 } ${idEnSurbrillance === d.id ? 'font-semibold' : ''}`}
               >
-                {config.colonnes.map((c) => (
+                {colonnesEcran.map((c) => (
                   <td
                     key={c.titre}
                     onContextMenu={numeroEstColonne(c) ? ouvrirSaisieNumero : undefined}
@@ -430,6 +542,101 @@ export function ListeDocuments<D extends DocumentHistorique, L extends { id?: un
             </div>
           </div>
         </Modal>
+      )}
+
+      {brouillon && (
+        <PanneauFiltres
+          onFermer={() => setBrouillon(null)}
+          onReinitialiser={() => setBrouillon({ ...brouillon, periode: '30', ...datesPeriode('30'), depots: [], types: [], produit: '' })}
+          onAppliquer={() => {
+            setFiltre(brouillon)
+            setBrouillon(null)
+          }}
+        >
+          <SectionFiltre titre="Période" resume={libellePeriode(brouillon)} ouvertParDefaut>
+            <div className="flex flex-wrap gap-1">
+              {PERIODES.map((pe) => (
+                <button
+                  key={pe.id}
+                  type="button"
+                  onClick={() => setBrouillon({ ...brouillon, periode: pe.id, ...datesPeriode(pe.id) })}
+                  className={`h-[26px] px-2.5 rounded-md text-xs font-medium border transition-all ${
+                    brouillon.periode === pe.id ? 'fiche-pastille-active border-accent/60 text-text' : 'border-border bg-card text-text-muted hover:text-text'
+                  }`}
+                >
+                  {pe.label}
+                </button>
+              ))}
+            </div>
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <label className="flex flex-col gap-1">
+                <span className={CLASSE_LABEL}>Du</span>
+                <input
+                  type="date"
+                  value={brouillon.du}
+                  max={brouillon.au || undefined}
+                  onChange={(e) => setBrouillon({ ...brouillon, du: e.target.value, periode: 'perso' })}
+                  className={CLASSE_CHAMP_COMPACT}
+                />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className={CLASSE_LABEL}>Au</span>
+                <input
+                  type="date"
+                  value={brouillon.au}
+                  min={brouillon.du || undefined}
+                  onChange={(e) => setBrouillon({ ...brouillon, au: e.target.value, periode: 'perso' })}
+                  className={CLASSE_CHAMP_COMPACT}
+                />
+              </label>
+            </div>
+          </SectionFiltre>
+          {config.typesFiltre && (
+            <SectionFiltre
+              titre="Types de mouvement"
+              resume={brouillon.types.length === 0 || brouillon.types.length === config.typesFiltre.length ? 'Tous' : `${brouillon.types.length} sur ${config.typesFiltre.length}`}
+              ouvertParDefaut
+            >
+              <p className="text-[11.5px] text-text-muted">Rien de coché = tous les types.</p>
+              <CaseFiltre
+                libelle={<span className="font-medium">Tous les types</span>}
+                coche={brouillon.types.length === config.typesFiltre.length}
+                onChange={(c) => setBrouillon({ ...brouillon, types: c ? config.typesFiltre!.map((t) => t.id) : [] })}
+              />
+              {config.typesFiltre.map((t) => (
+                <CaseFiltre
+                  key={t.id}
+                  libelle={t.label}
+                  coche={brouillon.types.includes(t.id)}
+                  onChange={(c) => setBrouillon({ ...brouillon, types: basculer(brouillon.types, t.id, c) })}
+                />
+              ))}
+            </SectionFiltre>
+          )}
+          {avecProduit && (
+            <SectionFiltre titre="Produit" resume={brouillon.produit.trim() || 'Tous'} ouvertParDefaut={Boolean(config.typesFiltre)}>
+              <input
+                value={brouillon.produit}
+                onChange={(e) => setBrouillon({ ...brouillon, produit: e.target.value })}
+                placeholder="Code ou nom (* en tête = contient)"
+                className={CLASSE_CHAMP_COMPACT}
+              />
+            </SectionFiltre>
+          )}
+          {depotsDisponibles.length > 0 && (
+            <SectionFiltre titre="Dépôts" resume={brouillon.depots.length === 0 ? 'Tous' : `${brouillon.depots.length} sur ${depotsDisponibles.length}`}>
+              <p className="text-[11.5px] text-text-muted">Rien de coché = tous les dépôts.</p>
+              {depotsDisponibles.map((nom) => (
+                <CaseFiltre
+                  key={nom}
+                  libelle={nom}
+                  coche={brouillon.depots.includes(nom)}
+                  onChange={(c) => setBrouillon({ ...brouillon, depots: basculer(brouillon.depots, nom, c) })}
+                />
+              ))}
+            </SectionFiltre>
+          )}
+        </PanneauFiltres>
       )}
 
       {/* Recherche d'un numéro (clic droit sur la colonne) */}

@@ -1906,6 +1906,55 @@ avant de valider ou d'annuler.
       `2026-10-29-entree-annuler-modifier.sql`
 - [ ] Vérification en local par Jean Didier
 
+# Filtres de la fiche de stock et filtre avancé de l'Historique
+
+**Statut :** code complet, en attente de vérification locale
+**Démarré le :** 29/10/2026
+
+## Retours de Jean Didier (29/10/2026)
+
+1. Fiche de stock, section Statuts : une case « Tout cocher / décocher »
+   comme pour les mouvements.
+2. Fiche de stock : un filtre sur la seule date renvoyait une liste vide.
+   Cause : toutes les cases (mouvements) décochées = « n'afficher aucun
+   type ». Règle changée : **rien de coché = aucun filtre**.
+3. Historique : bouton « Filtre avancé » pour filtrer les mouvements des
+   produits sur une plage de dates, et un bouton d'export qui ouvre la liste
+   des formats (Excel, CSV, PDF).
+
+## Avancement
+
+- [x] Fiche de stock : case « Tous les statuts » ; rien de coché = tout
+      (types et statuts) ; même règle dans le panneau d'Alertes stock.
+- [x] Historique (toutes les listes, composant `ListeDocuments`) :
+      - bouton **Filtre avancé** (panneau latéral) : Période (Aujourd'hui,
+        7 jours, 30 jours, 3 mois, Cette année, Tout, ou Du / Au), Types de
+        mouvement (Tous les mouvements), Produit (code ou nom), Dépôts ;
+        rappel des filtres actifs sous l'en-tête ; la ligne Du / Au est
+        remplacée ;
+      - bouton **Export** : menu Excel / CSV / PDF ; nouvel export PDF de
+        liste (`lib/export/listePdf.ts`, paysage, titre, période, pages).
+- [x] `tsc -b` + `vite build` OK
+- [x] Retours de Jean Didier (29/10/2026) sur l'historique des mouvements :
+      - colonnes Document, Quantité, Stock avant, Stock après et Motif
+        retirées du tableau à l'écran (option `masqueEcran`), mais gardées
+        dans les exports Excel / CSV / PDF ;
+      - largeurs revues (Date avec l'heure, Type assez large pour
+        « Déplacement ») ;
+      - bouton « Document » (recherche d'un numéro) et loupe de l'en-tête
+        retirés, sur toutes les listes de l'Historique ;
+      - défilement « en roue » : les lignes basculent en 3D en entrant et
+        en sortant de la zone visible (`.defilement-roue`, animation liée
+        au défilement ; Chrome / Edge, lignes simplement à plat ailleurs).
+- [ ] Vérification en local par Jean Didier
+
+## Points de vigilance
+
+- Une liste charge au plus 2 000 lignes par période : sur « Tout » avec
+  beaucoup de mouvements, réduire la période.
+- Les dates des mouvements sont celles de la **validation** (moment où le
+  stock bouge), pas la date saisie sur l'entrée.
+
 ## Format utilisé pour chaque plan
 
 ```

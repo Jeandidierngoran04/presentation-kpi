@@ -89,6 +89,11 @@ function libellePeriode(f: FiltresFiche): string {
   return 'Tout'
 }
 
+/** Toutes les cases cochées, ou aucune : pas de filtre (tout s'affiche). */
+function sansFiltre(coches: unknown[], total: number): boolean {
+  return coches.length === 0 || coches.length === total
+}
+
 /** Ajoute ou retire une valeur d'une liste de cases cochées. */
 function basculerValeur<T>(liste: T[], valeur: T, coche: boolean): T[] {
   return coche ? (liste.includes(valeur) ? liste : [...liste, valeur]) : liste.filter((v) => v !== valeur)
@@ -254,7 +259,7 @@ export function FicheStock() {
           : stockActuel
     const stockFinal = periodeLignes.length > 0 ? stockApres(periodeLignes[periodeLignes.length - 1]) : stockInitial
     // Le filtre par type masque des lignes, mais le stock de chaque ligne et le stock final restent réels.
-    const visibles = types.length === CATEGORIES.length ? periodeLignes : periodeLignes.filter((l) => types.includes(categorie(l)))
+    const visibles = sansFiltre(types, CATEGORIES.length) ? periodeLignes : periodeLignes.filter((l) => types.includes(categorie(l)))
     const totalEntrees = visibles.reduce((t, l) => t + l.entree, 0)
     const totalSorties = visibles.reduce((t, l) => t + l.sortie, 0)
 
@@ -268,7 +273,7 @@ export function FicheStock() {
     }))
     const lignes: Ligne[] = [
       ...visibles.map((m): Ligne => ({ genre: 'mouvement', date: m.cree_le, m })),
-      ...lignesStatut.filter((s) => s.genre === 'statut' && statuts.includes(s.c.nouveau_statut) && dansPeriode(s.date)),
+      ...lignesStatut.filter((s) => s.genre === 'statut' && (sansFiltre(statuts, STATUTS_FILTRE.length) || statuts.includes(s.c.nouveau_statut)) && dansPeriode(s.date)),
     ].sort((a, b) => a.date.localeCompare(b.date) || (a.genre === 'mouvement' ? -1 : 1))
 
     return { parDepot, stockApres, stockInitial, stockFinal, totalEntrees, totalSorties, lignes, nbMouvements: visibles.length }
@@ -333,8 +338,8 @@ export function FicheStock() {
   const partiesFiltre = [
     du || au ? libellePeriode(filtres) : null,
     nomDepot ?? null,
-    types.length < CATEGORIES.length ? `${types.length} type(s) de mouvement` : null,
-    statuts.length < STATUTS_FILTRE.length ? (statuts.length === 0 ? 'statuts masqués' : `${statuts.length} statut(s)`) : null,
+    sansFiltre(types, CATEGORIES.length) ? null : `${types.length} type(s) de mouvement`,
+    sansFiltre(statuts, STATUTS_FILTRE.length) ? null : `${statuts.length} statut(s)`,
   ].filter((p): p is string => p != null)
   const nbFiltresActifs = partiesFiltre.length
   const resumeFiltres = partiesFiltre.join(' · ')
@@ -474,7 +479,7 @@ export function FicheStock() {
             >
               <SectionFiltre
                 titre="Mouvements"
-                resume={brouillon.types.length === CATEGORIES.length ? 'Tous' : `${brouillon.types.length} sur ${CATEGORIES.length}`}
+                resume={sansFiltre(brouillon.types, CATEGORIES.length) ? 'Tous' : `${brouillon.types.length} sur ${CATEGORIES.length}`}
                 ouvertParDefaut
               >
                 <CaseFiltre
@@ -493,15 +498,14 @@ export function FicheStock() {
               </SectionFiltre>
               <SectionFiltre
                 titre="Statuts"
-                resume={
-                  brouillon.statuts.length === STATUTS_FILTRE.length
-                    ? 'Tous'
-                    : brouillon.statuts.length === 0
-                      ? 'Masqués'
-                      : `${brouillon.statuts.length} sur ${STATUTS_FILTRE.length}`
-                }
+                resume={sansFiltre(brouillon.statuts, STATUTS_FILTRE.length) ? 'Tous' : `${brouillon.statuts.length} sur ${STATUTS_FILTRE.length}`}
               >
                 <p className="text-[11.5px] text-text-muted">Changements de statut affichés dans le journal, à leur date.</p>
+                <CaseFiltre
+                  libelle={<span className="font-medium">Tous les statuts</span>}
+                  coche={brouillon.statuts.length === STATUTS_FILTRE.length}
+                  onChange={(c) => setBrouillon({ ...brouillon, statuts: c ? STATUTS_FILTRE.map((x) => x.id) : [] })}
+                />
                 {STATUTS_FILTRE.map((s) => (
                   <CaseFiltre
                     key={s.id}
