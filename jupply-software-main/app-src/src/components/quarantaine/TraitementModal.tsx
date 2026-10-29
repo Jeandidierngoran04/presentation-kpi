@@ -1,3 +1,4 @@
+import { useConfirmation } from '../../context/ConfirmationContext'
 import { useEffect, useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { messageErreur } from '../../lib/erreurs'
@@ -44,6 +45,7 @@ interface TraitementModalProps {
  * est répartie entre une ou plusieurs décisions, puis le stock est mis à jour.
  */
 export function TraitementModal({ dossier, onFermer, onTraite }: TraitementModalProps) {
+  const { confirmer } = useConfirmation()
   const aTraiter = dossier.quantite_restante - dossier.quantite_en_reparation
   const enReparation = dossier.quantite_en_reparation
   const [emplacements, setEmplacements] = useState<Emplacement[]>([])
@@ -104,6 +106,13 @@ export function TraitementModal({ dossier, onFermer, onTraite }: TraitementModal
       setErreur(probleme)
       return
     }
+    const unites = lignes.reduce((t, l) => t + Number(l.quantite || 0), 0)
+    const ok = await confirmer({
+      titre: `Valider le traitement de ${dossier.numero} ?`,
+      message: `${unites.toLocaleString('fr-FR')} unité(s) traitée(s). Le stock sera mis à jour selon les décisions saisies (libération, retour fournisseur, rebut, réparation). Un traitement validé ne peut pas être annulé.`,
+      libelleConfirmer: 'Valider le traitement',
+    })
+    if (!ok) return
     setErreur(null)
     setEnvoi(true)
     try {
@@ -321,7 +330,7 @@ export function TraitementModal({ dossier, onFermer, onTraite }: TraitementModal
         {erreur && <div className="text-xs bg-danger-soft text-danger-deep rounded-lg px-3 py-2">{erreur}</div>}
 
         <div className="flex justify-end gap-2">
-          <button type="button" onClick={onFermer} className={CLASSE_BOUTON_SECONDAIRE}>
+          <button type="button" onClick={onFermer} data-annuler className={CLASSE_BOUTON_SECONDAIRE}>
             Annuler
           </button>
           <button type="button" onClick={onValider} disabled={envoi} className={CLASSE_BOUTON_PRIMAIRE}>

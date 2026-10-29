@@ -296,10 +296,14 @@ create table receptions (
   -- Commande fournisseur d'origine (null pour une entree manuelle).
   commande_id uuid references commandes_fournisseurs(id) on delete set null,
   statut text not null default 'en_attente'
-    check (statut in ('en_attente', 'validee', 'partielle', 'anomalie')),
+    check (statut in ('en_attente', 'validee', 'partielle', 'anomalie', 'annulee')),
   cree_par uuid not null references profiles(id),
   valide_par uuid references profiles(id),
   valide_le timestamptz,
+  -- Annulation d'une entree en attente (aucun effet sur le stock).
+  annulee_par uuid references profiles(id),
+  annulee_le timestamptz,
+  motif_annulation text,
   notes text,
   cree_le timestamptz not null default now(),
   unique (entreprise_id, numero)
@@ -881,6 +885,28 @@ create policy "lecture receptions lignes visibles" on receptions_lignes
 create policy "creation receptions lignes" on receptions_lignes
   for insert with check (
     reception_id in (select id from receptions where entrepot_id in (select entrepots_visibles()))
+  );
+
+-- L'auteur d'une entree en attente peut l'annuler ou la modifier (les roles
+-- de validation le peuvent deja via "validation receptions"). Il ne peut pas
+-- la passer en validee : seuls les statuts en_attente / annulee sont permis.
+create policy "modification receptions en attente par l'auteur" on receptions
+  for update using (
+    entrepot_id in (select entrepots_visibles()) and cree_par = auth.uid() and statut = 'en_attente'
+  )
+  with check (
+    entrepot_id in (select entrepots_visibles()) and cree_par = auth.uid() and statut in ('en_attente', 'annulee')
+  );
+
+-- Remplacement des lignes d'une entree en attente (modification).
+create policy "suppression lignes receptions en attente" on receptions_lignes
+  for delete using (
+    reception_id in (
+      select id from receptions
+      where statut = 'en_attente'
+        and entrepot_id in (select entrepots_visibles())
+        and (cree_par = auth.uid() or role_courant() in ('administrateur', 'superviseur_entrepot', 'gestionnaire_entrepot'))
+    )
   );
 
 alter table bons_sortie enable row level security;
@@ -1642,61 +1668,24 @@ grant execute on function deplacer_stock to authenticated;
 -- numero_serie, date_expiration, prix_unitaire, anomalie.
 -- p_date_mouvement (optionnel) fixe la date de la reception et l'annee de
 -- son numero, comme pour les reintegrations.
-create function creer_reception(
-  p_entrepot_id uuid,
-  p_fournisseur_id uuid,
-  p_numero_po text,
-  p_lignes jsonb,
-  p_notes text default null,
-  p_date_mouvement timestamptz default null
-)
-returns uuid
+-- Ajoute les lignes d'une entree (creation ou modification), avec les memes
+-- controles : localisation existante dans un depot visible de l'entreprise,
+-- date d'expiration et lot, non-conformite. Le depot de chaque ligne est
+-- celui de sa localisation.
+create function ajouter_lignes_reception(p_reception_id uuid, p_entreprise_id uuid, p_lignes jsonb)
+returns void
 language plpgsql
 security invoker
 as $$
 declare
-  v_entreprise_id uuid;
-  v_reception_id uuid;
-  v_numero text;
-  v_date timestamptz;
   v_ligne jsonb;
   v_gere_expiration boolean;
   v_reference text;
   v_quantite_recue integer;
   v_quantite_nc integer;
   v_motif_nc text;
-  v_entrepot_principal uuid;
   v_entrepot_ligne uuid;
 begin
-  if jsonb_array_length(p_lignes) = 0 then
-    raise exception 'Une reception doit contenir au moins une ligne.';
-  end if;
-
-  -- Une entree peut couvrir plusieurs depots : le depot de chaque ligne est
-  -- celui de sa localisation. L'en-tete garde un depot "principal" (celui
-  -- passe en parametre, sinon celui de la premiere ligne).
-  v_entrepot_principal := coalesce(
-    p_entrepot_id,
-    (select e.entrepot_id from emplacements e where e.id = (p_lignes->0->>'emplacement_id')::uuid)
-  );
-  if v_entrepot_principal is null then
-    raise exception 'Ligne 1 : localisation introuvable ou depot non autorise.';
-  end if;
-  select entreprise_id into v_entreprise_id from entrepots where id = v_entrepot_principal;
-  if v_entreprise_id is null then
-    raise exception 'Entrepot introuvable.';
-  end if;
-
-  v_date := coalesce(p_date_mouvement, now());
-  v_numero := 'REC-' || to_char(v_date, 'YYYY') || '-' || lpad(nextval('receptions_numero_seq')::text, 5, '0');
-
-  insert into receptions (entreprise_id, numero, entrepot_id, fournisseur_id, numero_po, statut, cree_par, notes, cree_le)
-  values (
-    v_entreprise_id, v_numero, v_entrepot_principal, p_fournisseur_id, nullif(p_numero_po, ''), 'en_attente', auth.uid(),
-    nullif(p_notes, ''), v_date
-  )
-  returning id into v_reception_id;
-
   for v_ligne in select * from jsonb_array_elements(p_lignes)
   loop
     select gere_expiration, reference into v_gere_expiration, v_reference
@@ -1711,7 +1700,7 @@ begin
     if v_entrepot_ligne not in (select entrepots_visibles()) then
       raise exception 'Produit % : vous n''avez pas acces au depot de cette localisation.', v_reference;
     end if;
-    if not exists (select 1 from entrepots where id = v_entrepot_ligne and entreprise_id = v_entreprise_id) then
+    if not exists (select 1 from entrepots where id = v_entrepot_ligne and entreprise_id = p_entreprise_id) then
       raise exception 'Produit % : le depot n''appartient pas a votre entreprise.', v_reference;
     end if;
 
@@ -1749,7 +1738,7 @@ begin
       quantite_non_conforme, motif_non_conformite, constat_non_conformite
     )
     values (
-      v_reception_id,
+      p_reception_id,
       (v_ligne->>'produit_id')::uuid,
       (v_ligne->>'emplacement_id')::uuid,
       coalesce((v_ligne->>'quantite_attendue')::integer, 0),
@@ -1764,6 +1753,60 @@ begin
       case when v_quantite_nc > 0 then nullif(btrim(v_ligne->>'constat_non_conformite'), '') end
     );
   end loop;
+end;
+$$;
+
+grant execute on function ajouter_lignes_reception to authenticated;
+
+create function creer_reception(
+  p_entrepot_id uuid,
+  p_fournisseur_id uuid,
+  p_numero_po text,
+  p_lignes jsonb,
+  p_notes text default null,
+  p_date_mouvement timestamptz default null
+)
+returns uuid
+language plpgsql
+security invoker
+as $$
+declare
+  v_entreprise_id uuid;
+  v_reception_id uuid;
+  v_numero text;
+  v_date timestamptz;
+  v_entrepot_principal uuid;
+begin
+  if jsonb_array_length(p_lignes) = 0 then
+    raise exception 'Une reception doit contenir au moins une ligne.';
+  end if;
+
+  -- Une entree peut couvrir plusieurs depots : le depot de chaque ligne est
+  -- celui de sa localisation. L'en-tete garde un depot "principal" (celui
+  -- passe en parametre, sinon celui de la premiere ligne).
+  v_entrepot_principal := coalesce(
+    p_entrepot_id,
+    (select e.entrepot_id from emplacements e where e.id = (p_lignes->0->>'emplacement_id')::uuid)
+  );
+  if v_entrepot_principal is null then
+    raise exception 'Ligne 1 : localisation introuvable ou depot non autorise.';
+  end if;
+  select entreprise_id into v_entreprise_id from entrepots where id = v_entrepot_principal;
+  if v_entreprise_id is null then
+    raise exception 'Entrepot introuvable.';
+  end if;
+
+  v_date := coalesce(p_date_mouvement, now());
+  v_numero := 'REC-' || to_char(v_date, 'YYYY') || '-' || lpad(nextval('receptions_numero_seq')::text, 5, '0');
+
+  insert into receptions (entreprise_id, numero, entrepot_id, fournisseur_id, numero_po, statut, cree_par, notes, cree_le)
+  values (
+    v_entreprise_id, v_numero, v_entrepot_principal, p_fournisseur_id, nullif(p_numero_po, ''), 'en_attente', auth.uid(),
+    nullif(p_notes, ''), v_date
+  )
+  returning id into v_reception_id;
+
+  perform ajouter_lignes_reception(v_reception_id, v_entreprise_id, p_lignes);
 
   return v_reception_id;
 end;
@@ -1802,7 +1845,14 @@ declare
   v_statut text;
   v_numero_nc text;
   v_entrepot_ligne uuid;
+  v_statut_actuel text;
 begin
+  -- Verrou : deux validations simultanees ne peuvent pas ajouter deux fois le stock.
+  select statut into v_statut_actuel from receptions where id = p_reception_id for update;
+  if v_statut_actuel is not null and v_statut_actuel <> 'en_attente' then
+    raise exception 'Cette entree n''est plus en attente (deja validee ou annulee).';
+  end if;
+
   select entreprise_id, entrepot_id, numero, cree_le, fournisseur_id, numero_po
     into v_entreprise_id, v_entrepot_id, v_numero, v_date_entree, v_fournisseur_id, v_numero_po
     from receptions where id = p_reception_id;
@@ -1930,6 +1980,100 @@ end;
 $$;
 
 grant execute on function valider_reception to authenticated;
+
+-- Annule une entree en attente : aucun mouvement de stock. Motif obligatoire.
+-- Autorise : l'auteur de l'entree, ou un role qui peut valider.
+create function annuler_reception(p_reception_id uuid, p_motif text)
+returns void
+language plpgsql
+security invoker
+as $$
+declare
+  v_statut text;
+  v_cree_par uuid;
+begin
+  if nullif(btrim(coalesce(p_motif, '')), '') is null then
+    raise exception 'Le motif d''annulation est obligatoire.';
+  end if;
+  -- Lecture simple d'abord (messages clairs), verrou ensuite.
+  select statut, cree_par into v_statut, v_cree_par from receptions where id = p_reception_id;
+  if v_statut is null then
+    raise exception 'Entree introuvable, ou vous ne pouvez pas la modifier.';
+  end if;
+  if v_statut <> 'en_attente' then
+    raise exception 'Seule une entree en attente peut etre annulee.';
+  end if;
+  if v_cree_par <> auth.uid() and role_courant() not in ('administrateur', 'superviseur_entrepot', 'gestionnaire_entrepot') then
+    raise exception 'Seuls l''auteur de l''entree et les responsables peuvent l''annuler.';
+  end if;
+  perform 1 from receptions where id = p_reception_id for update;
+
+  update receptions
+     set statut = 'annulee', annulee_par = auth.uid(), annulee_le = now(), motif_annulation = btrim(p_motif)
+   where id = p_reception_id;
+end;
+$$;
+
+grant execute on function annuler_reception to authenticated;
+
+-- Modifie une entree en attente : fournisseur, note, date et lignes (les
+-- lignes sont remplacees, avec les memes controles qu'a la creation). Le
+-- numero est conserve. Autorise : l'auteur de l'entree, ou un role qui peut valider.
+create function modifier_reception(
+  p_reception_id uuid,
+  p_fournisseur_id uuid,
+  p_lignes jsonb,
+  p_notes text default null,
+  p_date_mouvement timestamptz default null
+)
+returns void
+language plpgsql
+security invoker
+as $$
+declare
+  v_statut text;
+  v_cree_par uuid;
+  v_entreprise_id uuid;
+  v_entrepot_principal uuid;
+begin
+  if jsonb_array_length(coalesce(p_lignes, '[]'::jsonb)) = 0 then
+    raise exception 'Une reception doit contenir au moins une ligne.';
+  end if;
+  select statut, cree_par, entreprise_id into v_statut, v_cree_par, v_entreprise_id
+    from receptions where id = p_reception_id;
+  if v_statut is null then
+    raise exception 'Entree introuvable, ou vous ne pouvez pas la modifier.';
+  end if;
+  if v_statut <> 'en_attente' then
+    raise exception 'Seule une entree en attente peut etre modifiee.';
+  end if;
+  if v_cree_par <> auth.uid() and role_courant() not in ('administrateur', 'superviseur_entrepot', 'gestionnaire_entrepot') then
+    raise exception 'Seuls l''auteur de l''entree et les responsables peuvent la modifier.';
+  end if;
+  perform 1 from receptions where id = p_reception_id for update;
+
+  v_entrepot_principal := (select e.entrepot_id from emplacements e where e.id = (p_lignes->0->>'emplacement_id')::uuid);
+  if v_entrepot_principal is null then
+    raise exception 'Ligne 1 : localisation introuvable ou depot non autorise.';
+  end if;
+
+  delete from receptions_lignes where reception_id = p_reception_id;
+  -- Une regle de securite qui bloquerait la suppression le ferait sans erreur : on verifie.
+  if exists (select 1 from receptions_lignes where reception_id = p_reception_id) then
+    raise exception 'Les anciennes lignes n''ont pas pu etre remplacees.';
+  end if;
+  perform ajouter_lignes_reception(p_reception_id, v_entreprise_id, p_lignes);
+
+  update receptions
+     set fournisseur_id = p_fournisseur_id,
+         notes = nullif(btrim(coalesce(p_notes, '')), ''),
+         entrepot_id = v_entrepot_principal,
+         cree_le = coalesce(p_date_mouvement, cree_le)
+   where id = p_reception_id;
+end;
+$$;
+
+grant execute on function modifier_reception to authenticated;
 
 -- Commandes fournisseurs : creation (statut "fait").
 -- p_lignes : tableau JSON, un objet par ligne : produit_id, quantite_commandee, prix_unitaire.

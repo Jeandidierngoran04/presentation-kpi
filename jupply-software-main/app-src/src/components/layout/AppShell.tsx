@@ -23,11 +23,13 @@ import {
   HistoriqueTransferts,
 } from '../../pages/Historique'
 import { ToastProvider } from '../../context/ToastContext'
+import { ConfirmationProvider } from '../../context/ConfirmationContext'
 import { Quarantaine } from '../../pages/Quarantaine'
 import { ComingSoon } from '../../pages/ComingSoon'
 import { CommandesFournisseurs } from '../../pages/CommandesFournisseurs'
 import { NouvelleCommande } from '../../pages/NouvelleCommande'
 import { FicheStock } from '../../pages/FicheStock'
+import { DetailEntree } from '../../pages/DetailEntree'
 
 const COMPOSANTS = {
   dashboard: Dashboard,
@@ -52,6 +54,9 @@ const COMPOSANTS = {
   'nouvelle-commande': NouvelleCommande,
   'historique-commandes': HistoriqueCommandes,
   'fiche-stock': FicheStock,
+  entree: DetailEntree,
+  // Même feuille que la saisie, pré-remplie avec une entrée en attente.
+  'modifier-entree': () => <NouvelleReception modification />,
 } satisfies Record<EcranId, () => ReactElement>
 
 /** Raccourcis proposés quand aucun écran n'est ouvert. */
@@ -110,6 +115,7 @@ export function AppShell() {
   return (
     <SelectionProvider>
       <ToastProvider>
+        <ConfirmationProvider>
         <TabsProvider>
           {/* Barre latérale à gauche, zone de travail (onglets + écran) sur tout l'espace restant */}
           <div className="flex h-screen overflow-hidden bg-canvas">
@@ -120,6 +126,7 @@ export function AppShell() {
             </div>
           </div>
         </TabsProvider>
+        </ConfirmationProvider>
       </ToastProvider>
     </SelectionProvider>
   )

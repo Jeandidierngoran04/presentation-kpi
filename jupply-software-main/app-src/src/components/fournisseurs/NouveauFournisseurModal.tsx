@@ -84,7 +84,7 @@ export function NouveauFournisseurModal({ entrepriseId, nomInitial = '', onFerme
         {erreur && <div className="text-xs bg-danger-soft text-danger-deep rounded-lg px-3 py-2">{erreur}</div>}
 
         <div className="flex justify-end gap-2 mt-1">
-          <button type="button" onClick={onFermer} className={CLASSE_BOUTON_SECONDAIRE}>
+          <button type="button" onClick={onFermer} data-annuler className={CLASSE_BOUTON_SECONDAIRE}>
             Annuler
           </button>
           <button type="submit" disabled={envoi} className={CLASSE_BOUTON_PRIMAIRE}>

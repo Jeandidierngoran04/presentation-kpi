@@ -144,7 +144,7 @@ export function CommandesFournisseurs() {
   const reliquat = lignes.reduce((t, l) => t + l.quantite_restante, 0)
 
   return (
-    <div className="h-full flex flex-col gap-2 p-4" onContextMenu={onClicDroit}>
+    <div className="h-full flex flex-col gap-2 p-[var(--content-padding)] pt-2" onContextMenu={onClicDroit}>
       <EnTetePage
         titre="Commandes fournisseurs"
         compteur={commandesFiltrees.length}

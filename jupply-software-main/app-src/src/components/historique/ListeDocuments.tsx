@@ -267,7 +267,7 @@ export function ListeDocuments<D extends DocumentHistorique, L extends { id?: un
   const numeroEstColonne = (c: ColonneDocument<D>) => config.colonneNumero && c.titre === config.colonneNumero.titre
 
   return (
-    <div className="h-full flex flex-col gap-2 p-[var(--content-padding)] min-h-0">
+    <div className="h-full flex flex-col gap-2 p-[var(--content-padding)] pt-2 min-h-0">
       {/* En-tête compact : titre [nombre] à gauche, exports et actions à droite */}
       <EnTetePage
         titre={titre ?? config.libelle}
@@ -409,7 +409,7 @@ export function ListeDocuments<D extends DocumentHistorique, L extends { id?: un
 
       {/* Fiche complète + exports */}
       {detail && config.lignes && (
-        <Modal titre={config.titreDetail?.(detail) ?? 'Détail'} onFermer={() => setDetail(null)} large>
+        <Modal titre={config.titreDetail?.(detail) ?? 'Détail'} onFermer={() => setDetail(null)} large sansConfirmationFermeture>
           <div className="flex flex-col gap-3 min-h-0">
             <dl className="shrink-0 grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-2 bg-muted/50 border border-border rounded-lg p-3">
               {config.colonnes.map((c) => (

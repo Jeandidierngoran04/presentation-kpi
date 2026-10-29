@@ -1,102 +1,69 @@
 import { useEffect, useMemo, useState, type MouseEvent } from 'react'
-import { AlertTriangle, Plus } from 'lucide-react'
-import { useAuth } from '../context/AuthContext'
-import { messageErreur } from '../lib/erreurs'
-import { peutValiderReception } from '../lib/permissions'
-import { getProduitsAvecStock } from '../lib/api/stock'
-import {
-  getLignesReception,
-  getReceptions,
-  validerReception,
-  type ReceptionAffichee,
-  type ReceptionLigneAffichee,
-} from '../lib/api/receptions'
-import type { ProduitAvecStock, StatutReception } from '../types/stock'
-import { libelleMotif } from '../lib/api/quarantaine'
+import { Plus } from 'lucide-react'
+import { getReceptions, STATUTS_RECEPTION, type ReceptionAffichee } from '../lib/api/receptions'
 import { useMenuContextuel } from '../components/ui/MenuContextuel'
-import { classeBadge, type TonBadge } from '../components/ui/Badge'
+import { classeBadge } from '../components/ui/Badge'
 import { EnTetePage } from '../components/ui/EnTetePage'
 import { ChampRecherche } from '../components/ui/ChampRecherche'
 import { texteFiltre } from '../lib/filtreTexte'
 import { useTabs } from '../context/TabsContext'
-
-// Vert = terminé, bleu = en cours, gris = en attente, rouge = problème.
-const STYLES_STATUT: Record<StatutReception, { label: string; ton: TonBadge }> = {
-  en_attente: { label: 'En attente', ton: 'neutre' },
-  validee: { label: 'Validée', ton: 'succes' },
-  partielle: { label: 'Partielle', ton: 'info' },
-  anomalie: { label: 'Anomalie', ton: 'danger' },
-}
+import { useSelection } from '../context/SelectionContext'
 
 function heure(iso: string): string {
   return new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
 }
 
+/**
+ * Liste des entrées. Un clic sur le numéro (ou un double-clic sur la ligne)
+ * ouvre la page de l'entrée, où l'on valide, modifie ou annule.
+ */
 export function Receptions() {
-  const { profil, entrepotsAssignes } = useAuth()
   const [receptions, setReceptions] = useState<ReceptionAffichee[]>([])
   const [chargement, setChargement] = useState(true)
   const [erreur, setErreur] = useState<string | null>(null)
   const [recherche, setRecherche] = useState('')
-  const { ongletActifId, ouvrirOnglet } = useTabs()
-
   const [selectionId, setSelectionId] = useState<string | null>(null)
-  const [lignes, setLignes] = useState<ReceptionLigneAffichee[]>([])
-  const [produits, setProduits] = useState<ProduitAvecStock[]>([])
-  const [envoiValidation, setEnvoiValidation] = useState(false)
-
+  const { ongletActifId, ouvrirOnglet } = useTabs()
+  const { afficherEntree } = useSelection()
   const { ouvrir: ouvrirMenu, menu } = useMenuContextuel()
 
   function chargerListe() {
-    Promise.all([getReceptions(), getProduitsAvecStock()])
-      .then(([r, p]) => {
-        setReceptions(r)
-        setProduits(p)
-      })
+    getReceptions()
+      .then(setReceptions)
       .catch((e) => setErreur(e.message ?? 'Erreur inconnue.'))
       .finally(() => setChargement(false))
   }
 
-  // Recharge à chaque retour sur l'onglet (ex. après l'enregistrement d'une
-  // réception dans l'onglet "Nouvelle réception").
+  // Recharge à chaque retour sur l'onglet (après un enregistrement, une validation, une annulation...).
   useEffect(() => {
     if (ongletActifId === 'entrees') chargerListe()
   }, [ongletActifId])
 
-  useEffect(() => {
-    if (!selectionId) return
-    getLignesReception(selectionId).then(setLignes)
-  }, [selectionId])
-
-  const selection = receptions.find((r) => r.id === selectionId) ?? null
   const receptionsFiltrees = useMemo(() => {
     if (!recherche.trim()) return receptions
     return receptions.filter((r) =>
-      [r.numero, ...r.depots_noms, r.fournisseur_nom ?? '', r.numero_po ?? ''].some((v) => texteFiltre(v, recherche)),
+      [r.numero, ...r.depots_noms, r.fournisseur_nom ?? '', r.numero_po ?? '', STATUTS_RECEPTION[r.statut].label].some((v) =>
+        texteFiltre(v, recherche),
+      ),
     )
   }, [receptions, recherche])
-  const produitParId = useMemo(() => new Map(produits.map((p) => [p.id, p])), [produits])
 
   function creer() {
     ouvrirOnglet('nouvelle-reception', 'Nouvelle entrée')
   }
 
-  function onClicDroitTableau(e: MouseEvent) {
-    ouvrirMenu(e, [{ label: 'Créer', onClick: creer }])
+  function ouvrirEntree(r: ReceptionAffichee) {
+    setSelectionId(r.id)
+    afficherEntree(r.id)
+    ouvrirOnglet('entree', `Entrée ${r.numero}`)
   }
 
-  async function onValider() {
-    if (!selection) return
-    setEnvoiValidation(true)
-    try {
-      await validerReception(selection.id)
-      chargerListe()
-      getLignesReception(selection.id).then(setLignes)
-    } catch (e) {
-      setErreur(messageErreur(e))
-    } finally {
-      setEnvoiValidation(false)
-    }
+  function onClicDroitTableau(e: MouseEvent) {
+    const selection = receptions.find((r) => r.id === selectionId)
+    ouvrirMenu(e, [
+      ...(selection ? [{ label: `Ouvrir ${selection.numero}`, onClick: () => ouvrirEntree(selection) }] : []),
+      { label: 'Créer', onClick: creer },
+    ])
   }
 
   if (erreur) {
@@ -107,16 +74,17 @@ export function Receptions() {
     )
   }
 
-  const peutValiderCelle =
-    selection != null && peutValiderReception(profil?.role, selection.entrepot_id, entrepotsAssignes)
-
   return (
-    <div className="h-full flex flex-col gap-2 p-4" onContextMenu={onClicDroitTableau}>
+    <div className="h-full flex flex-col gap-2 p-[var(--content-padding)] pt-2" onContextMenu={onClicDroitTableau}>
       <EnTetePage
         titre="Entrées de stock"
         actions={
           <>
-            <ChampRecherche valeur={recherche} onChange={setRecherche} aide="N° d'entrée, dépôt, fournisseur ou n° de commande (* en tête = contient)" />
+            <ChampRecherche
+              valeur={recherche}
+              onChange={setRecherche}
+              aide="N° d'entrée, dépôt, fournisseur, n° de commande ou statut (* en tête = contient)"
+            />
             <button
               type="button"
               onClick={creer}
@@ -133,46 +101,60 @@ export function Receptions() {
       ) : (
         <div className="flex-1 min-h-0 bg-card rounded-lg border border-border overflow-hidden flex flex-col">
           <div className="overflow-auto flex-1">
-          <table className="tableau-dense">
-            <thead className="sticky top-0 z-10">
-              <tr className="text-left text-[11px] text-text-muted uppercase tracking-wide bg-muted">
-                <th className="font-medium py-1 px-2">Numéro</th>
-                <th className="font-medium py-1 px-2">Dépôt</th>
-                <th className="font-medium py-1 px-2">Fournisseur</th>
-                <th className="font-medium py-1 px-2">N° PO</th>
-                <th className="font-medium py-1 px-2">Statut</th>
-                <th className="font-medium py-1 px-2">Date</th>
-                <th className="font-medium py-1 px-2">Enregistré par</th>
-              </tr>
-            </thead>
-            <tbody>
-              {receptionsFiltrees.map((r) => (
-                <tr
-                  key={r.id}
-                  onClick={() => setSelectionId(r.id)}
-                  className={`border-t border-border cursor-pointer ${
-                    selectionId === r.id ? 'bg-accent-soft' : 'hover:bg-muted'
-                  }`}
-                >
-                  <td className="py-1 px-2 font-mono text-xs text-text-muted">{r.numero}</td>
-                  <td className="py-1 px-2 font-medium text-text" title={r.depots_noms.join(', ')}>
-                    {r.depots_noms.join(', ')}
-                  </td>
-                  <td className="py-1 px-2 text-text-muted">{r.fournisseur_nom ?? '—'}</td>
-                  <td className="py-1 px-2 text-text-muted">{r.numero_po ?? '—'}</td>
-                  <td className="py-1 px-2">
-                    <span className={classeBadge(STYLES_STATUT[r.statut].ton)}>
-                      {STYLES_STATUT[r.statut].label}
-                    </span>
-                  </td>
-                  <td className="py-1 px-2 text-text-muted">{new Date(r.cree_le).toLocaleDateString('fr-FR')}</td>
-                  <td className="py-1 px-2 text-text-muted whitespace-nowrap">
-                    {heure(r.cree_le)} · <span className="text-text">{r.cree_par_nom}</span>
-                  </td>
+            <table className="tableau-dense">
+              <thead className="sticky top-0 z-10">
+                <tr className="text-left text-[11px] text-text-muted uppercase tracking-wide bg-muted">
+                  <th className="font-medium py-1 px-2">Numéro</th>
+                  <th className="font-medium py-1 px-2">Dépôt</th>
+                  <th className="font-medium py-1 px-2">Fournisseur</th>
+                  <th className="font-medium py-1 px-2">N° PO</th>
+                  <th className="font-medium py-1 px-2">Statut</th>
+                  <th className="font-medium py-1 px-2">Date</th>
+                  <th className="font-medium py-1 px-2">Enregistré par</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {receptionsFiltrees.map((r) => {
+                  const annulee = r.statut === 'annulee'
+                  return (
+                    <tr
+                      key={r.id}
+                      onClick={() => setSelectionId(r.id)}
+                      onDoubleClick={() => ouvrirEntree(r)}
+                      className={`border-t border-border cursor-pointer ${selectionId === r.id ? 'bg-accent-soft' : 'hover:bg-muted'} ${
+                        annulee ? 'text-text-muted' : ''
+                      }`}
+                    >
+                      <td className="py-1 px-2">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            ouvrirEntree(r)
+                          }}
+                          className={`font-mono text-xs hover:underline ${annulee ? 'text-text-muted line-through' : 'text-info-deep'}`}
+                          title="Ouvrir l'entrée"
+                        >
+                          {r.numero}
+                        </button>
+                      </td>
+                      <td className={`py-1 px-2 font-medium ${annulee ? '' : 'text-text'}`} title={r.depots_noms.join(', ')}>
+                        {r.depots_noms.join(', ')}
+                      </td>
+                      <td className="py-1 px-2 text-text-muted">{r.fournisseur_nom ?? '—'}</td>
+                      <td className="py-1 px-2 text-text-muted">{r.numero_po ?? '—'}</td>
+                      <td className="py-1 px-2">
+                        <span className={classeBadge(STATUTS_RECEPTION[r.statut].ton)}>{STATUTS_RECEPTION[r.statut].label}</span>
+                      </td>
+                      <td className="py-1 px-2 text-text-muted">{new Date(r.cree_le).toLocaleDateString('fr-FR')}</td>
+                      <td className="py-1 px-2 text-text-muted whitespace-nowrap">
+                        {heure(r.cree_le)} · <span className={annulee ? '' : 'text-text'}>{r.cree_par_nom}</span>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
           </div>
           {receptionsFiltrees.length === 0 && (
             <p className="text-sm text-text-muted py-8 text-center">
@@ -182,79 +164,7 @@ export function Receptions() {
         </div>
       )}
 
-      {selection && (
-        <div className="shrink-0 max-h-[26vh] overflow-y-auto bg-card rounded-lg border border-border p-2.5">
-          <div className="flex items-center justify-between mb-1.5">
-            <h2 className="text-xs font-semibold text-text uppercase tracking-wide">
-              Lignes — {selection.numero}
-            </h2>
-            {selection.valide_le && (
-              <span className="text-xs text-text-muted">
-                Validée le {new Date(selection.valide_le).toLocaleDateString('fr-FR')} à {heure(selection.valide_le)} ·{' '}
-                <span className="text-text">{selection.valide_par_nom ?? '—'}</span>
-              </span>
-            )}
-            {selection.statut === 'en_attente' && peutValiderCelle && (
-              <button
-                onClick={onValider}
-                disabled={envoiValidation}
-                className="text-xs font-semibold bg-accent hover:bg-accent-strong text-accent-contrast rounded-lg px-3 py-1.5 disabled:opacity-60"
-              >
-                {envoiValidation ? 'Validation...' : 'Valider la réception'}
-              </button>
-            )}
-          </div>
-          {selection.notes && (
-            <p className="text-xs text-text-muted mb-1.5">
-              <span className="font-semibold text-text">Notes :</span> {selection.notes}
-            </p>
-          )}
-
-          <table className="tableau-dense">
-            <thead>
-              <tr className="text-left text-[10px] text-text-muted uppercase tracking-wide">
-                <th className="font-medium pb-1">Produit</th>
-                <th className="font-medium pb-1">Dépôt</th>
-                <th className="font-medium pb-1">Localisation</th>
-                <th className="font-medium pb-1">Attendu</th>
-                <th className="font-medium pb-1">Reçu</th>
-                <th className="font-medium pb-1">Lot / N° série</th>
-                <th className="font-medium pb-1">Prix</th>
-                <th className="font-medium pb-1">Non conforme</th>
-              </tr>
-            </thead>
-            <tbody>
-              {lignes.map((l) => (
-                <tr key={l.id} className="border-t border-border">
-                  <td className="py-1 font-medium text-text">
-                    {produitParId.get(l.produit_id)?.designation ?? l.produit_id}
-                  </td>
-                  <td className="py-1 text-text-muted">{l.entrepot_nom ?? '—'}</td>
-                  <td className="py-1 text-text-muted font-mono text-[11px]">{l.emplacement_code ?? '—'}</td>
-                  <td className="py-1 text-text-muted">{l.quantite_attendue}</td>
-                  <td className="py-1 text-text-muted">{l.quantite_recue}</td>
-                  <td className="py-1 text-text-muted font-mono text-[11px]">{l.numero_serie ?? l.lot ?? '—'}</td>
-                  <td className="py-1 text-text-muted">{l.prix_unitaire.toLocaleString('fr-FR')}</td>
-                  <td className="py-1">
-                    {(l.quantite_non_conforme || (l.anomalie ? l.quantite_recue : 0)) > 0 && (
-                      <span
-                        className="inline-flex items-center gap-1 text-danger text-xs font-semibold"
-                        title={l.constat_non_conformite ?? undefined}
-                      >
-                        <AlertTriangle size={12} /> {l.quantite_non_conforme || l.quantite_recue} ·{' '}
-                        {libelleMotif(l.motif_non_conformite ?? 'autre')}
-                      </span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
       {menu}
     </div>
   )
 }
-

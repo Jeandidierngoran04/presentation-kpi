@@ -233,7 +233,7 @@ export function AlertesStock() {
   }
 
   return (
-    <div className="h-full flex flex-col gap-2 p-[var(--content-padding)]">
+    <div className="h-full flex flex-col gap-2 p-[var(--content-padding)] pt-2">
       <div className="shrink-0 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
           <h1 className="shrink-0 text-[length:var(--page-title-size)] font-semibold text-text leading-tight">

@@ -4,7 +4,8 @@ import { useTabs, type EcranId } from '../../context/TabsContext'
 import { useSelection } from '../../context/SelectionContext'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
-import { MENU, MENU_PARAMETRE, type EntreeMenu, type GroupeMenu } from '../../lib/modules'
+import { useConfirmation } from '../../context/ConfirmationContext'
+import { ENTREE_MENU_PAR_ECRAN, MENU, MENU_PARAMETRE, type EntreeMenu, type GroupeMenu } from '../../lib/modules'
 import { InfoBulle } from './InfoBulle'
 import { MenuFlottant } from './MenuFlottant'
 
@@ -44,7 +45,8 @@ const CLASSE_SOUS_LIGNE =
  * Réduite, elle devient un rail d'icônes avec info-bulles.
  */
 export function BarreLaterale() {
-  const { ongletActifId, moduleActifId, ouvrirOnglet } = useTabs()
+  const { ongletActifId, moduleActifId, ouvrirOnglet, onglets, saisiesEnCours } = useTabs()
+  const { confirmer } = useConfirmation()
   const { produitSelectionneId, declencherSortieManuelle } = useSelection()
   const { profil, deconnexion } = useAuth()
   const { theme, basculer } = useTheme()
@@ -101,7 +103,9 @@ export function BarreLaterale() {
     if (reduite && e.currentTarget.contains(cible) && !cible.closest('button')) basculerReduite()
   }
 
-  const estActif = (ecran: EcranId) => ecran === ongletActifId
+  // L'entrée du menu de l'onglet actif (ou dont il vient) s'allume avec lui.
+  const estActif = (ecran: EcranId) =>
+    ecran === ongletActifId || (ongletActifId != null && ENTREE_MENU_PAR_ECRAN[ongletActifId] === ecran)
   const nom = profil?.nom_complet ?? 'Utilisateur'
   const initiale = nom.trim().charAt(0).toUpperCase() || '?'
 
@@ -253,9 +257,19 @@ export function BarreLaterale() {
           <button
             type="button"
             role="menuitem"
-            onClick={() => {
+            onClick={async () => {
               setMenu(null)
-              deconnexion()
+              const nonEnregistres = onglets.filter((o) => saisiesEnCours.includes(o.id)).map((o) => o.titre)
+              const ok = await confirmer({
+                titre: 'Se déconnecter ?',
+                message:
+                  nonEnregistres.length > 0
+                    ? `Des saisies ne sont pas enregistrées (${nonEnregistres.join(', ')}) : elles seront perdues.`
+                    : 'Tes onglets ouverts seront fermés.',
+                libelleConfirmer: 'Se déconnecter',
+                danger: nonEnregistres.length > 0,
+              })
+              if (ok) deconnexion()
             }}
             className="w-full flex items-center gap-2.5 px-3 h-8 text-[13px] text-danger hover:bg-danger-soft"
           >

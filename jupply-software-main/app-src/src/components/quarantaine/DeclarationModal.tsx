@@ -1,3 +1,4 @@
+import { useConfirmation } from '../../context/ConfirmationContext'
 import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { messageErreur } from '../../lib/erreurs'
@@ -24,6 +25,7 @@ function libelleLot(l: StockLot): string {
 
 /** Déclaration d'une non-conformité constatée en stock : la quantité passe en quarantaine avec un dossier. */
 export function DeclarationModal({ onFermer, onDeclare }: DeclarationModalProps) {
+  const { confirmer } = useConfirmation()
   const { profil, entrepotsAssignes } = useAuth()
   const [entrepots, setEntrepots] = useState<Entrepot[]>([])
   const [produits, setProduits] = useState<ProduitAvecStock[]>([])
@@ -74,6 +76,12 @@ export function DeclarationModal({ onFermer, onDeclare }: DeclarationModalProps)
     if (!Number.isInteger(n) || n <= 0 || n > lotChoisi.quantite) return setErreur(`Quantité invalide (maximum ${lotChoisi.quantite}).`)
     if (!motif) return setErreur('Choisis le motif.')
     if (!constat.trim()) return setErreur('Décris le constat.')
+    const ok = await confirmer({
+      titre: 'Mettre en quarantaine ?',
+      message: `${n.toLocaleString('fr-FR')} unité(s) de ${produit.reference} vont être bloquées en quarantaine (retirées du stock disponible) et un dossier de non-conformité sera ouvert.`,
+      libelleConfirmer: 'Mettre en quarantaine',
+    })
+    if (!ok) return
     setErreur(null)
     setEnvoi(true)
     try {
@@ -188,7 +196,7 @@ export function DeclarationModal({ onFermer, onDeclare }: DeclarationModalProps)
         {erreur && <div className="text-xs bg-danger-soft text-danger-deep rounded-lg px-3 py-2">{erreur}</div>}
 
         <div className="flex justify-end gap-2">
-          <button type="button" onClick={onFermer} className={CLASSE_BOUTON_SECONDAIRE}>
+          <button type="button" onClick={onFermer} data-annuler className={CLASSE_BOUTON_SECONDAIRE}>
             Annuler
           </button>
           <button type="button" onClick={onValider} disabled={envoi} className={CLASSE_BOUTON_PRIMAIRE}>

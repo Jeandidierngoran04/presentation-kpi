@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, Plus, Search, Trash2 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useSaisieEnCours, useTabs } from '../context/TabsContext'
+import { useConfirmation } from '../context/ConfirmationContext'
 import { useSelection } from '../context/SelectionContext'
 import { useToast } from '../context/ToastContext'
 import { messageErreur } from '../lib/erreurs'
@@ -88,6 +89,7 @@ function CelluleExpiration({ date, reference }: { date: string | null; reference
 export function NouvelleSortie() {
   const { profil, entrepotsAssignes } = useAuth()
   const { ongletActifId, ouvrirOnglet, fermerOnglet } = useTabs()
+  const { confirmer } = useConfirmation()
   const { demandeSortieManuelle, effacerDemandeSortie, signalerSortie } = useSelection()
   const { afficherToast } = useToast()
 
@@ -319,6 +321,13 @@ export function NouvelleSortie() {
       setErreur('Le panier contient un lot périmé : renseigne le motif (ex. mise au rebut) avant de valider.')
       return
     }
+    const unites = panier.reduce((t, l) => t + l.quantite, 0)
+    const ok = await confirmer({
+      titre: 'Valider la sortie ?',
+      message: `${panier.length} ligne(s), ${unites.toLocaleString('fr-FR')} unité(s) vont sortir du stock et le bon de sortie sera créé. Une sortie validée ne peut plus être modifiée.`,
+      libelleConfirmer: 'Valider la sortie',
+    })
+    if (!ok) return
     setErreur(null)
     setEnvoi(true)
     try {
@@ -358,7 +367,7 @@ export function NouvelleSortie() {
   const quantiteTotalePanier = panier.reduce((total, l) => total + l.quantite, 0)
 
   return (
-    <div className="h-full flex flex-col gap-2 p-3 min-h-0">
+    <div className="h-full flex flex-col gap-2 p-[var(--content-padding)] pt-2 min-h-0">
       {/* En-tête compact sur une ligne : laisse toute la hauteur à la recherche et au panier. */}
       <div className="shrink-0 bg-muted/50 rounded-lg border border-border px-3 py-2 grid grid-cols-2 lg:grid-cols-[200px_170px_150px_minmax(180px,1fr)_minmax(220px,1.4fr)] gap-x-4 gap-y-2">
         <label className="flex flex-col gap-1">

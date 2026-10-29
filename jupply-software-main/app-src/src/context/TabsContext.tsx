@@ -25,6 +25,8 @@ export type EcranId =
   | 'nouvelle-commande'
   | 'historique-commandes'
   | 'fiche-stock'
+  | 'entree'
+  | 'modifier-entree'
 
 export interface Onglet {
   id: EcranId
@@ -45,6 +47,8 @@ interface TabsState {
   demanderFermeture: (id: EcranId) => void
   /** Une feuille de saisie signale qu'elle contient (ou plus) des données non enregistrées. */
   signalerSaisie: (id: EcranId, enCours: boolean) => void
+  /** Onglets dont la saisie n'est pas enregistrée (pour prévenir avant une déconnexion). */
+  saisiesEnCours: EcranId[]
   activerOnglet: (id: EcranId) => void
   /** Déplace un onglet à la place d'un autre (glisser-déposer). */
   deplacerOnglet: (id: EcranId, versId: EcranId) => void
@@ -60,7 +64,9 @@ export function TabsProvider({ children }: { children: ReactNode }) {
   const [ongletActifId, setOngletActifId] = useState<EcranId | null>(null)
 
   function ouvrirOnglet(ecran: EcranId, titre: string) {
-    setOnglets((prev) => (prev.some((o) => o.id === ecran) ? prev : [...prev, { id: ecran, titre }]))
+    setOnglets((prev) =>
+      prev.some((o) => o.id === ecran) ? prev.map((o) => (o.id === ecran ? { ...o, titre } : o)) : [...prev, { id: ecran, titre }],
+    )
     setOngletActifId(ecran)
   }
 
@@ -121,6 +127,7 @@ export function TabsProvider({ children }: { children: ReactNode }) {
         fermerOnglet,
         demanderFermeture,
         signalerSaisie,
+        saisiesEnCours,
         activerOnglet: setOngletActifId,
         deplacerOnglet,
       }}

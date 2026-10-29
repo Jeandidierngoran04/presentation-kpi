@@ -381,7 +381,7 @@ export function ReceptionCommandeModal({ commande, lignes, onFermer, onReception
           <div className="flex gap-2">
             {etape === 'saisie' ? (
               <>
-                <Bouton variante="secondaire" taille="sm" onClick={onFermer}>
+                <Bouton variante="secondaire" taille="sm" onClick={onFermer} data-annuler>
                   Annuler
                 </Bouton>
                 <Bouton taille="sm" onClick={verifier}>

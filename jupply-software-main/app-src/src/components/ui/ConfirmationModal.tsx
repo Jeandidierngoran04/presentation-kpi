@@ -51,7 +51,7 @@ export function ConfirmationModal({
   }
 
   return (
-    <Modal titre={titre} onFermer={envoi ? () => {} : onFermer}>
+    <Modal titre={titre} onFermer={envoi ? () => {} : onFermer} sansConfirmationFermeture>
       <div className="flex flex-col gap-3 text-[13px] text-text">
         <div className="flex gap-2.5">
           <AlertTriangle size={18} strokeWidth={1.75} className={`shrink-0 mt-0.5 ${danger ? 'text-danger' : 'text-warn-deep'}`} />

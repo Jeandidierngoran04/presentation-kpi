@@ -24,7 +24,7 @@ export function RechercheTraitementModal({ dossiers, onFermer, onChoisir }: Rech
   const resultats = terme ? ouverts.filter((d) => correspond(d, terme)) : ouverts
 
   return (
-    <Modal titre="Traitement d'une non-conformité" onFermer={onFermer} large>
+    <Modal titre="Traitement d'une non-conformité" onFermer={onFermer} large sansConfirmationFermeture>
       <div className="flex flex-col gap-3 min-h-0">
         <div className="flex items-center gap-2 border border-border rounded-lg px-3 h-10 focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/30">
           <Search size={16} strokeWidth={1.75} className="text-text-muted shrink-0" />

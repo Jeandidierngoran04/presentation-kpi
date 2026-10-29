@@ -77,6 +77,7 @@ const STATUTS_RECEPTION: Record<string, { label: string; ton: TonBadge }> = {
   validee: { label: 'Validée', ton: 'succes' },
   partielle: { label: 'Partielle', ton: 'info' },
   anomalie: { label: 'Anomalie', ton: 'danger' },
+  annulee: { label: 'Annulée', ton: 'neutre' },
 }
 
 export const CONFIG_ENTREES: ConfigDocuments<DocumentHistorique, DocumentHistorique> = {

@@ -81,9 +81,24 @@ export const MENU_PARAMETRE: GroupeMenu = {
   entrees: [{ ecran: 'entrepots', label: 'Entrepôts et emplacements' }],
 }
 
+/**
+ * Entrée du menu d'où vient un écran secondaire : elle s'allume avec son onglet
+ * (ex. la page d'une entrée allume « Entrées »).
+ */
+export const ENTREE_MENU_PAR_ECRAN: Partial<Record<EcranId, EcranId>> = {
+  'nouvelle-reception': 'entrees',
+  entree: 'entrees',
+  'modifier-entree': 'entrees',
+  'nouvelle-sortie': 'sorties',
+  'nouvelle-commande': 'commandes-fournisseurs',
+  'fiche-stock': 'produits',
+}
+
 /** Écrans ouverts depuis un autre écran (absents du menu), rattachés à leur groupe. */
 const ECRANS_SECONDAIRES: Partial<Record<EcranId, string>> = {
   'nouvelle-reception': 'mouvement',
+  entree: 'mouvement',
+  'modifier-entree': 'mouvement',
   'nouvelle-sortie': 'mouvement',
   'nouvelle-commande': 'mouvement',
   'fiche-stock': 'stock',

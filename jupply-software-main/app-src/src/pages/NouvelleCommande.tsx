@@ -175,7 +175,7 @@ export function NouvelleCommande() {
   const lignesSansPrix = lignesRemplies.filter((l) => !Number(l.prixUnitaire)).length
 
   return (
-    <div className="h-full flex flex-col gap-3 p-4 min-h-0 overflow-y-auto">
+    <div className="h-full flex flex-col gap-3 p-[var(--content-padding)] pt-2 min-h-0 overflow-y-auto">
       <div className="shrink-0 grid grid-cols-1 md:grid-cols-[1fr_1fr_1.2fr] gap-x-6 gap-y-2 bg-muted/50 border border-border rounded-lg p-3">
         <div className="flex flex-col gap-2">
           <div className="flex flex-col gap-1">

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Search } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useTabs } from '../context/TabsContext'
+import { useConfirmation } from '../context/ConfirmationContext'
 import { messageErreur } from '../lib/erreurs'
 import { peutReintegrer } from '../lib/permissions'
 import { texteFiltre } from '../lib/filtreTexte'
@@ -34,6 +35,7 @@ interface LignePanierReintegration {
 }
 
 export function Reintegration() {
+  const { confirmer } = useConfirmation()
   const { profil, entrepotsAssignes } = useAuth()
   const { ongletActifId } = useTabs()
 
@@ -174,6 +176,13 @@ export function Reintegration() {
       setErreur('Ajoute au moins une ligne au panier.')
       return
     }
+    const unites = panier.reduce((t, l) => t + l.quantite, 0)
+    const ok = await confirmer({
+      titre: 'Valider la réintégration ?',
+      message: `${panier.length} ligne(s), ${unites.toLocaleString('fr-FR')} unité(s) vont revenir en stock. Une réintégration validée ne peut plus être modifiée.`,
+      libelleConfirmer: 'Valider la réintégration',
+    })
+    if (!ok) return
     setErreur(null)
     setEnvoi(true)
     try {
@@ -204,7 +213,7 @@ export function Reintegration() {
     : produitsReintegrables.find((p) => p.produitId === produitSelectionneId)
 
   return (
-    <div className="h-full flex flex-col gap-1.5 p-3 overflow-y-auto">
+    <div className="h-full flex flex-col gap-1.5 p-[var(--content-padding)] pt-2 overflow-y-auto">
       <div className="shrink-0 flex items-baseline justify-between gap-3">
         <h1 className="text-base font-bold text-text">Réintégration</h1>
         <p className="text-[11px] text-text-muted">Annule tout ou partie d'une sortie déjà confirmée, sans supprimer l'historique</p>

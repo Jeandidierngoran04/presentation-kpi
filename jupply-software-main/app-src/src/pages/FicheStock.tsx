@@ -340,7 +340,7 @@ export function FicheStock() {
   const resumeFiltres = partiesFiltre.join(' · ')
 
   return (
-    <div className="h-full flex flex-col gap-2 p-[var(--content-padding)] overflow-hidden">
+    <div className="h-full flex flex-col gap-2 p-[var(--content-padding)] pt-2 overflow-hidden">
       {/* Ligne 1 : bandeau produit, une seule ligne fine */}
       <div className="fiche-bandeau shrink-0 rounded-lg h-10 px-3 flex items-center gap-3">
         <Package size={16} strokeWidth={1.75} className="shrink-0 text-accent" />

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent, type MouseEvent } from 'r
 import { Plus, Search, Trash2 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useTabs } from '../context/TabsContext'
+import { useConfirmation } from '../context/ConfirmationContext'
 import {
   peutDemanderTransfert,
   peutExpedierTransfert,
@@ -53,6 +54,7 @@ const STYLES_STATUT: Record<StatutTransfert, { label: string; ton: TonBadge }> =
 
 export function Transferts() {
   const { profil, entrepotsAssignes } = useAuth()
+  const { confirmer } = useConfirmation()
   const { ongletActifId } = useTabs()
   const [transferts, setTransferts] = useState<TransfertAffiche[]>([])
   const [produits, setProduits] = useState<ProduitAvecStock[]>([])
@@ -109,6 +111,12 @@ export function Transferts() {
 
   async function onValider() {
     if (!selection) return
+    const ok = await confirmer({
+      titre: `Valider le transfert ${selection.numero_suivi} ?`,
+      message: `De ${selection.entrepot_source_nom ?? '—'} vers ${selection.entrepot_destination_nom ?? '—'}. Une fois validé, le dépôt de départ pourra l'expédier.`,
+      libelleConfirmer: 'Valider le transfert',
+    })
+    if (!ok) return
     setEnvoiValidation(true)
     try {
       await validerTransfert(selection.id)
@@ -131,7 +139,7 @@ export function Transferts() {
     selection != null && peutReceptionnerTransfert(profil?.role, selection.entrepot_destination_id, entrepotsAssignes)
 
   return (
-    <div className="h-full flex flex-col gap-2 p-4" onContextMenu={onClicDroitTableau}>
+    <div className="h-full flex flex-col gap-2 p-[var(--content-padding)] pt-2" onContextMenu={onClicDroitTableau}>
       <EnTetePage titre="Transferts entre entrepôts" compteur={transfertsFiltres.length} />
       <div className="shrink-0">
         <ChampRecherche valeur={recherche} onChange={setRecherche} aide="N° de suivi, dépôt de départ ou d'arrivée (* en tête = contient)" />
@@ -304,6 +312,7 @@ interface NouveauTransfertModalProps {
 
 function NouveauTransfertModal({ produits, onFermer, onCree }: NouveauTransfertModalProps) {
   const { profil } = useAuth()
+  const { confirmer } = useConfirmation()
   const [entrepots, setEntrepots] = useState<Entrepot[]>([])
   const [entrepotSourceId, setEntrepotSourceId] = useState('')
   const [entrepotDestinationId, setEntrepotDestinationId] = useState('')
@@ -354,6 +363,14 @@ function NouveauTransfertModal({ produits, onFermer, onCree }: NouveauTransfertM
       setErreur('Chaque ligne doit avoir un produit et une quantité.')
       return
     }
+    const nomDepot = (id: string) => entrepots.find((e) => e.id === id)?.nom ?? '—'
+    const unites = ligneFormulaires.reduce((t, l) => t + Number(l.quantite || 0), 0)
+    const ok = await confirmer({
+      titre: 'Envoyer la demande de transfert ?',
+      message: `${ligneFormulaires.length} ligne(s), ${unites.toLocaleString('fr-FR')} unité(s), de ${nomDepot(entrepotSourceId)} vers ${nomDepot(entrepotDestinationId)}. Le stock ne bouge qu'à l'expédition.`,
+      libelleConfirmer: 'Envoyer la demande',
+    })
+    if (!ok) return
 
     setEnvoi(true)
     try {
@@ -506,6 +523,7 @@ interface ExpedierTransfertModalProps {
 }
 
 function ExpedierTransfertModal({ transfert, lignes, onFermer, onExpedie }: ExpedierTransfertModalProps) {
+  const { confirmer } = useConfirmation()
   const [emplacements, setEmplacements] = useState<Emplacement[]>([])
   const [localisations, setLocalisations] = useState<Map<string, LocalisationProduit[]>>(new Map())
   const [choix, setChoix] = useState<Map<string, string>>(new Map())
@@ -541,6 +559,12 @@ function ExpedierTransfertModal({ transfert, lignes, onFermer, onExpedie }: Expe
       setErreur('Choisis un emplacement source pour chaque ligne.')
       return
     }
+    const ok = await confirmer({
+      titre: `Expédier ${transfert.numero_suivi} ?`,
+      message: `${lignes.length} ligne(s) vont quitter le stock de ${transfert.entrepot_source_nom ?? 'départ'} et passer « En transit ». L'expédition ne peut pas être annulée.`,
+      libelleConfirmer: 'Expédier',
+    })
+    if (!ok) return
     setEnvoi(true)
     try {
       await expedierTransfert(
@@ -620,6 +644,7 @@ interface ReceptionnerTransfertModalProps {
 }
 
 function ReceptionnerTransfertModal({ transfert, lignes, onFermer, onReceptionne }: ReceptionnerTransfertModalProps) {
+  const { confirmer } = useConfirmation()
   const [emplacements, setEmplacements] = useState<Emplacement[]>([])
   const [emplacementChoisi, setEmplacementChoisi] = useState<Map<string, string>>(new Map())
   const [quantiteChoisie, setQuantiteChoisie] = useState<Map<string, string>>(new Map())
@@ -655,6 +680,13 @@ function ReceptionnerTransfertModal({ transfert, lignes, onFermer, onReceptionne
       setErreur('Choisis un emplacement et une quantité reçue pour chaque ligne.')
       return
     }
+    const unites = lignes.reduce((t, l) => t + Number(quantiteChoisie.get(l.id) ?? 0), 0)
+    const ok = await confirmer({
+      titre: `Réceptionner ${transfert.numero_suivi} ?`,
+      message: `${unites.toLocaleString('fr-FR')} unité(s) vont entrer dans le stock de ${transfert.entrepot_destination_nom ?? 'destination'}. Un écart avec la quantité expédiée sera enregistré tel quel.`,
+      libelleConfirmer: 'Réceptionner',
+    })
+    if (!ok) return
     setEnvoi(true)
     try {
       await receptionnerTransfert(

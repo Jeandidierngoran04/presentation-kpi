@@ -590,7 +590,7 @@ périmètre.
 
 - [x] Décisions validées avec Jean Didier
 - [x] Règle d'alerte : `schema.sql` + fichier de migration écrits
-- [ ] **Migration à exécuter dans Supabase par Jean Didier** (pas d'accès
+- [x] **Migration à exécuter dans Supabase par Jean Didier** (pas d'accès
       direct à la base depuis ce poste : `SUPABASE_DB_URL` absent de
       `.env.local`). SQL non testé en base.
 - [x] Écran `pages/AlertesStock.tsx` + branchement `AppShell`
@@ -707,7 +707,8 @@ lignes saisies directement dans un tableau en dessous.
         l'application) à chaque nouvel objet session renvoyé par Supabase.
         Rechargement désormais limité à un vrai changement d'utilisateur.
 - [x] `tsc -b` + `vite build` OK (`oxlint` bloqué par Windows sur ce poste)
-- [ ] Migration exécutée par Jean Didier + vérification locale
+- [x] Migration exécutée par Jean Didier (vérifiée le 29/10/2026)
+- [ ] Vérification locale
 
 ---
 
@@ -889,7 +890,7 @@ système applique le FIFO (premier entré, premier sorti).
       tant que la migration n'est pas exécutée.
 - [x] Nouvelle réception : contrôle lot / date d'expiration
 - [x] `tsc -b` + `vite build` OK
-- [ ] Migration exécutée dans Supabase par Jean Didier
+- [x] Migration exécutée dans Supabase par Jean Didier
 - [ ] Vérification en local par Jean Didier
 - [ ] Plus tard : détail des lots dans Produits, lots conservés dans les
       transferts, alerte de péremption
@@ -1012,7 +1013,7 @@ Le bon de sortie PDF reprend le modèle AIRSTOCK fourni (photo du
 - [x] Exports : Excel (`write-excel-file`), CSV (séparateur `;`, UTF-8),
       PDF (`jspdf` + `jspdf-autotable`), chargés à la demande.
 - [x] `tsc -b` + `vite build` OK
-- [ ] Migration exécutée dans Supabase par Jean Didier
+- [x] Migration exécutée dans Supabase par Jean Didier
 - [ ] Vérification en local par Jean Didier (Light + Dark)
 - [ ] Plus tard : PDF des autres documents (bon de réception, bon de
       transfert) sur le même modèle
@@ -1368,7 +1369,7 @@ quantités reçues et les comparer à la commande.
       réception en deux temps (saisie puis vérification des écarts),
       confirmations avant chaque action, clôture avec motif obligatoire,
       liste Historiques > Commandes fournisseurs
-- [ ] Exécuter la migration dans Supabase (Jean Didier)
+- [x] Exécuter la migration dans Supabase (Jean Didier)
 - [ ] PDF du bon de commande (plus tard)
 - [ ] Vérification en local par Jean Didier
 
@@ -1437,7 +1438,7 @@ défilement interne) affiche toutes les informations de l'élément.
 - [x] Point 3 : migration `2026-10-27-suivi-statuts-stock.sql` (journal des statuts, reprise du passé, vue `v_journal_stock`), testée sur base de test, `schema.sql` aligné
 - [x] Point 3 : section « Suivi du statut » dans la fenêtre Info
 - [x] Point 5 : écran Fiche de stock (bouton « Avancé »)
-- [ ] Exécuter les migrations dans Supabase (commandes fournisseurs, puis suivi des statuts)
+- [x] Exécuter les migrations dans Supabase (commandes fournisseurs, puis suivi des statuts)
 - [ ] Vérification en local par Jean Didier
 
 # Remarques du 28/10 : fiche de stock, menu, alertes, onglets
@@ -1759,8 +1760,150 @@ les doublons, et ne plus perdre une saisie en fermant un onglet par erreur.
       y compris Sorties du jour et Historiques (recherche dans toutes les
       colonnes) ; police des onglets 11,5 px.
 - [x] `tsc -b` + `vite build` OK
-- [ ] **Exécuter la migration `2026-10-28-entree-multi-depots.sql` dans
+- [x] Retours de Jean Didier (29/10/2026) :
+      - quantité restée sur une ligne sans référence (référence effacée,
+        ou doublon refusé) : une ligne sans référence est désormais vidée,
+        et ses cases restent grisées tant qu'aucune référence n'est saisie ;
+      - modèle : colonne **Désignation** ajoutée (le produit est retrouvé
+        par son code ou par son nom ; nom porté par plusieurs produits ou
+        code et nom contradictoires = ligne en rouge) ; feuille « Aide » et
+        ligne d'exemple retirées (la ligne d'exemple risquait d'être
+        importée comme une vraie entrée).
+- [x] Retours de Jean Didier (29/10/2026, suite) :
+      - compteur « n ligne(s) à corriger » calculé en continu : il
+        diminue à chaque correction et disparaît à zéro (les lignes saisies
+        à la main ne passent en rouge qu'après un essai d'enregistrement) ;
+        une ligne avec des valeurs mais sans référence est signalée ;
+      - icône « Import » (flèche entrante) au lieu de la flèche vers le
+        haut ; icône tableur pour « Télécharger le modèle » ;
+      - marge du haut des écrans réduite à 8 px, et même marge partout.
+- [x] **Exécuter la migration `2026-10-28-entree-multi-depots.sql` dans
       Supabase** (après les migrations précédentes)
+- [ ] Vérification en local par Jean Didier
+
+# Page de détail d'une entrée : Annuler, Modifier, Valider
+
+**Statut :** validé, code complet, en attente migration SQL + vérif locale
+**Démarré le :** 29/10/2026
+
+## Objectif
+
+Demande de Jean Didier (29/10) : un clic sur le numéro d'une entrée ouvre une
+page qui présente bien l'entrée, avec en en-tête trois boutons **Annuler**,
+**Modifier** et **Valider**. Le stock ne bouge qu'à la validation ; une
+entrée annulée ne touche pas au stock. Une confirmation est toujours demandée
+avant de valider ou d'annuler.
+
+## Analyse de l'existant
+
+- Liste des Entrées (`pages/Receptions.tsx`) : un clic sur une ligne affiche
+  un petit panneau en bas avec les lignes et le bouton « Valider la
+  réception ». Pas de confirmation avant de valider.
+- Base : `receptions.statut` n'accepte que `en_attente`, `validee`,
+  `partielle`, `anomalie`. **Pas de statut « annulée »**, et aucune fonction
+  pour annuler ou modifier une entrée.
+- `receptions_lignes` n'a pas de règle de sécurité pour modifier ou
+  supprimer une ligne : une modification passe forcément par une nouvelle
+  fonction en base.
+- Validation : Administrateur, Superviseur, Gestionnaire du dépôt (pas le
+  Magasinier), règle déjà en place (`peutValiderReception`).
+
+## Plan détaillé
+
+### 1. Base (migration `2026-10-29-entree-annuler-modifier.sql`)
+- Statut **`annulee`** ajouté, avec `annulee_par`, `annulee_le` et
+  `motif_annulation`.
+- `annuler_reception(id, motif)` : seulement une entrée « En attente » ;
+  aucun mouvement de stock.
+- `modifier_reception(id, fournisseur, lignes, notes, date)` : seulement une
+  entrée « En attente » ; remplace ses lignes avec les mêmes contrôles qu'à
+  la création (localisation, dépôt autorisé, lot / expiration). Le numéro
+  REC est conservé.
+- `valider_reception` refuse une entrée annulée ou déjà validée (protection
+  contre un double clic).
+- Testée sur la base de test avant de te la confier.
+
+### 2. Page « Entrée REC-... » (nouvel onglet)
+- Ouverte par un clic sur le **numéro** dans la liste (ou double-clic sur
+  la ligne).
+- En-tête : numéro, statut, fournisseur, date du mouvement, enregistré par,
+  dépôts concernés, note ; à droite **Annuler**, **Modifier**, **Valider**
+  (visibles seulement pour une entrée « En attente » et pour les rôles
+  autorisés).
+- Corps : tableau des lignes (Référence, Désignation, Dépôt, Localisation,
+  Lot, N° série, Expiration, Quantité, Prix, Valeur), totaux en bas.
+- **Valider** : confirmation avec le récapitulatif (« 6 lignes, 156 unités,
+  2 dépôts : le stock sera mis à jour. ») ; ensuite la page passe en
+  « Validée » (validé par, le...).
+- **Annuler** : confirmation avec **motif obligatoire** ; la page passe en
+  « Annulée » (annulée par, le, motif). Le stock n'est pas touché.
+- **Modifier** : ouvre la feuille de saisie pré-remplie (mêmes règles :
+  dépôt par ligne, doublons, import possible), titre « Modifier
+  REC-... » ; à l'enregistrement, retour sur la page de l'entrée.
+- Une entrée validée ou annulée s'affiche en lecture seule.
+
+### 3. Liste des Entrées
+- Le numéro devient un lien ; le panneau du bas est **retiré** (la page le
+  remplace et libère de la place).
+- Statut « Annulée » en gris ; la recherche (loupe) couvre aussi le statut.
+
+## Décisions actées avec Jean Didier (29/10/2026)
+
+1. Motif d'annulation **obligatoire**.
+2. Annuler / modifier : **l'auteur de l'entrée, plus les rôles qui peuvent
+   valider**. Valider : rôles de validation seulement (pas le Magasinier).
+3. Panneau du bas de la liste **retiré**.
+
+## Avancement
+
+- [x] Plan validé par Jean Didier
+- [x] Migration `2026-10-29-entree-annuler-modifier.sql` + `schema.sql`
+      aligné : statut `annulee` (+ par / le / motif), `annuler_reception`,
+      `modifier_reception`, fonction partagée `ajouter_lignes_reception`
+      (mêmes contrôles à la création et à la modification), verrou dans
+      `valider_reception` (pas de double validation, pas de validation
+      d'une entrée annulée), règles de sécurité pour l'auteur (il ne peut
+      jamais passer lui-même une entrée en « validée »). Testée sur base de
+      test : 23 contrôles, depuis la base actuelle (migrations multi-dépôts
+      puis celle-ci exécutée deux fois) et depuis le nouveau `schema.sql` ;
+      tests multi-dépôts et commandes fournisseurs repassés sans régression.
+- [x] Page `pages/DetailEntree.tsx` (onglet « Entrée REC-... ») : en-tête
+      (statut, fournisseur, date, dépôts, auteur, validation / annulation,
+      note), boutons Annuler / Modifier / Valider selon statut et rôle,
+      lignes avec totaux ; confirmation avant de valider (récapitulatif) et
+      d'annuler (motif obligatoire) ; bulle de confirmation.
+- [x] Modifier : onglet « Modifier REC-... » = feuille de saisie pré-remplie
+      (`NouvelleReception` en mode modification) ; retour sur la page de
+      l'entrée à l'enregistrement ; confirmation si on ferme avec des
+      changements non enregistrés.
+- [x] Liste : numéro cliquable (et double-clic), panneau du bas et
+      validation retirés, statut « Annulée » en gris et numéro barré,
+      recherche sur le statut.
+- [x] `tsc -b` + `vite build` OK
+- [x] Retours de Jean Didier (29/10/2026) :
+      - **une seule modification à la fois** : « Modifier » sur une autre
+        entrée pendant qu'une modification est ouverte est refusé (« Termine
+        d'abord Modifier REC-... »), avec un bouton pour y aller ; sur la
+        même entrée, on retourne simplement à l'onglet sans recharger ;
+      - **confirmations généralisées** : nouveau service
+        `context/ConfirmationContext.tsx` (`confirmer(...)`) branché sur
+        valider une sortie, valider une réintégration, les quatre étapes
+        d'un transfert (demande, validation, expédition, réception), le
+        traitement et la déclaration de quarantaine, l'affectation et le
+        déplacement de stock (Produits), la déconnexion (qui prévient des
+        saisies non enregistrées). La fenêtre commune (`Modal`) repère
+        toute saisie : croix, clic à côté, Échap ou « Annuler » demandent
+        « Fermer sans enregistrer ? » ; seule la fenêtre du dessus réagit à
+        Échap ;
+      - **lueur reliant l'onglet actif et son entrée du menu** : liseré et
+        halo verts sur l'onglet actif (icône en vert), même halo sur
+        l'entrée du menu, brève illumination des deux au changement
+        d'écran ; les écrans ouverts depuis un autre (Nouvelle entrée, page
+        d'une entrée, Modifier, Nouvelle sortie, Nouvelle commande, Fiche
+        de stock) allument l'entrée du menu dont ils viennent.
+- [x] **Exécuter dans Supabase, dans l'ordre** : les migrations en attente,
+      puis `2026-10-28-entree-multi-depots.sql`, puis
+      `2026-10-29-entree-annuler-modifier.sql`
 - [ ] Vérification en local par Jean Didier
 
 ## Format utilisé pour chaque plan

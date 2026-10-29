@@ -7,6 +7,8 @@ export interface LigneImportee {
   /** Numéro de la ligne dans le fichier (pour les messages). */
   numeroFichier: number
   reference: string
+  /** Nom du produit : permet de le retrouver quand on n'a pas son code (et inversement). */
+  designation: string
   quantite: string
   prixUnitaire: string
   depot: string
@@ -19,16 +21,18 @@ export interface LigneImportee {
 
 type Champ = Exclude<keyof LigneImportee, 'numeroFichier'>
 
-// Titres du modèle, dans l'ordre. L'astérisque signale une colonne obligatoire.
-const COLONNES: { champ: Champ; titre: string; largeur: number; aide: string }[] = [
-  { champ: 'reference', titre: 'Référence*', largeur: 16, aide: 'Code du produit, exactement comme dans Produits.' },
-  { champ: 'quantite', titre: 'Quantité*', largeur: 11, aide: 'Quantité reçue (nombre entier).' },
-  { champ: 'prixUnitaire', titre: 'Prix unitaire', largeur: 13, aide: "Prix d'achat unitaire. Vide = prix moyen actuel du produit." },
-  { champ: 'depot', titre: 'Dépôt*', largeur: 22, aide: 'Nom du dépôt (voir la liste ci-dessous).' },
-  { champ: 'localisation', titre: 'Localisation*', largeur: 14, aide: "Code de l'emplacement dans ce dépôt (voir la liste ci-dessous)." },
-  { champ: 'lot', titre: 'Lot', largeur: 14, aide: "Numéro de lot. Obligatoire si une date d'expiration est saisie (ou le N° de série)." },
-  { champ: 'numeroSerie', titre: 'N° série', largeur: 14, aide: 'Numéro de série, si le produit en a un.' },
-  { champ: 'dateExpiration', titre: "Date d'expiration", largeur: 16, aide: 'Format JJ/MM/AAAA. Obligatoire pour les produits qui gèrent l\'expiration.' },
+// Titres du modèle, dans l'ordre. L'astérisque signale une colonne obligatoire ;
+// pour le produit, la Référence ou la Désignation suffit.
+const COLONNES: { champ: Champ; titre: string; largeur: number }[] = [
+  { champ: 'reference', titre: 'Référence', largeur: 16 },
+  { champ: 'designation', titre: 'Désignation', largeur: 32 },
+  { champ: 'quantite', titre: 'Quantité*', largeur: 11 },
+  { champ: 'prixUnitaire', titre: 'Prix unitaire', largeur: 13 },
+  { champ: 'depot', titre: 'Dépôt*', largeur: 22 },
+  { champ: 'localisation', titre: 'Localisation*', largeur: 14 },
+  { champ: 'lot', titre: 'Lot', largeur: 14 },
+  { champ: 'numeroSerie', titre: 'N° série', largeur: 14 },
+  { champ: 'dateExpiration', titre: "Date d'expiration", largeur: 16 },
 ]
 
 /** Titre sans accents, majuscules, astérisque ni ponctuation : « N° série » et « no serie » se valent. */
@@ -45,6 +49,12 @@ const SYNONYMES: Record<string, Champ> = {
   reference: 'reference',
   ref: 'reference',
   code: 'reference',
+  designation: 'designation',
+  nom: 'designation',
+  nomproduit: 'designation',
+  produit: 'designation',
+  libelle: 'designation',
+  description: 'designation',
   quantite: 'quantite',
   qte: 'quantite',
   prixunitaire: 'prixUnitaire',
@@ -66,39 +76,15 @@ const SYNONYMES: Record<string, Champ> = {
   peremption: 'dateExpiration',
 }
 
-/** Télécharge le modèle Excel : feuille « Entrées » à remplir, feuille « Aide » avec les dépôts et localisations existants. */
-export async function telechargerModeleEntrees(depots: { nom: string; localisations: string[] }[]) {
+/** Télécharge le modèle Excel : une seule feuille « Entrées », avec les titres des colonnes à remplir. */
+export async function telechargerModeleEntrees() {
   const { default: writeXlsxFile } = await import('write-excel-file/browser')
-  const premier = depots[0]
   const entete = COLONNES.map((c) => ({ value: c.titre, fontWeight: 'bold' as const, backgroundColor: '#E8F5E9' }))
-  const exemple = [
-    { value: 'ART-0001' },
-    { value: 10 },
-    { value: 1500 },
-    { value: premier?.nom ?? 'Entrepôt principal' },
-    { value: premier?.localisations[0] ?? 'A1' },
-    null,
-    null,
-    null,
-  ]
-
-  const titre = (value: string) => ({ value, fontWeight: 'bold' as const })
-  const aide = [
-    [titre('Comment remplir la feuille « Entrées »')],
-    [{ value: "Une ligne par produit reçu. Supprime la ligne d'exemple avant d'importer. Les colonnes avec * sont obligatoires." }],
-    [{ value: "Un même produit peut figurer deux fois s'il arrive en deux lots ou va à deux endroits, mais pas deux fois à l'identique." }],
-    [null],
-    [titre('Colonne'), titre('Ce qu\'il faut saisir')],
-    ...COLONNES.map((c) => [{ value: c.titre }, { value: c.aide }]),
-    [null],
-    [titre('Dépôt'), titre('Localisations disponibles')],
-    ...depots.map((d) => [{ value: d.nom }, { value: d.localisations.join(', ') }]),
-  ]
-
-  await writeXlsxFile([
-    { data: [entete, exemple], sheet: 'Entrées', columns: COLONNES.map((c) => ({ width: c.largeur })), stickyRowsCount: 1 },
-    { data: aide, sheet: 'Aide', columns: [{ width: 24 }, { width: 90 }] },
-  ]).toFile('Modele_import_entrees.xlsx')
+  await writeXlsxFile([entete], {
+    sheet: 'Entrées',
+    columns: COLONNES.map((c) => ({ width: c.largeur })),
+    stickyRowsCount: 1,
+  }).toFile('Modele_import_entrees.xlsx')
 }
 
 function texteCellule(valeur: unknown): string {
@@ -172,9 +158,12 @@ export async function lireFichierEntrees(fichier: File): Promise<LigneImportee[]
     tableau = await readSheet(fichier, 1)
   }
 
-  const indexEntete = tableau.findIndex((ligne) => ligne.some((c) => SYNONYMES[normaliser(texteCellule(c))] === 'reference'))
+  // En-tête = première ligne qui contient une colonne Référence ou Désignation.
+  const indexEntete = tableau.findIndex((ligne) =>
+    ligne.some((c) => ['reference', 'designation'].includes(SYNONYMES[normaliser(texteCellule(c))])),
+  )
   if (indexEntete < 0) {
-    throw new Error("Colonne « Référence » introuvable. Utilise le modèle (lien « Télécharger le modèle » sous le bouton Import).")
+    throw new Error("Colonne « Référence » ou « Désignation » introuvable. Utilise le modèle (lien « Télécharger le modèle » sous le bouton Import).")
   }
   const colonnes = new Map<Champ, number>()
   tableau[indexEntete].forEach((c, i) => {
@@ -196,6 +185,7 @@ export async function lireFichierEntrees(fichier: File): Promise<LigneImportee[]
   tableau.slice(indexEntete + 1).forEach((ligne, i) => {
     const valeurs = {
       reference: lire(ligne, 'reference'),
+      designation: lire(ligne, 'designation'),
       quantite: lire(ligne, 'quantite'),
       prixUnitaire: lire(ligne, 'prixUnitaire').replace(',', '.').replace(/\s/g, ''),
       depot: lire(ligne, 'depot'),

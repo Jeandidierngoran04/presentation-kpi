@@ -158,7 +158,7 @@ export function Quarantaine() {
   }
 
   return (
-    <div className="h-full flex flex-col gap-3 p-[var(--content-padding)] min-h-0 overflow-y-auto">
+    <div className="h-full flex flex-col gap-3 p-[var(--content-padding)] pt-2 min-h-0 overflow-y-auto">
       <EnTetePage titre="Quarantaine" compteur={lignes.length} />
 
       {/* Indicateurs */}

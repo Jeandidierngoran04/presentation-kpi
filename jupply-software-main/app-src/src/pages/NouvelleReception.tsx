@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react'
-import { AlertTriangle, Download, Plus, Trash2, Upload } from 'lucide-react'
+import { AlertTriangle, FileSpreadsheet, Import, Plus, Trash2 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useSaisieEnCours, useTabs } from '../context/TabsContext'
+import { useSelection } from '../context/SelectionContext'
 import { messageErreur } from '../lib/erreurs'
 import { peutGererCatalogue, peutSaisirReception } from '../lib/permissions'
 import { dateSaisieVersISO, dateVersInput } from '../lib/dates'
 import { getEmplacements, getEntrepots } from '../lib/api/entrepots'
 import { getProduitsAvecStock } from '../lib/api/stock'
 import { getFournisseurs, getLocalisationsProduits } from '../lib/api/produits'
-import { creerReception, type NouvelleLigneReception } from '../lib/api/receptions'
+import { creerReception, getLignesReception, getReception, modifierReception, type NouvelleLigneReception } from '../lib/api/receptions'
 import { lireFichierEntrees, telechargerModeleEntrees, type LigneImportee } from '../lib/import/entrees'
 import type { Emplacement, Entrepot, Fournisseur, LocalisationProduit, ProduitAvecStock } from '../types/stock'
 import { NouveauFournisseurModal } from '../components/fournisseurs/NouveauFournisseurModal'
@@ -30,6 +31,7 @@ interface LigneSaisie {
   dateExpiration: string
   /** Problème relevé à l'import (dépôt ou localisation inconnus...), effacé dès que la ligne est corrigée. */
   noteImport: string
+  importee: boolean
 }
 
 type ColonneSaisie = 'reference' | 'quantite' | 'prixUnitaire' | 'entrepotId' | 'emplacementId' | 'lot' | 'numeroSerie' | 'dateExpiration'
@@ -54,6 +56,7 @@ function ligneVide(entrepotId = ''): LigneSaisie {
     numeroSerie: '',
     dateExpiration: '',
     noteImport: '',
+    importee: false,
   }
 }
 
@@ -80,10 +83,18 @@ function normaliser(texte: string): string {
  * Feuille de saisie d'une entrée, ouverte dans son propre onglet : la saisie
  * en cours est conservée quand on passe sur un autre onglet. Chaque ligne a
  * son dépôt : une même entrée (un seul numéro) peut alimenter plusieurs dépôts.
+ * En mode « modification », la feuille est pré-remplie avec une entrée en
+ * attente et l'enregistrement remplace son contenu (même numéro).
  */
-export function NouvelleReception() {
+export function NouvelleReception({ modification = false }: { modification?: boolean } = {}) {
   const { profil, entrepotsAssignes } = useAuth()
   const { ouvrirOnglet, fermerOnglet } = useTabs()
+  const { demandeModificationEntree, afficherEntree } = useSelection()
+  const ecran = modification ? 'modifier-entree' : 'nouvelle-reception'
+  const [entreeModifiee, setEntreeModifiee] = useState<{ id: string; numero: string } | null>(null)
+  // État de la feuille juste après le pré-remplissage : sert à savoir si l'on a modifié quelque chose.
+  const [etatInitial, setEtatInitial] = useState<string | null>(null)
+  const [capturerEtat, setCapturerEtat] = useState(false)
   const [produits, setProduits] = useState<ProduitAvecStock[]>([])
   const [entrepots, setEntrepots] = useState<Entrepot[]>([])
   const [emplacements, setEmplacements] = useState<Emplacement[]>([])
@@ -97,7 +108,8 @@ export function NouvelleReception() {
   const [lignes, setLignes] = useState<LigneSaisie[]>([ligneVide()])
   const [envoi, setEnvoi] = useState(false)
   const [erreur, setErreur] = useState<string | null>(null)
-  const [resumeImport, setResumeImport] = useState<string | null>(null)
+  // Après un essai d'enregistrement, toutes les lignes à corriger passent en rouge (pas seulement les importées).
+  const [tentative, setTentative] = useState(false)
   const [abandonAConfirmer, setAbandonAConfirmer] = useState(false)
   const tableauRef = useRef<HTMLDivElement>(null)
   const fichierRef = useRef<HTMLInputElement>(null)
@@ -119,6 +131,46 @@ export function NouvelleReception() {
       .catch((e) => setErreur(messageErreur(e)))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    if (!modification || !demandeModificationEntree || produits.length === 0 || emplacements.length === 0) return
+    let actif = true
+    const id = demandeModificationEntree.receptionId
+    Promise.all([getReception(id), getLignesReception(id)])
+      .then(([reception, lignesEntree]) => {
+        if (!actif || !reception) return
+        setEntreeModifiee({ id: reception.id, numero: reception.numero })
+        setFournisseurId(reception.fournisseur_id ?? '')
+        setDateMouvement(dateVersInput(new Date(reception.cree_le)))
+        setAvecNote(Boolean(reception.notes))
+        setNotes(reception.notes ?? '')
+        const parId = new Map(produits.map((p) => [p.id, p]))
+        setLignes(
+          avecLigneVideFinale(
+            lignesEntree.map((l) => ({
+              ...ligneVide(),
+              reference: parId.get(l.produit_id)?.reference ?? '',
+              produitId: l.produit_id,
+              entrepotId: emplacements.find((e) => e.id === l.emplacement_id)?.entrepot_id ?? '',
+              emplacementId: l.emplacement_id ?? '',
+              quantite: String(l.quantite_recue),
+              prixUnitaire: l.prix_unitaire ? String(l.prix_unitaire) : '',
+              lot: l.lot ?? '',
+              numeroSerie: l.numero_serie ?? '',
+              dateExpiration: l.date_expiration ?? '',
+            })),
+          ),
+        )
+        setTentative(false)
+        setErreur(null)
+        setCapturerEtat(true)
+      })
+      .catch((e) => actif && setErreur(messageErreur(e)))
+    return () => {
+      actif = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modification, demandeModificationEntree, produits.length, emplacements.length])
 
   const produitParReference = useMemo(() => new Map(produits.map((p) => [p.reference.trim().toLowerCase(), p])), [produits])
   const produitParId = useMemo(() => new Map(produits.map((p) => [p.id, p])), [produits])
@@ -150,7 +202,18 @@ export function NouvelleReception() {
     )
   }
 
+  /** Ligne remise à blanc (le dépôt est gardé) : une ligne sans référence ne garde ni quantité ni prix. */
+  function viderLigne(ligne: LigneSaisie) {
+    setLignes((prev) =>
+      avecLigneVideFinale(prev.map((l) => (l.cle === ligne.cle ? { ...ligneVide(ligne.entrepotId), cle: ligne.cle } : l))),
+    )
+  }
+
   function onChangerReference(ligne: LigneSaisie, texte: string) {
+    if (!texte.trim()) {
+      viderLigne(ligne)
+      return
+    }
     const produit = produitParReference.get(texte.trim().toLowerCase())
     if (!produit || produit.id === ligne.produitId) {
       majLigne(ligne.cle, { reference: texte, produitId: produit?.id ?? '' })
@@ -170,7 +233,7 @@ export function NouvelleReception() {
       setErreur(
         `${produit.reference} est déjà saisi ligne ${index + 1} (même dépôt, localisation et lot). Modifie la quantité de cette ligne, ou change le lot ou la localisation.`,
       )
-      majLigne(ligne.cle, { reference: '', produitId: '' })
+      viderLigne(ligne)
       focusCellule(index, 'quantite')
       return
     }
@@ -220,8 +283,22 @@ export function NouvelleReception() {
   }
 
   const lignesRemplies = lignes.filter((l) => !estVide(l))
-  const saisieEnCours = lignesRemplies.length > 0 || notes.trim() !== ''
-  useSaisieEnCours('nouvelle-reception', saisieEnCours)
+  const etatSaisie = JSON.stringify([
+    fournisseurId,
+    dateMouvement,
+    avecNote ? notes.trim() : '',
+    lignesRemplies.map((l) => [l.produitId, l.reference, l.entrepotId, l.emplacementId, l.quantite, l.prixUnitaire, l.lot, l.numeroSerie, l.dateExpiration]),
+  ])
+  useEffect(() => {
+    if (!capturerEtat) return
+    setEtatInitial(etatSaisie)
+    setCapturerEtat(false)
+  }, [capturerEtat, etatSaisie])
+  // Nouvelle entrée : dès qu'une ligne ou une note est saisie. Modification : dès qu'on change quelque chose.
+  const saisieEnCours = modification
+    ? etatInitial != null && etatSaisie !== etatInitial
+    : lignesRemplies.length > 0 || notes.trim() !== ''
+  useSaisieEnCours(ecran, saisieEnCours)
 
   const quantiteTotale = lignesRemplies.reduce((total, l) => total + Number(l.quantite || 0), 0)
   const valeurTotale = lignesRemplies.reduce((total, l) => total + Number(l.quantite || 0) * Number(l.prixUnitaire || 0), 0)
@@ -240,10 +317,13 @@ export function NouvelleReception() {
     return resultat
   }, [lignes])
 
-  /** Retour à la liste des entrées, en fermant cet onglet. */
+  /** Retour à la liste des entrées (ou à la page de l'entrée modifiée), en fermant cet onglet. */
   function revenirALaListe() {
-    ouvrirOnglet('entrees', 'Entrées')
-    fermerOnglet('nouvelle-reception')
+    if (modification && entreeModifiee) {
+      afficherEntree(entreeModifiee.id)
+      ouvrirOnglet('entree', `Entrée ${entreeModifiee.numero}`)
+    } else ouvrirOnglet('entrees', 'Entrées')
+    fermerOnglet(ecran)
   }
 
   function annuler() {
@@ -251,25 +331,40 @@ export function NouvelleReception() {
     else revenirALaListe()
   }
 
+  /** Ce qui empêche d'enregistrer une ligne remplie (vide = ligne correcte). */
+  function problemesLigne(l: LigneSaisie): string[] {
+    if (estVide(l)) return []
+    if (l.noteImport) return [l.noteImport]
+    const problemes: string[] = []
+    if (!l.reference.trim()) problemes.push('référence manquante')
+    else if (!l.produitId) problemes.push('référence inconnue')
+    const quantite = Number(l.quantite)
+    if (!Number.isInteger(quantite) || quantite <= 0) problemes.push('quantité reçue manquante (nombre entier)')
+    if (!l.entrepotId) problemes.push('dépôt manquant')
+    else if (l.produitId && !l.emplacementId) problemes.push('localisation manquante')
+    const premiere = doublonDe.get(l.cle)
+    if (premiere != null) problemes.push(`déjà saisi ligne ${premiere + 1} (même dépôt, localisation et lot)`)
+    if (l.dateExpiration && !/^\d{4}-\d{2}-\d{2}$/.test(l.dateExpiration)) problemes.push("date d'expiration illisible")
+    // Sans lot ni date, la sortie "premier périmé, premier sorti" est impossible (même contrôle côté base).
+    else if (l.produitId && produitParId.get(l.produitId)?.gere_expiration && !l.dateExpiration) {
+      problemes.push("date d'expiration obligatoire pour ce produit")
+    }
+    if (l.dateExpiration && !l.lot.trim() && !l.numeroSerie.trim()) {
+      problemes.push("lot (ou N° de série) obligatoire avec une date d'expiration")
+    }
+    return problemes
+  }
+
+  const problemesParLigne = new Map(lignes.map((l) => [l.cle, problemesLigne(l)]))
+  const aSignaler = (l: LigneSaisie) => (l.importee || tentative) && (problemesParLigne.get(l.cle)?.length ?? 0) > 0
+  const nbACorriger = lignes.filter(aSignaler).length
+
   function erreurDeSaisie(): string | null {
     if (lignesRemplies.length === 0) return 'Saisis au moins une ligne.'
-    for (const l of lignesRemplies) {
-      const numero = lignes.indexOf(l) + 1
-      if (!l.produitId) return `Ligne ${numero} : référence inconnue.`
-      const quantite = Number(l.quantite)
-      if (!Number.isInteger(quantite) || quantite <= 0) return `Ligne ${numero} : saisis la quantité reçue (nombre entier).`
-      if (!l.entrepotId) return `Ligne ${numero} : choisis le dépôt.`
-      if (!l.emplacementId) return `Ligne ${numero} : choisis la localisation.`
-      const premiere = doublonDe.get(l.cle)
-      if (premiere != null) return `Ligne ${numero} : déjà saisi ligne ${premiere + 1} (même dépôt, localisation et lot).`
-      if (l.dateExpiration && !/^\d{4}-\d{2}-\d{2}$/.test(l.dateExpiration)) return `Ligne ${numero} : date d'expiration illisible.`
-      // Sans lot ni date, la sortie "premier périmé, premier sorti" est impossible (même contrôle côté base).
-      if (produitParId.get(l.produitId)?.gere_expiration && !l.dateExpiration) {
-        return `Ligne ${numero} : la date d'expiration est obligatoire pour ce produit.`
-      }
-      if (l.dateExpiration && !l.lot.trim() && !l.numeroSerie.trim()) {
-        return `Ligne ${numero} : le numéro de lot (ou de série) est obligatoire avec une date d'expiration.`
-      }
+    const index = lignes.findIndex((l) => (problemesParLigne.get(l.cle)?.length ?? 0) > 0)
+    if (index >= 0) {
+      setTentative(true)
+      return `Ligne ${index + 1} : ${problemesParLigne.get(lignes[index].cle)![0]}.`
     }
     if (avecNote && !notes.trim()) return 'Écris la note, ou décoche « Ajouter une note ».'
     return null
@@ -299,15 +394,19 @@ export function NouvelleReception() {
         motifNonConformite: null,
         constatNonConformite: null,
       }))
-      await creerReception({
-        // Dépôt principal = celui de la première ligne ; chaque ligne entre dans son propre dépôt.
-        entrepotId: lignesRemplies[0].entrepotId,
+      const contenu = {
         fournisseurId: fournisseurId || null,
-        numeroPo: null,
         notes: avecNote ? notes.trim() || null : null,
         dateMouvement: dateMouvement ? dateSaisieVersISO(dateMouvement) : null,
         lignes: lignesReception,
-      })
+      }
+      if (modification) {
+        if (!entreeModifiee) throw new Error("L'entrée à modifier n'est pas encore chargée.")
+        await modifierReception(entreeModifiee.id, contenu)
+      } else {
+        // Dépôt principal = celui de la première ligne ; chaque ligne entre dans son propre dépôt.
+        await creerReception({ ...contenu, entrepotId: lignesRemplies[0].entrepotId, numeroPo: null })
+      }
       revenirALaListe()
     } catch (err) {
       setErreur(messageErreur(err))
@@ -317,10 +416,27 @@ export function NouvelleReception() {
 
   // --- Import d'une liste ---------------------------------------------------
 
+  /** Produit d'une ligne importée : par son code, sinon par son nom (s'il n'est porté que par un seul produit). */
+  function produitImporte(li: LigneImportee, problemes: string[]): ProduitAvecStock | undefined {
+    const parCode = li.reference ? produitParReference.get(li.reference.trim().toLowerCase()) : undefined
+    const homonymes = li.designation ? produits.filter((p) => normaliser(p.designation) === normaliser(li.designation)) : []
+    if (parCode) {
+      if (li.designation && homonymes.length > 0 && !homonymes.includes(parCode)) {
+        problemes.push(`la référence ${parCode.reference} ne correspond pas à « ${li.designation} »`)
+      }
+      return parCode
+    }
+    if (homonymes.length === 1) return homonymes[0]
+    if (homonymes.length > 1) problemes.push(`plusieurs produits s'appellent « ${li.designation} », indique la référence`)
+    else if (!li.reference && !li.designation) problemes.push('référence ou désignation manquante')
+    else if (!li.reference) problemes.push(`aucun produit ne s'appelle « ${li.designation} »`)
+    return undefined
+  }
+
   function depuisImport(li: LigneImportee): LigneSaisie {
     const ligne = ligneVide()
     const problemes: string[] = []
-    const produit = produitParReference.get(li.reference.trim().toLowerCase())
+    const produit = produitImporte(li, problemes)
     const depot = entrepots.find((e) => normaliser(e.nom) === normaliser(li.depot))
     if (!li.depot) problemes.push('dépôt manquant')
     else if (!depot) problemes.push(`dépôt « ${li.depot} » introuvable ou non autorisé`)
@@ -331,7 +447,8 @@ export function NouvelleReception() {
     else if (depot && !emplacement) problemes.push(`localisation « ${li.localisation} » introuvable dans ${depot.nom}`)
     return {
       ...ligne,
-      reference: li.reference,
+      // Produit trouvé par son nom : on affiche son code. Sinon, ce que contenait le fichier (en rouge).
+      reference: produit?.reference ?? (li.reference || li.designation),
       produitId: produit?.id ?? '',
       entrepotId: depot?.id ?? '',
       emplacementId: emplacement?.id ?? (produit && depot ? emplacementParDefaut(produit.id, depot.id) : ''),
@@ -341,6 +458,7 @@ export function NouvelleReception() {
       numeroSerie: li.numeroSerie,
       dateExpiration: li.dateExpiration,
       noteImport: problemes.length > 0 ? `Ligne ${li.numeroFichier} du fichier : ${problemes.join(', ')}.` : '',
+      importee: true,
     }
   }
 
@@ -349,31 +467,29 @@ export function NouvelleReception() {
     e.target.value = ''
     if (!fichier) return
     setErreur(null)
-    setResumeImport(null)
     try {
       const importees = (await lireFichierEntrees(fichier)).map(depuisImport)
       // Les lignes importées s'ajoutent à celles déjà saisies.
-      const nouvelles = avecLigneVideFinale([...lignesRemplies, ...importees])
-      setLignes(nouvelles)
-      const aCorriger = importees.filter((l) => l.noteImport || !l.produitId || !l.quantite || Number(l.quantite) <= 0).length
-      setResumeImport(
-        `${importees.length} ligne(s) importée(s)` +
-          (aCorriger > 0 ? `, ${aCorriger} à corriger (en rouge).` : '. Vérifie puis clique sur « Enregistrer ».'),
-      )
+      setLignes(avecLigneVideFinale([...lignesRemplies, ...importees]))
     } catch (err) {
       setErreur(messageErreur(err))
     }
   }
 
   function telechargerModele() {
-    const depots = entrepots.map((ent) => ({ nom: ent.nom, localisations: emplacementsDe(ent.id).map((em) => em.code) }))
-    telechargerModeleEntrees(depots).catch((err) => setErreur(messageErreur(err)))
+    telechargerModeleEntrees().catch((err) => setErreur(messageErreur(err)))
   }
 
   return (
-    <div className="h-full flex flex-col gap-2 p-[var(--content-padding)] min-h-0">
+    <div className="h-full flex flex-col gap-2 p-[var(--content-padding)] pt-2 min-h-0">
       {/* En-tête sur une ligne : fournisseur, date, note ; actions et import à droite */}
       <div className="shrink-0 flex items-start gap-4 flex-wrap">
+        {modification && (
+          <div className="flex flex-col gap-1">
+            <span className={CLASSE_LABEL}>Modification</span>
+            <span className="h-[30px] flex items-center font-mono text-[13px] font-semibold text-info-deep">{entreeModifiee?.numero ?? '...'}</span>
+          </div>
+        )}
         <div className="flex flex-col gap-1">
           <span className={CLASSE_LABEL}>Fournisseur</span>
           <div className="flex gap-1">
@@ -426,15 +542,15 @@ export function NouvelleReception() {
               className={`${CLASSE_BOUTON_SECONDAIRE} inline-flex items-center gap-1.5`}
               title="Remplir le tableau à partir d'un fichier Excel ou CSV (modèle ci-dessous)"
             >
-              <Upload size={14} strokeWidth={1.75} /> Import
+              <Import size={14} strokeWidth={1.75} /> Import
             </button>
             <button
               type="button"
               onClick={telechargerModele}
               className="inline-flex items-center gap-1 text-[11px] text-info-deep hover:underline"
-              title="Fichier Excel à remplir, avec la liste de tes dépôts et localisations"
+              title="Fichier Excel à remplir : une ligne par produit (référence ou désignation)"
             >
-              <Download size={11} strokeWidth={1.75} /> Télécharger le modèle
+              <FileSpreadsheet size={11} strokeWidth={1.75} /> Télécharger le modèle
             </button>
           </div>
           <input ref={fichierRef} type="file" accept=".xlsx,.csv" onChange={onFichierChoisi} className="hidden" />
@@ -458,9 +574,15 @@ export function NouvelleReception() {
           <span className="font-semibold text-text">{quantiteTotale.toLocaleString('fr-FR')}</span> · Valeur{' '}
           <span className="font-semibold text-text">{valeurTotale.toLocaleString('fr-FR')} XOF</span>
         </span>
-        {resumeImport && <span className="text-info-deep font-medium">{resumeImport}</span>}
+        {nbACorriger > 0 && (
+          <span className="text-danger-deep font-medium">
+            {nbACorriger} ligne(s) à corriger (en rouge, détail au survol)
+          </span>
+        )}
       </div>
-      {erreur && <div className="shrink-0 text-xs bg-danger-soft text-danger-deep rounded-lg px-3 py-2">{erreur}</div>}
+      {erreur && !(tentative && nbACorriger === 0 && erreur.startsWith('Ligne ')) && (
+        <div className="shrink-0 text-xs bg-danger-soft text-danger-deep rounded-lg px-3 py-2">{erreur}</div>
+      )}
 
       <datalist id="references-reception">
         {produits.map((p) => (
@@ -501,6 +623,8 @@ export function NouvelleReception() {
             {lignes.map((ligne, index) => {
               const produit = ligne.produitId ? produitParId.get(ligne.produitId) : undefined
               const vide = estVide(ligne)
+              // Pas de quantité ni de prix sans référence : les cases restent grisées.
+              const sansReference = !ligne.reference.trim()
               const referenceInconnue = ligne.reference.trim() !== '' && !produit
               const avertissement = avertissementEmplacement(ligne)
               const premiereIdentique = doublonDe.get(ligne.cle)
@@ -509,9 +633,9 @@ export function NouvelleReception() {
               const depotManquant = !vide && !ligne.entrepotId
               const localisationManquante = !vide && produit != null && !ligne.emplacementId
               const dateIllisible = ligne.dateExpiration !== '' && !/^\d{4}-\d{2}-\d{2}$/.test(ligne.dateExpiration)
-              const enErreur = Boolean(ligne.noteImport) || premiereIdentique != null
-              const messageLigne =
-                premiereIdentique != null ? `Déjà saisi ligne ${premiereIdentique + 1} (même dépôt, localisation et lot).` : ligne.noteImport
+              // Doublon : toujours signalé. Autres problèmes : ligne importée ou après un essai d'enregistrement.
+              const enErreur = aSignaler(ligne) || premiereIdentique != null
+              const messageLigne = enErreur ? (problemesParLigne.get(ligne.cle) ?? []).join(' · ') : ''
               return (
                 <tr key={ligne.cle} className={enErreur ? 'bg-danger-soft/40' : ''} title={messageLigne || undefined}>
                   <td className={`${CLASSE_TD} text-center bg-muted ${enErreur ? 'text-danger-deep font-bold' : 'text-text-muted'}`}>
@@ -537,6 +661,7 @@ export function NouvelleReception() {
                   <td className={quantiteInvalide || quantiteManquante ? CLASSE_TD_ERREUR : CLASSE_TD}>
                     <input
                       {...attributsCellule(index, 'quantite')}
+                      disabled={sansReference}
                       type="number"
                       min="1"
                       step="1"
@@ -548,6 +673,7 @@ export function NouvelleReception() {
                   <td className={CLASSE_TD}>
                     <input
                       {...attributsCellule(index, 'prixUnitaire')}
+                      disabled={sansReference}
                       type="number"
                       min="0"
                       step="0.01"
@@ -577,7 +703,7 @@ export function NouvelleReception() {
                         {...attributsCellule(index, 'emplacementId')}
                         value={ligne.emplacementId}
                         onChange={(e) => majLigne(ligne.cle, { emplacementId: e.target.value })}
-                        disabled={!ligne.entrepotId}
+                        disabled={!ligne.entrepotId || sansReference}
                         className={`${CLASSE_CELLULE} ${localisationManquante || premiereIdentique != null ? 'bg-transparent' : ''}`}
                       >
                         <option value="">—</option>
@@ -597,6 +723,7 @@ export function NouvelleReception() {
                   <td className={premiereIdentique != null ? CLASSE_TD_ERREUR : CLASSE_TD}>
                     <input
                       {...attributsCellule(index, 'lot')}
+                      disabled={sansReference}
                       value={ligne.lot}
                       onChange={(e) => majLigne(ligne.cle, { lot: e.target.value })}
                       className={`${CLASSE_CELLULE} ${premiereIdentique != null ? 'bg-transparent' : ''}`}
@@ -605,6 +732,7 @@ export function NouvelleReception() {
                   <td className={CLASSE_TD}>
                     <input
                       {...attributsCellule(index, 'numeroSerie')}
+                      disabled={sansReference}
                       value={ligne.numeroSerie}
                       onChange={(e) => majLigne(ligne.cle, { numeroSerie: e.target.value })}
                       className={CLASSE_CELLULE}
@@ -625,6 +753,7 @@ export function NouvelleReception() {
                       <input
                         {...attributsCellule(index, 'dateExpiration')}
                         type="date"
+                        disabled={sansReference}
                         value={ligne.dateExpiration}
                         onChange={(e) => majLigne(ligne.cle, { dateExpiration: e.target.value })}
                         className={CLASSE_CELLULE}
@@ -650,7 +779,7 @@ export function NouvelleReception() {
       )}
       {abandonAConfirmer && (
         <ConfirmationModal
-          titre="Abandonner cette entrée ?"
+          titre={modification ? 'Abandonner les modifications ?' : 'Abandonner cette entrée ?'}
           libelleConfirmer="Abandonner"
           libelleRetour="Continuer la saisie"
           danger
@@ -658,7 +787,7 @@ export function NouvelleReception() {
           onConfirmer={revenirALaListe}
           onFermer={() => setAbandonAConfirmer(false)}
         >
-          <p>Les lignes saisies ne seront pas enregistrées.</p>
+          <p>{modification ? "L'entrée reste telle qu'elle était." : 'Les lignes saisies ne seront pas enregistrées.'}</p>
         </ConfirmationModal>
       )}
     </div>

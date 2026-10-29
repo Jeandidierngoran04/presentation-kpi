@@ -142,7 +142,7 @@ export interface ProduitEquivalent {
   designation: string
 }
 
-export type StatutReception = 'en_attente' | 'validee' | 'partielle' | 'anomalie'
+export type StatutReception = 'en_attente' | 'validee' | 'partielle' | 'anomalie' | 'annulee'
 
 export interface Reception {
   id: string
@@ -155,6 +155,10 @@ export interface Reception {
   cree_par: string
   valide_par: string | null
   valide_le: string | null
+  /** Annulation d'une entrée en attente (aucun effet sur le stock). */
+  annulee_par?: string | null
+  annulee_le?: string | null
+  motif_annulation?: string | null
   notes: string | null
   cree_le: string
 }

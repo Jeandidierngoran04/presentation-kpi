@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent, type MouseEvent } from 'react'
 import { History } from 'lucide-react'
+import { useConfirmation } from '../context/ConfirmationContext'
 import { useAuth } from '../context/AuthContext'
 import { useTabs } from '../context/TabsContext'
 import { useSelection } from '../context/SelectionContext'
@@ -335,7 +336,7 @@ export function Produits() {
   }
 
   return (
-    <div className="h-full flex flex-col gap-2 p-[var(--content-padding)]" onContextMenu={onClicDroitTableau}>
+    <div className="h-full flex flex-col gap-2 p-[var(--content-padding)] pt-2" onContextMenu={onClicDroitTableau}>
       {/* Ligne de recherche : code ou nom, * = "contient" */}
       <div className="shrink-0 flex items-center gap-2 flex-wrap">
         <ChampRecherche valeur={recherche} onChange={setRecherche} aide="Code ou nom du produit. Commence par * pour chercher un texte contenu dans le nom." className="w-[320px]" />
@@ -929,6 +930,7 @@ interface AffecterLocalisationModalProps {
 }
 
 function AffecterLocalisationModal({ produit, onFermer, onAffecte }: AffecterLocalisationModalProps) {
+  const { confirmer } = useConfirmation()
   const [entrepots, setEntrepots] = useState<Entrepot[]>([])
   const [emplacements, setEmplacements] = useState<Emplacement[]>([])
   const [entrepotId, setEntrepotId] = useState('')
@@ -955,10 +957,16 @@ function AffecterLocalisationModal({ produit, onFermer, onAffecte }: AffecterLoc
       setErreur('Choisis un emplacement.')
       return
     }
+    const donnees = new FormData(e.currentTarget)
+    const ok = await confirmer({
+      titre: 'Affecter la localisation ?',
+      message: `${Number(donnees.get('quantite')).toLocaleString('fr-FR')} unité(s) de ${produit.reference} seront rangées à l'emplacement choisi.`,
+      libelleConfirmer: 'Affecter',
+    })
+    if (!ok) return
     setErreur(null)
     setEnvoi(true)
     try {
-      const donnees = new FormData(e.currentTarget)
       await affecterLocalisation({
         produitId: produit.id,
         entrepotId,
@@ -1022,6 +1030,7 @@ interface ModifierLocalisationModalProps {
 }
 
 function ModifierLocalisationModal({ produit, localisations, onFermer, onDeplace }: ModifierLocalisationModalProps) {
+  const { confirmer } = useConfirmation()
   const entrepotsAvecStock = useMemo(
     () => [...new Map(localisations.map((l) => [l.entrepot_id, l.entrepot_nom])).entries()],
     [localisations],
@@ -1059,10 +1068,17 @@ function ModifierLocalisationModal({ produit, localisations, onFermer, onDeplace
       setErreur('Choisis un emplacement source et un emplacement destination.')
       return
     }
+    const donnees = new FormData(e.currentTarget)
+    const destination = emplacements.find((em) => em.id === emplacementDestinationId)?.code ?? '—'
+    const ok = await confirmer({
+      titre: 'Déplacer le stock ?',
+      message: `${Number(donnees.get('quantite')).toLocaleString('fr-FR')} unité(s) de ${produit.reference} passeront de ${source?.emplacement_code ?? '—'} à ${destination}.`,
+      libelleConfirmer: 'Déplacer',
+    })
+    if (!ok) return
     setErreur(null)
     setEnvoi(true)
     try {
-      const donnees = new FormData(e.currentTarget)
       await deplacerStock({
         produitId: produit.id,
         entrepotId,

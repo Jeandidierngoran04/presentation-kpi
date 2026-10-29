@@ -9,6 +9,12 @@
 
 ## En cours
 
+> **[2026-10-29] Toutes les migrations sont exécutées dans Supabase**
+> (de `2026-10-01-stock-alerte` à `2026-10-29-entree-annuler-modifier`,
+> vérifié par Jean Didier avec `app-src/supabase/verifier-migrations.sql`).
+> Les mentions « en attente de la migration » ci-dessous sont donc réglées ;
+> il ne reste, pour chaque chantier, que la vérification locale.
+
 - **[2026-08-27] Construction de l'application JUPPLY selon le cahier des
   charges.** Feuille de route : Entrepôts → Produits → Réceptions → Sorties
   → Transferts → Inventaires → Outillage → Utilisateurs (rôles/privilèges)
@@ -130,6 +136,19 @@
   enregistrée. Loupe sur toutes les listes, onglets en plus petit.
   Migration `2026-10-28-entree-multi-depots.sql` testée sur base de test,
   en attente d'exécution dans Supabase et de la vérification locale.
+
+- **[2026-10-29] Page d'une entrée : Annuler, Modifier, Valider.** Clic sur
+  le numéro d'une entrée : onglet dédié avec tout son contenu et les trois
+  actions (confirmation avant de valider, motif obligatoire pour annuler,
+  modification dans la feuille de saisie pré-remplie, même numéro). Statut
+  « Annulée » ; plus de double validation possible. Panneau du bas de la
+  liste retiré. Au passage : compteur « à corriger » qui diminue au fil des
+  corrections, icône Import, marge du haut réduite. Puis : une seule
+  modification à la fois, confirmation avant toute action qui fait bouger
+  le stock, avant la déconnexion et avant de fermer une fenêtre remplie,
+  lueur qui relie l'onglet actif à son entrée du menu. Migration
+  `2026-10-29-entree-annuler-modifier.sql` testée sur base de test, en
+  attente d'exécution dans Supabase et de la vérification locale.
 
 ## Terminé
 

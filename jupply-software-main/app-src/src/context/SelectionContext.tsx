@@ -35,6 +35,12 @@ interface SelectionState {
   /** Produit à afficher dans l'onglet « Fiche de stock » (bouton « Avancé » de la fenêtre Info). */
   demandeFicheStock: DemandeAffichageProduit | null
   demanderFicheStock: (produitId: string) => void
+  /** Entrée à afficher dans l'onglet « Entrée » (clic sur son numéro dans la liste). */
+  entreeAfficheeId: string | null
+  afficherEntree: (receptionId: string) => void
+  /** Entrée en attente à modifier dans l'onglet « Modifier » (bouton Modifier de la page de l'entrée). */
+  demandeModificationEntree: { receptionId: string; jeton: number } | null
+  demanderModificationEntree: (receptionId: string) => void
   /** Dernière sortie validée : la liste des sorties la met en avant et propose d'imprimer le bon. */
   derniereSortie: SortieValidee | null
   signalerSortie: (sortie: Omit<SortieValidee, 'jeton'>) => void
@@ -52,6 +58,12 @@ export function SelectionProvider({ children }: { children: ReactNode }) {
     setDemandeFicheStock((prev) => ({ produitId, jeton: (prev?.jeton ?? 0) + 1 }))
   }
   const [derniereSortie, setDerniereSortie] = useState<SortieValidee | null>(null)
+  const [entreeAfficheeId, afficherEntree] = useState<string | null>(null)
+  const [demandeModificationEntree, setDemandeModificationEntree] = useState<{ receptionId: string; jeton: number } | null>(null)
+
+  function demanderModificationEntree(receptionId: string) {
+    setDemandeModificationEntree((prev) => ({ receptionId, jeton: (prev?.jeton ?? 0) + 1 }))
+  }
 
   function declencherSortieManuelle(produitId: string | null) {
     setDemandeSortieManuelle((prev) => ({ produitId, jeton: (prev?.jeton ?? 0) + 1 }))
@@ -83,6 +95,10 @@ export function SelectionProvider({ children }: { children: ReactNode }) {
         demanderFicheStock,
         derniereSortie,
         signalerSortie,
+        entreeAfficheeId,
+        afficherEntree,
+        demandeModificationEntree,
+        demanderModificationEntree,
       }}
     >
       {children}

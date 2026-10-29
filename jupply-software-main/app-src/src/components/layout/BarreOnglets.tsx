@@ -45,10 +45,10 @@ export function BarreOnglets() {
               }}
               title={o.titre}
               className={`group relative flex-[0_1_auto] min-w-[72px] max-w-[160px] flex items-center gap-1 pl-2 pr-1 h-7 text-[11.5px] font-medium whitespace-nowrap cursor-pointer rounded-t-[10px] transition-colors ${
-                actif ? 'onglet-actif bg-card text-text' : 'text-text-muted hover:text-text hover:bg-card/50'
+                actif ? 'onglet-actif onglet-lueur bg-card text-text' : 'text-text-muted hover:text-text hover:bg-card/50'
               } ${glisse === o.id ? 'opacity-60' : ''}`}
             >
-              {Icone && <Icone size={11} strokeWidth={1.75} className="shrink-0 opacity-70" />}
+              {Icone && <Icone size={11} strokeWidth={1.75} className={`shrink-0 ${actif ? 'text-accent-deep' : 'opacity-70'}`} />}
               <span className="flex-1 min-w-0 truncate">{o.titre}</span>
               <button
                 onClick={(e) => {

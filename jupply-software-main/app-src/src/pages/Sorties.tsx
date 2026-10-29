@@ -76,7 +76,7 @@ export function Sorties() {
       />
 
       {confirmation && (
-        <Modal titre="Bon de sortie enregistré" onFermer={() => setConfirmation(null)}>
+        <Modal titre="Bon de sortie enregistré" onFermer={() => setConfirmation(null)} sansConfirmationFermeture>
           <div className="flex flex-col gap-4">
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 shrink-0 rounded-full bg-accent-soft text-accent-deep flex items-center justify-center">
