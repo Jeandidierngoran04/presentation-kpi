@@ -3,6 +3,7 @@ import { AlertTriangle } from 'lucide-react'
 import { messageErreur } from '../../lib/erreurs'
 import { Modal } from './Modal'
 import { Bouton } from './Bouton'
+import { BandeauErreur } from './BandeauErreur'
 
 interface ConfirmationModalProps {
   titre: string
@@ -57,7 +58,7 @@ export function ConfirmationModal({
           <AlertTriangle size={18} strokeWidth={1.75} className={`shrink-0 mt-0.5 ${danger ? 'text-danger' : 'text-warn-deep'}`} />
           <div className="flex-1 min-w-0 flex flex-col gap-2">{children}</div>
         </div>
-        {erreur && <div className="text-xs bg-danger-soft text-danger-deep rounded-lg px-3 py-2">{erreur}</div>}
+        <BandeauErreur message={erreur} className="text-xs bg-danger-soft text-danger-deep rounded-lg px-3 py-2" />
         <div className="flex justify-end gap-2 pt-1">
           <Bouton variante="secondaire" taille="sm" onClick={onFermer} disabled={envoi} autoFocus={focusSurRetour}>
             {libelleRetour}

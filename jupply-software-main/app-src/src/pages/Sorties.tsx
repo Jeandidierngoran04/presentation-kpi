@@ -63,8 +63,8 @@ export function Sorties() {
       <ListeDocuments
         config={CONFIG_SORTIES}
         estActif={ongletActifId === 'sorties'}
-        titre="Sorties du jour"
-        duJourSeulement
+        titre="Sorties"
+        derniersJours={30}
         idEnSurbrillance={derniereSortie?.id ?? null}
         jetonRechargement={derniereSortie?.jeton ?? 0}
         elementsMenuTableau={[{ label: 'Nouvelle sortie', onClick: nouvelleSortie }]}

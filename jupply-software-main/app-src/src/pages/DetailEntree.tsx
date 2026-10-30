@@ -24,6 +24,7 @@ import type { ProduitAvecStock } from '../types/stock'
 import { Badge } from '../components/ui/Badge'
 import { ConfirmationModal } from '../components/ui/ConfirmationModal'
 import { CLASSE_LABEL } from '../components/ui/styles'
+import { BandeauErreur } from '../components/ui/BandeauErreur'
 
 const nombre = (n: number) => n.toLocaleString('fr-FR')
 const dateCourte = (iso: string) => new Date(iso).toLocaleDateString('fr-FR')
@@ -181,7 +182,7 @@ export function DetailEntree() {
         )}
       </div>
 
-      {erreur && <div className="shrink-0 text-xs bg-danger-soft text-danger-deep rounded-lg px-3 py-2">{erreur}</div>}
+      <BandeauErreur message={erreur} className="shrink-0 text-xs bg-danger-soft text-danger-deep rounded-lg px-3 py-2" />
 
       {/* Lignes de l'entrée */}
       <div className="flex-1 min-h-0 bg-card rounded-lg border border-border overflow-auto defilement-fin">
@@ -212,7 +213,7 @@ export function DetailEntree() {
               <th>Expiration</th>
               <th className="text-right">Quantité</th>
               <th className="text-right">Prix unit.</th>
-              <th className="text-right">Valeur</th>
+              <th className="text-right">Montant</th>
               {avecNonConformite && <th className="text-right">Non conforme</th>}
             </tr>
           </thead>
@@ -265,7 +266,7 @@ export function DetailEntree() {
         >
           <p>
             <span className="font-semibold">{lignes.length} ligne(s)</span>, <span className="font-semibold">{nombre(quantiteTotale)}</span>{' '}
-            unité(s), valeur {nombre(valeurTotale)} XOF.
+            unité(s), montant {nombre(valeurTotale)} XOF.
           </p>
           <p>
             Le stock sera augmenté dans : <span className="font-semibold">{depots}</span>. Une entrée validée ne peut plus être

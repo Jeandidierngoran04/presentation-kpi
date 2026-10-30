@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent, type ReactNode } from 'react'
 import { AlertTriangle, FileSpreadsheet, Import, Plus, Trash2 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useSaisieEnCours, useTabs } from '../context/TabsContext'
 import { useSelection } from '../context/SelectionContext'
+import { useToast } from '../context/ToastContext'
+import { BandeauErreur } from '../components/ui/BandeauErreur'
 import { messageErreur } from '../lib/erreurs'
 import { peutGererCatalogue, peutSaisirReception } from '../lib/permissions'
 import { dateSaisieVersISO, dateVersInput } from '../lib/dates'
@@ -110,6 +112,9 @@ export function NouvelleReception({ modification = false }: { modification?: boo
   const [erreur, setErreur] = useState<string | null>(null)
   // Après un essai d'enregistrement, toutes les lignes à corriger passent en rouge (pas seulement les importées).
   const [tentative, setTentative] = useState(false)
+  // Incrémenté à chaque refus d'enregistrement : le bandeau d'erreur tressaute, même si le message est le même.
+  const [secousse, setSecousse] = useState(0)
+  const { afficherToast } = useToast()
   const [abandonAConfirmer, setAbandonAConfirmer] = useState(false)
   const tableauRef = useRef<HTMLDivElement>(null)
   const fichierRef = useRef<HTMLInputElement>(null)
@@ -336,21 +341,22 @@ export function NouvelleReception({ modification = false }: { modification?: boo
     if (estVide(l)) return []
     if (l.noteImport) return [l.noteImport]
     const problemes: string[] = []
-    if (!l.reference.trim()) problemes.push('référence manquante')
-    else if (!l.produitId) problemes.push('référence inconnue')
+    if (!l.reference.trim()) problemes.push('la référence manque')
+    else if (!l.produitId) problemes.push("cette référence n'existe pas")
     const quantite = Number(l.quantite)
-    if (!Number.isInteger(quantite) || quantite <= 0) problemes.push('quantité reçue manquante (nombre entier)')
-    if (!l.entrepotId) problemes.push('dépôt manquant')
-    else if (l.produitId && !l.emplacementId) problemes.push('localisation manquante')
+    if (l.quantite.trim() === '') problemes.push('la quantité manque')
+    else if (!Number.isInteger(quantite) || quantite <= 0) problemes.push('la quantité doit être un nombre entier plus grand que 0')
+    if (!l.entrepotId) problemes.push('le dépôt manque')
+    else if (l.produitId && !l.emplacementId) problemes.push('la localisation manque')
     const premiere = doublonDe.get(l.cle)
-    if (premiere != null) problemes.push(`déjà saisi ligne ${premiere + 1} (même dépôt, localisation et lot)`)
-    if (l.dateExpiration && !/^\d{4}-\d{2}-\d{2}$/.test(l.dateExpiration)) problemes.push("date d'expiration illisible")
+    if (premiere != null) problemes.push(`ce produit est déjà saisi ligne ${premiere + 1} (même dépôt, localisation et lot)`)
+    if (l.dateExpiration && !/^\d{4}-\d{2}-\d{2}$/.test(l.dateExpiration)) problemes.push("la date d'expiration est illisible")
     // Sans lot ni date, la sortie "premier périmé, premier sorti" est impossible (même contrôle côté base).
     else if (l.produitId && produitParId.get(l.produitId)?.gere_expiration && !l.dateExpiration) {
-      problemes.push("date d'expiration obligatoire pour ce produit")
+      problemes.push("la date d'expiration manque (obligatoire pour ce produit)")
     }
     if (l.dateExpiration && !l.lot.trim() && !l.numeroSerie.trim()) {
-      problemes.push("lot (ou N° de série) obligatoire avec une date d'expiration")
+      problemes.push("le lot manque (obligatoire avec une date d'expiration)")
     }
     return problemes
   }
@@ -364,7 +370,7 @@ export function NouvelleReception({ modification = false }: { modification?: boo
     const index = lignes.findIndex((l) => (problemesParLigne.get(l.cle)?.length ?? 0) > 0)
     if (index >= 0) {
       setTentative(true)
-      return `Ligne ${index + 1} : ${problemesParLigne.get(lignes[index].cle)![0]}.`
+      return `Ligne ${index + 1} : ${problemesParLigne.get(lignes[index].cle)![0]}. Complète les cases en rouge, puis enregistre.`
     }
     if (avecNote && !notes.trim()) return 'Écris la note, ou décoche « Ajouter une note ».'
     return null
@@ -374,6 +380,12 @@ export function NouvelleReception({ modification = false }: { modification?: boo
     const probleme = erreurDeSaisie()
     if (probleme) {
       setErreur(probleme)
+      setSecousse((n) => n + 1)
+      afficherToast(probleme, 'erreur')
+      setTimeout(() => {
+        const caseRouge = tableauRef.current?.querySelector<HTMLElement>('td[aria-invalid="true"] input, td[aria-invalid="true"] select')
+        caseRouge?.focus()
+      }, 60)
       return
     }
     setErreur(null)
@@ -571,7 +583,7 @@ export function NouvelleReception({ modification = false }: { modification?: boo
       <div className="shrink-0 flex items-baseline gap-3 flex-wrap text-xs text-text-muted">
         <span>
           <span className="font-semibold text-text">{lignesRemplies.length}</span> ligne(s) · Quantité totale{' '}
-          <span className="font-semibold text-text">{quantiteTotale.toLocaleString('fr-FR')}</span> · Valeur{' '}
+          <span className="font-semibold text-text">{quantiteTotale.toLocaleString('fr-FR')}</span> · Montant{' '}
           <span className="font-semibold text-text">{valeurTotale.toLocaleString('fr-FR')} XOF</span>
         </span>
         {nbACorriger > 0 && (
@@ -580,9 +592,12 @@ export function NouvelleReception({ modification = false }: { modification?: boo
           </span>
         )}
       </div>
-      {erreur && !(tentative && nbACorriger === 0 && erreur.startsWith('Ligne ')) && (
-        <div className="shrink-0 text-xs bg-danger-soft text-danger-deep rounded-lg px-3 py-2">{erreur}</div>
-      )}
+      {/* Le bandeau tressaute à chaque refus (clé), et disparaît dès qu'on corrige. */}
+      <BandeauErreur
+        key={secousse}
+        message={erreur && !(tentative && nbACorriger === 0 && erreur.startsWith('Ligne ')) ? erreur : null}
+        className="shrink-0 text-xs bg-danger-soft text-danger-deep rounded-lg px-3 py-2 animate-[secousse_360ms_ease-in-out]"
+      />
 
       <datalist id="references-reception">
         {produits.map((p) => (
@@ -628,29 +643,57 @@ export function NouvelleReception({ modification = false }: { modification?: boo
               const referenceInconnue = ligne.reference.trim() !== '' && !produit
               const avertissement = avertissementEmplacement(ligne)
               const premiereIdentique = doublonDe.get(ligne.cle)
-              const quantiteInvalide = !vide && ligne.quantite !== '' && !(Number.isInteger(Number(ligne.quantite)) && Number(ligne.quantite) > 0)
-              const quantiteManquante = !vide && produit != null && ligne.quantite === ''
-              const depotManquant = !vide && !ligne.entrepotId
-              const localisationManquante = !vide && produit != null && !ligne.emplacementId
               const dateIllisible = ligne.dateExpiration !== '' && !/^\d{4}-\d{2}-\d{2}$/.test(ligne.dateExpiration)
               // Doublon : toujours signalé. Autres problèmes : ligne importée ou après un essai d'enregistrement.
-              const enErreur = aSignaler(ligne) || premiereIdentique != null
-              const messageLigne = enErreur ? (problemesParLigne.get(ligne.cle) ?? []).join(' · ') : ''
+              const signaler = aSignaler(ligne) || premiereIdentique != null
+              const doublon = premiereIdentique != null ? `Déjà saisi ligne ${premiereIdentique + 1} : change la localisation ou le lot` : null
+              // Seule la case en cause passe en rouge, avec ce qu'il faut faire (bulle au survol).
+              const erreurs = {
+                reference: referenceInconnue
+                  ? 'Référence inconnue : vérifie le code ou choisis-le dans la liste'
+                  : signaler && sansReference && !vide
+                    ? 'Référence manquante : saisis le code du produit'
+                    : null,
+                quantite:
+                  signaler && !sansReference && !(Number.isInteger(Number(ligne.quantite)) && Number(ligne.quantite) > 0)
+                    ? ligne.quantite === ''
+                      ? 'Quantité manquante : saisis la quantité reçue'
+                      : 'Quantité invalide : un nombre entier plus grand que 0'
+                    : null,
+                depot: signaler && !ligne.entrepotId ? 'Dépôt manquant : choisis le dépôt' : null,
+                localisation:
+                  doublon ?? (signaler && produit && !ligne.emplacementId ? 'Localisation manquante : choisis où ranger le produit' : null),
+                lot:
+                  doublon ??
+                  (signaler && ligne.dateExpiration && !ligne.lot.trim() && !ligne.numeroSerie.trim()
+                    ? "Lot manquant : obligatoire avec une date d'expiration"
+                    : null),
+                expiration: dateIllisible
+                  ? 'Date illisible : clique pour la ressaisir'
+                  : signaler && produit?.gere_expiration && !ligne.dateExpiration
+                    ? "Date d'expiration manquante : obligatoire pour ce produit"
+                    : null,
+              }
+              const messagesLigne = [ligne.noteImport, ...Object.values(erreurs)].filter((m): m is string => Boolean(m))
+              const enErreur = signaler && messagesLigne.length > 0
               return (
-                <tr key={ligne.cle} className={enErreur ? 'bg-danger-soft/40' : ''} title={messageLigne || undefined}>
-                  <td className={`${CLASSE_TD} text-center bg-muted ${enErreur ? 'text-danger-deep font-bold' : 'text-text-muted'}`}>
+                <tr key={ligne.cle}>
+                  <td
+                    className={`${CLASSE_TD} text-center bg-muted ${enErreur ? 'text-danger-deep font-bold' : 'text-text-muted'}`}
+                    title={enErreur ? [...new Set(messagesLigne)].join('\n') : undefined}
+                  >
                     {enErreur ? <AlertTriangle size={12} strokeWidth={2} className="inline" /> : index + 1}
                   </td>
-                  <td className={referenceInconnue ? CLASSE_TD_ERREUR : CLASSE_TD}>
+                  <CelluleSaisie erreur={erreurs.reference}>
                     <input
                       {...attributsCellule(index, 'reference')}
                       list="references-reception"
                       value={ligne.reference}
                       onChange={(e) => onChangerReference(ligne, e.target.value)}
                       placeholder={vide ? 'Référence...' : ''}
-                      className={`${CLASSE_CELLULE} font-mono ${referenceInconnue ? 'text-danger bg-transparent' : ''}`}
+                      className={`${CLASSE_CELLULE} font-mono ${erreurs.reference ? 'text-danger bg-transparent placeholder:text-danger' : ''}`}
                     />
-                  </td>
+                  </CelluleSaisie>
                   <td className={`${CLASSE_TD} px-2 truncate`} title={produit?.designation}>
                     {produit ? (
                       <span className="text-text">{produit.designation}</span>
@@ -658,7 +701,7 @@ export function NouvelleReception({ modification = false }: { modification?: boo
                       <span className="text-danger">Référence inconnue</span>
                     ) : null}
                   </td>
-                  <td className={quantiteInvalide || quantiteManquante ? CLASSE_TD_ERREUR : CLASSE_TD}>
+                  <CelluleSaisie erreur={erreurs.quantite}>
                     <input
                       {...attributsCellule(index, 'quantite')}
                       disabled={sansReference}
@@ -667,9 +710,9 @@ export function NouvelleReception({ modification = false }: { modification?: boo
                       step="1"
                       value={ligne.quantite}
                       onChange={(e) => majLigne(ligne.cle, { quantite: e.target.value })}
-                      className={`${CLASSE_CELLULE} text-right ${quantiteInvalide || quantiteManquante ? 'bg-transparent' : ''}`}
+                      className={`${CLASSE_CELLULE} text-right ${erreurs.quantite ? 'bg-transparent placeholder:text-danger' : ''}`}
                     />
-                  </td>
+                  </CelluleSaisie>
                   <td className={CLASSE_TD}>
                     <input
                       {...attributsCellule(index, 'prixUnitaire')}
@@ -682,12 +725,12 @@ export function NouvelleReception({ modification = false }: { modification?: boo
                       className={`${CLASSE_CELLULE} text-right`}
                     />
                   </td>
-                  <td className={depotManquant ? CLASSE_TD_ERREUR : CLASSE_TD}>
+                  <CelluleSaisie erreur={erreurs.depot}>
                     <select
                       {...attributsCellule(index, 'entrepotId')}
                       value={ligne.entrepotId}
                       onChange={(e) => onChangerDepot(ligne, e.target.value)}
-                      className={`${CLASSE_CELLULE} ${depotManquant ? 'bg-transparent' : ''}`}
+                      className={`${CLASSE_CELLULE} ${erreurs.depot ? 'bg-transparent text-danger' : ''}`}
                     >
                       <option value="">—</option>
                       {entrepots.map((ent) => (
@@ -696,15 +739,15 @@ export function NouvelleReception({ modification = false }: { modification?: boo
                         </option>
                       ))}
                     </select>
-                  </td>
-                  <td className={localisationManquante || premiereIdentique != null ? CLASSE_TD_ERREUR : CLASSE_TD}>
+                  </CelluleSaisie>
+                  <CelluleSaisie erreur={erreurs.localisation}>
                     <div className="flex items-center">
                       <select
                         {...attributsCellule(index, 'emplacementId')}
                         value={ligne.emplacementId}
                         onChange={(e) => majLigne(ligne.cle, { emplacementId: e.target.value })}
                         disabled={!ligne.entrepotId || sansReference}
-                        className={`${CLASSE_CELLULE} ${localisationManquante || premiereIdentique != null ? 'bg-transparent' : ''}`}
+                        className={`${CLASSE_CELLULE} ${erreurs.localisation ? 'bg-transparent' : ''} ${erreurs.localisation && !ligne.emplacementId ? 'text-danger' : ''}`}
                       >
                         <option value="">—</option>
                         {emplacementsDe(ligne.entrepotId).map((em) => (
@@ -719,16 +762,16 @@ export function NouvelleReception({ modification = false }: { modification?: boo
                         </span>
                       )}
                     </div>
-                  </td>
-                  <td className={premiereIdentique != null ? CLASSE_TD_ERREUR : CLASSE_TD}>
+                  </CelluleSaisie>
+                  <CelluleSaisie erreur={erreurs.lot}>
                     <input
                       {...attributsCellule(index, 'lot')}
                       disabled={sansReference}
                       value={ligne.lot}
                       onChange={(e) => majLigne(ligne.cle, { lot: e.target.value })}
-                      className={`${CLASSE_CELLULE} ${premiereIdentique != null ? 'bg-transparent' : ''}`}
+                      className={`${CLASSE_CELLULE} ${erreurs.lot ? 'bg-transparent placeholder:text-danger' : ''}`}
                     />
-                  </td>
+                  </CelluleSaisie>
                   <td className={CLASSE_TD}>
                     <input
                       {...attributsCellule(index, 'numeroSerie')}
@@ -738,7 +781,7 @@ export function NouvelleReception({ modification = false }: { modification?: boo
                       className={CLASSE_CELLULE}
                     />
                   </td>
-                  <td className={dateIllisible ? CLASSE_TD_ERREUR : CLASSE_TD}>
+                  <CelluleSaisie erreur={erreurs.expiration}>
                     {dateIllisible ? (
                       // Date importée illisible : on la montre telle quelle pour qu'elle soit corrigée.
                       <input
@@ -746,7 +789,6 @@ export function NouvelleReception({ modification = false }: { modification?: boo
                         value={ligne.dateExpiration}
                         onChange={(e) => majLigne(ligne.cle, { dateExpiration: e.target.value })}
                         onFocus={() => majLigne(ligne.cle, { dateExpiration: '' })}
-                        title="Date illisible : clique pour la ressaisir"
                         className={`${CLASSE_CELLULE} text-danger bg-transparent`}
                       />
                     ) : (
@@ -756,10 +798,10 @@ export function NouvelleReception({ modification = false }: { modification?: boo
                         disabled={sansReference}
                         value={ligne.dateExpiration}
                         onChange={(e) => majLigne(ligne.cle, { dateExpiration: e.target.value })}
-                        className={CLASSE_CELLULE}
+                        className={`${CLASSE_CELLULE} ${erreurs.expiration ? 'bg-transparent text-danger' : ''}`}
                       />
                     )}
-                  </td>
+                  </CelluleSaisie>
                   <td className={`${CLASSE_TD} text-center`}>
                     {!vide && (
                       <button type="button" onClick={() => retirerLigne(ligne.cle)} className="text-text-muted hover:text-danger" title="Retirer cette ligne">
@@ -791,5 +833,24 @@ export function NouvelleReception({ modification = false }: { modification?: boo
         </ConfirmationModal>
       )}
     </div>
+  )
+}
+
+/**
+ * Case du tableau de saisie. En erreur : fond rouge, et une bulle dit ce qu'il
+ * faut faire, au survol ou quand le curseur est dans la case.
+ */
+function CelluleSaisie({ erreur, children }: { erreur: string | null; children: ReactNode }) {
+  if (!erreur) return <td className={CLASSE_TD}>{children}</td>
+  return (
+    <td className={`${CLASSE_TD_ERREUR} relative group/case`} aria-invalid="true">
+      {children}
+      <span
+        role="tooltip"
+        className="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden whitespace-nowrap rounded-md bg-danger px-2 py-1 text-[11px] font-medium text-white shadow-lg group-hover/case:block group-focus-within/case:block"
+      >
+        {erreur}
+      </span>
+    </td>
   )
 }

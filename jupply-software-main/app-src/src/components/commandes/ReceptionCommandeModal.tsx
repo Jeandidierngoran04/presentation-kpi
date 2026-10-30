@@ -13,6 +13,7 @@ import { messageErreur } from '../../lib/erreurs'
 import type { Emplacement } from '../../types/stock'
 import { Modal } from '../ui/Modal'
 import { Bouton } from '../ui/Bouton'
+import { BandeauErreur } from '../ui/BandeauErreur'
 
 interface Saisie {
   quantite: string
@@ -373,7 +374,7 @@ export function ReceptionCommandeModal({ commande, lignes, onFermer, onReception
           </div>
         )}
 
-        {erreur && <div className="shrink-0 text-xs bg-danger-soft text-danger-deep rounded-lg px-3 py-2">{erreur}</div>}
+        <BandeauErreur message={erreur} className="shrink-0 text-xs bg-danger-soft text-danger-deep rounded-lg px-3 py-2" />
         <div className="shrink-0 flex items-center justify-between gap-2 pt-1">
           <span className="text-xs text-text-muted">
             Total saisi : <span className="font-semibold text-text tabular-nums">{total.toLocaleString('fr-FR')}</span>

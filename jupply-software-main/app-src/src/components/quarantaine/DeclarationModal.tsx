@@ -11,6 +11,7 @@ import { declarerNonConformite, MOTIFS_NC, type MotifNonConformite } from '../..
 import type { Entrepot, Fournisseur, ProduitAvecStock, StockLot } from '../../types/stock'
 import { Modal } from '../ui/Modal'
 import { CLASSE_BOUTON_PRIMAIRE, CLASSE_BOUTON_SECONDAIRE, CLASSE_CHAMP, CLASSE_LABEL } from '../ui/styles'
+import { BandeauErreur } from '../ui/BandeauErreur'
 
 interface DeclarationModalProps {
   onFermer: () => void
@@ -193,7 +194,7 @@ export function DeclarationModal({ onFermer, onDeclare }: DeclarationModalProps)
           </label>
         </div>
 
-        {erreur && <div className="text-xs bg-danger-soft text-danger-deep rounded-lg px-3 py-2">{erreur}</div>}
+        <BandeauErreur message={erreur} className="text-xs bg-danger-soft text-danger-deep rounded-lg px-3 py-2" />
 
         <div className="flex justify-end gap-2">
           <button type="button" onClick={onFermer} data-annuler className={CLASSE_BOUTON_SECONDAIRE}>

@@ -27,4 +27,10 @@ union all
 select '09. 2026-10-28-entree-multi-depots',
        pg_get_functiondef('public.creer_reception'::regproc) ilike '%v_entrepot_principal%'
 union all
-select '10. 2026-10-29-entree-annuler-modifier', to_regproc('public.annuler_reception') is not null;
+select '10. 2026-10-29-entree-annuler-modifier', to_regproc('public.annuler_reception') is not null
+union all
+select '11. 2026-10-30-sortie-recu-par-obligatoire',
+       pg_get_functiondef('public.creer_sortie'::regproc) ilike '%Reçu par%'
+union all
+select '12. 2026-10-30-sortie-multi-depots',
+       pg_get_functiondef('public.creer_sortie'::regproc) ilike '%v_entrepot_ligne%';

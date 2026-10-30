@@ -14,7 +14,8 @@ export interface BonSortieCree {
 }
 
 export async function creerSortie(
-  entrepotId: string,
+  /** Dépôt principal ; null = celui de la première ligne (sortie sur plusieurs dépôts). */
+  entrepotId: string | null,
   motif: string | null,
   lignes: LigneSortie[],
   dateMouvement?: string | null,

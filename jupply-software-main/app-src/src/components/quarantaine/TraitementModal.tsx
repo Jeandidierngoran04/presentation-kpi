@@ -19,6 +19,7 @@ import {
   CLASSE_CHAMP_COMPACT,
   CLASSE_LABEL,
 } from '../ui/styles'
+import { BandeauErreur } from '../ui/BandeauErreur'
 
 interface LigneDecision {
   cle: string
@@ -327,7 +328,7 @@ export function TraitementModal({ dossier, onFermer, onTraite }: TraitementModal
           </label>
         </div>
 
-        {erreur && <div className="text-xs bg-danger-soft text-danger-deep rounded-lg px-3 py-2">{erreur}</div>}
+        <BandeauErreur message={erreur} className="text-xs bg-danger-soft text-danger-deep rounded-lg px-3 py-2" />
 
         <div className="flex justify-end gap-2">
           <button type="button" onClick={onFermer} data-annuler className={CLASSE_BOUTON_SECONDAIRE}>

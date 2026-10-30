@@ -10,6 +10,7 @@ import { dateVersInput, dateSaisieVersISO } from '../lib/dates'
 import { getEmplacements, getEntrepots } from '../lib/api/entrepots'
 import { creerReintegration, getSortiesAReintegrer } from '../lib/api/reintegrations'
 import type { Emplacement, Entrepot, SortieAReintegrer } from '../types/stock'
+import { BandeauErreur } from '../components/ui/BandeauErreur'
 
 const CLASSE_INPUT = 'border border-border rounded-md px-2 py-1 text-xs outline-none focus:border-accent focus:ring-2 focus:ring-accent/30 h-[26px]'
 const CLASSE_CHAMP_LECTURE = 'bg-muted rounded-md px-2 py-1 text-xs text-text h-[26px] flex items-center'
@@ -481,7 +482,7 @@ export function Reintegration() {
       </div>
 
       <div className="shrink-0 flex items-center justify-end gap-3">
-        {erreur && <div className="text-xs bg-danger-soft text-danger-deep rounded-lg px-3 py-2">{erreur}</div>}
+        <BandeauErreur message={erreur} className="text-xs bg-danger-soft text-danger-deep rounded-lg px-3 py-2" />
         <button onClick={onValider} disabled={envoi || panier.length === 0} className={CLASSE_BOUTON_PRIMAIRE}>
           {envoi ? 'Validation...' : `Valider la réintégration (${panier.length})`}
         </button>

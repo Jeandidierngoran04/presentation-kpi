@@ -1777,6 +1777,17 @@ les doublons, et ne plus perdre une saisie en fermant un onglet par erreur.
       - icône « Import » (flèche entrante) au lieu de la flèche vers le
         haut ; icône tableur pour « Télécharger le modèle » ;
       - marge du haut des écrans réduite à 8 px, et même marge partout.
+- [x] Retours de Jean Didier (29/10/2026, fin de journée) :
+      - « Valeur » remplacé par « Montant » (feuille de saisie, page de
+        l'entrée, confirmation de validation) ;
+      - seule la case en cause passe en rouge (plus la ligne entière) ;
+        elle indique « À saisir » / « À choisir » et une bulle dit quoi
+        faire au survol ou quand on clique dedans (ex. « Quantité
+        manquante : saisis la quantité reçue ») ;
+      - un clic n'importe où sur la ligne ouvre l'entrée (liste des
+        Entrées) ou la fiche du document (Sorties, Historique) ;
+      - menu Export (et menus du clic droit) toujours entièrement visibles,
+        alignés sous le bouton, lignes plus aérées avec icônes.
 - [x] **Exécuter la migration `2026-10-28-entree-multi-depots.sql` dans
       Supabase** (après les migrations précédentes)
 - [ ] Vérification en local par Jean Didier
@@ -1954,6 +1965,234 @@ avant de valider ou d'annuler.
   beaucoup de mouvements, réduire la période.
 - Les dates des mouvements sont celles de la **validation** (moment où le
   stock bouge), pas la date saisie sur l'entrée.
+
+# Sorties : « Reçu par » obligatoire, liste des sorties
+
+**Statut :** en cours (point 1 codé, point 2 à trancher)
+**Démarré le :** 30/10/2026
+
+## Retours de Jean Didier (30/10/2026)
+
+1. Une sortie passe sans « Reçu par ». Or une sortie est toujours destinée à
+   quelqu'un : une personne, ou un service (Logistique, Supply chain) quand
+   l'équipe prend elle-même.
+2. Après avoir fermé puis rouvert l'application, la liste des sorties est
+   vide : les sorties sont-elles enregistrées en base ?
+
+## Analyse
+
+- Point 1 : « Reçu par » était facultatif à l'écran et dans la base
+  (`creer_sortie(..., p_recu_par default null)`).
+- Point 2 : **les sorties sont bien enregistrées** (tables `bons_sortie`,
+  `bons_sortie_lignes`, mouvements de stock). L'écran « Sorties » est la
+  liste **du jour** (`ListeDocuments` avec `duJourSeulement`) : une sortie
+  datée d'un autre jour (le lendemain, ou une date du mouvement choisie
+  dans le passé) n'y apparaît plus. Elle reste dans Historiques > Sorties.
+
+## Avancement
+
+- [x] Point 1 : migration `2026-10-30-sortie-recu-par-obligatoire.sql`
+      (`creer_sortie` refuse un « Reçu par » vide) + `schema.sql` aligné,
+      testée sur base de test (5 contrôles, migration exécutée deux fois,
+      nouveau schéma ; entrées et commandes sans régression). Écran :
+      « Reçu par * », suggestions Logistique / Supply chain / Magasin,
+      champ en rouge et message clair si vide à la validation.
+- [x] Migration exécutée dans Supabase par Jean Didier (30/10/2026)
+- [x] Point 2 (décision de Jean Didier, 30/10) : l'écran « Sorties »
+      affiche les sorties des **30 derniers jours** (période qui glisse
+      avec la date du jour), avec la loupe et « Nouvelle sortie » ; pas de
+      filtre avancé ni d'export ici, ni de phrase d'explication : le
+      filtrage avancé reste dans Historiques > Sorties. Option
+      `derniersJours` de `ListeDocuments` (remplace `duJourSeulement`).
+      Phrase d'aide sous le détail retirée.
+- [ ] Vérification en local par Jean Didier
+
+# Nouvelle sortie : recherche, sélection multiple, sortie par catégorie
+
+**Statut :** code complet, en attente de vérification locale
+**Démarré le :** 30/10/2026
+
+## Objectif (demande de Jean Didier, 30/10)
+
+- Plus de liste de produits à gauche : une **longue barre de recherche**
+  (code ou désignation, « * » en tête = contient).
+- Les résultats s'affichent avec une **case à cocher à gauche** de chaque
+  ligne : on coche ce qu'on veut sortir.
+- Bouton **Par catégorie** : on choisit une catégorie, tous ses produits
+  s'affichent, on coche ceux qu'on veut.
+- **Étape par étape** : tant que la sélection cochée n'est pas ajoutée au
+  panier, on ne peut pas commencer une autre recherche ni cocher ailleurs,
+  ni valider la sortie. Ainsi, rien de coché ne peut être « oublié » en
+  croyant qu'il est dans le panier.
+
+## Analyse de l'existant
+
+- `pages/NouvelleSortie.tsx` : liste de toutes les références à gauche,
+  une référence à la fois ; à droite, ses lots dans l'ordre de sortie
+  (premier périmé, premier sorti, sinon premier entré) avec une quantité
+  par lot, puis « Ajouter au panier ».
+- La base (`creer_sortie`) reçoit déjà plusieurs lignes, chacune avec son
+  emplacement et son lot : **aucune modification de la base** n'est
+  nécessaire.
+
+## Proposition d'écran (3 étapes)
+
+1. **Chercher** : barre de recherche sur toute la largeur, bouton « Par
+   catégorie » à côté. Les résultats s'affichent dessous : case, référence,
+   désignation, catégorie, stock dans le dépôt.
+2. **Cocher et indiquer les quantités** : en cochant une ligne, une case
+   « Quantité » s'ouvre sur cette ligne. Pendant cette étape, la recherche
+   et « Par catégorie » sont grisés ; deux boutons : **Ajouter au panier
+   (n)** et **Annuler la sélection**.
+3. **Panier** : les lignes ajoutées, avec le lot et la localisation qui
+   sortent ; puis « Valider la sortie » (avec la confirmation existante).
+
+## Points à trancher
+
+1. **Lots** : à l'ajout au panier, le système prend automatiquement les
+   lots dans l'ordre de sortie (premier périmé, premier sorti), répartis
+   sur plusieurs lots si besoin, et on peut changer de lot ligne par ligne
+   dans le panier ? (Recommandé : plus rapide quand on sort beaucoup de
+   produits d'un coup.)
+2. **Quantité par défaut** à la case cochée : vide (à saisir), ou 1 ?
+3. **Produits en rupture** dans les résultats : affichés grisés, non
+   cochables (recommandé), ou masqués ?
+
+## Décisions actées avec Jean Didier (30/10/2026)
+
+1. Lots pris automatiquement dans l'ordre de sortie, modifiables dans le
+   panier. Précision technique : les lots **non périmés d'abord** ; un lot
+   périmé n'est pris que s'il ne reste rien d'autre (avertissement, motif
+   obligatoire).
+2. Quantité par défaut : pas de réponse ; choix provisoire **vide, à
+   saisir** (plus sûr), à revoir après le test.
+3. Produits en rupture **affichés grisés, impossibles à cocher**.
+
+## Avancement
+
+- [x] Compréhension et points à trancher validés par Jean Didier
+- [x] Écran `pages/NouvelleSortie.tsx` réécrit : longue barre de recherche
+      + liste « Par catégorie » ; résultats avec case à cocher, stock
+      disponible (panier déduit), case Quantité à la ligne cochée ;
+      sélection en cours = recherche, catégorie, dépôt et « Valider la
+      sortie » bloqués, boutons « Ajouter au panier (n) » / « Annuler la
+      sélection » ; quantités en erreur en rouge avec bulle ; répartition
+      automatique sur les lots, fusion avec une ligne déjà au panier sur le
+      même lot ; changement de lot dans le panier (avertissement si l'ordre
+      de sortie n'est pas respecté) ; ouverture depuis Produits : le
+      produit est cherché et coché. Aucune modification de la base.
+- [x] `tsc -b` + `vite build` OK
+- [ ] Vérification en local par Jean Didier
+
+## Retours après le premier test (30/10/2026) : nouvelle version proposée
+
+Demandes de Jean Didier :
+1. Barre de recherche : texte « Recherche » seulement.
+2. Un clic dans la recherche affiche **tous les produits**, avec les cases
+   à gauche. **Cocher un produit l'ajoute aussitôt au panier**, avec sa
+   quantité à saisir. Le bas de l'écran ne doit pas rester vide.
+3. Bug : après avoir saisi les quantités, le message rouge restait affiché.
+   Le rouge ne doit apparaître que s'il manque vraiment une quantité.
+4. Une case « Tout cocher » dans l'en-tête de la liste (utile par catégorie).
+5. « Par catégorie » devient **« Toutes les catégories »** (première
+   option), puis chaque catégorie.
+6. **Import** à côté, avec un modèle (Référence, Désignation, Quantité) :
+   les lignes importées arrivent au panier après confirmation.
+7. Dépôt : par défaut **« Tous les dépôts »**, puis la liste des dépôts.
+
+Proposition (remplace le blocage « étape par étape » d'hier, devenu inutile
+puisque cocher = ajouter au panier) :
+
+- **Écran en deux parties** : en haut la recherche, « Toutes les
+  catégories », « Import » (+ modèle) ; la liste des produits s'affiche dès
+  qu'on clique dans la recherche ou qu'on choisit une catégorie. En dessous,
+  le panier.
+- **Cocher = au panier** (décocher = retiré) ; « Tout cocher » ajoute tous
+  les produits affichés (sauf ruptures). La quantité se saisit dans le
+  panier (une case par ligne) ; seules les quantités vides ou trop grandes
+  passent en rouge, et le rouge disparaît dès que c'est corrigé.
+- **Lots** : répartis automatiquement (premier périmé, premier sorti, non
+  périmés d'abord), affichés dans le panier ; on peut forcer un lot.
+- **Tous les dépôts** : chaque ligne du panier a son dépôt (par défaut celui
+  qui a le plus de stock du produit), modifiable. Une sortie = un seul
+  numéro BS, chaque ligne sort de son dépôt. Nécessite une **migration**
+  (même principe que les entrées multi-dépôts : le dépôt de chaque ligne se
+  déduit de sa localisation), testée sur base de test.
+- **Import** : modèle Excel (Référence, Désignation, Quantité, Dépôt
+  facultatif) ; à l'import, un résumé « n produits trouvés, m à corriger »,
+  « Ajouter au panier » ; les lignes en erreur en rouge.
+
+## Décisions actées (30/10/2026)
+
+1. Bouton « Ajouter au panier » et blocage **supprimés** : cocher = au panier.
+2. **Tous les dépôts** accepté : une sortie peut couvrir plusieurs dépôts.
+
+## Avancement de la nouvelle version
+
+- [x] Migration `2026-10-30-sortie-multi-depots.sql` + `schema.sql` aligné :
+      `creer_sortie` (dépôt de chaque ligne = dépôt de sa localisation,
+      dépôt principal = 1re ligne si aucun n'est passé), `creer_reintegration`
+      (une ligne revient dans le dépôt d'où elle est sortie),
+      `v_sorties_a_reintegrer` (vrai dépôt de chaque ligne). Testée sur base
+      de test : 13 contrôles, depuis la base actuelle (migration exécutée
+      deux fois) et depuis le nouveau schéma ; tests précédents (entrées
+      multi-dépôts, annuler / modifier, « Reçu par », commandes) sans
+      régression. Ligne ajoutée à `verifier-migrations.sql`.
+- [x] Écran `NouvelleSortie.tsx` réécrit : dépôt « Tous les dépôts » par
+      défaut ; recherche « Recherche » qui ouvre la liste de tous les
+      produits ; « Toutes les catégories » ; case « Tout cocher » ; cocher =
+      au panier (décocher = retiré) ; quantité saisie dans le panier, rouge
+      seulement si vide (après un essai de validation), invalide ou trop
+      grande, et qui disparaît dès que c'est corrigé ; dépôt par ligne
+      (celui qui a le plus de stock par défaut) ; lots répartis
+      automatiquement, lot imposable (avertissement si hors ordre) ;
+      Import + modèle (Référence, Désignation, Quantité, Dépôt facultatif)
+      avec confirmation « Ajouter au panier » ; ruptures grisées.
+- [x] Import des sorties (`lib/import/sorties.ts`, lecture partagée avec
+      les entrées) : 6 contrôles ; tests de l'import des entrées repassés.
+- [x] `tsc -b` + `vite build` OK
+- [ ] **Exécuter `2026-10-30-sortie-multi-depots.sql` dans Supabase**
+- [ ] Vérification en local par Jean Didier
+
+Limite connue : la liste des sorties et l'Historique affichent le dépôt
+principal du bon ; le détail montre la localisation de chaque ligne.
+
+- [x] Retour de Jean Didier (30/10/2026) : **deux vues séparées** au lieu de
+      la liste et du petit panier l'un au-dessus de l'autre :
+      - vue « Choix » (pleine hauteur) : recherche, Toutes les catégories,
+        Import ; liste de tous les produits à cocher (Tout cocher), quantité
+        facultative sur les lignes cochées ; produits déjà au panier marqués
+        d'une coche verte ; bouton « Ajouter (n) » ; bouton « Panier (n) »
+        pour revenir au panier sans rien ajouter ;
+      - « Ajouter » : les produits cochés passent au panier, les cases se
+        vident, la vue « Panier » (pleine hauteur) s'ouvre, curseur sur la
+        première quantité vide ; boutons « Ajouter d'autres produits » et
+        « Valider la sortie » ; l'import mène aussi au panier.
+- [x] Retours (30/10/2026, suite) : colonne Lot vide quand le lot n'a ni
+      numéro de lot ni de série, liste des lots limitée aux lots numérotés
+      (sans emplacement ni quantité) ; bandeau « n ligne(s) à corriger »
+      calculé en continu, qui disparaît une fois tout corrigé ; icône « + »
+      pour « Ajouter d'autres produits » ; bouton « Vider le panier » (avec
+      confirmation) ; avec « Tous les dépôts », le dépôt de la 1re ligne est
+      envoyé comme dépôt principal. Le message « Entrepot introuvable » venait
+      de l'ancienne fonction : migration `2026-10-30-sortie-multi-depots.sql`
+      pas encore exécutée.
+- [x] Règle pour toute l'application (30/10/2026) : **une erreur disparaît
+      dès qu'elle est corrigée**. Nouveau composant `BandeauErreur` (se
+      masque à la première saisie dans l'écran ou la fenêtre, revient si
+      l'action principale est relancée et que l'erreur persiste), posé sur
+      les 21 bandeaux d'erreur de l'application. Nouvelle sortie : messages
+      « Reçu par » et motif recalculés en continu. Badge « 13 j » sur une
+      seule ligne, police réduite.
+- [x] (30/10/2026) Panneau du bas des listes (Sorties, Historiques)
+      **retiré** : le clic sur une ligne ouvre déjà la fiche complète ; le
+      tableau prend toute la hauteur.
+- [x] (30/10/2026) **Écran d'ouverture animé** à la place de
+      « Chargement... » (`components/layout/EcranOuverture.tsx`) : le « J »
+      arrive en tournant, ondes et anneau lumineux autour, « Jupply » s'écrit
+      lettre par lettre, barre lumineuse ; joué au moins 1,9 s puis fondu sur
+      l'application ; rejoué à la connexion ; Light / Dark ; mouvements
+      réduits respectés.
 
 ## Format utilisé pour chaque plan
 

@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { isSupabaseConfigured } from '../lib/supabase'
+import { BandeauErreur } from '../components/ui/BandeauErreur'
 
 export function Login() {
   const { session, connexion } = useAuth()
@@ -66,7 +67,7 @@ export function Login() {
               />
             </label>
 
-            {erreur && <div className="text-xs bg-danger-soft text-danger-deep rounded-lg px-3 py-2.5">{erreur}</div>}
+            <BandeauErreur message={erreur} className="text-xs bg-danger-soft text-danger-deep rounded-lg px-3 py-2.5" />
 
             <button
               type="submit"

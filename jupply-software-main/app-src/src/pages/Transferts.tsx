@@ -38,6 +38,7 @@ import { useMenuContextuel } from '../components/ui/MenuContextuel'
 import { classeBadge, type TonBadge } from '../components/ui/Badge'
 import { EnTetePage } from '../components/ui/EnTetePage'
 import { ChampRecherche } from '../components/ui/ChampRecherche'
+import { BandeauErreur } from '../components/ui/BandeauErreur'
 
 const CLASSE_INPUT = 'border border-border rounded-lg px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30'
 const CLASSE_BOUTON_PRIMAIRE =
@@ -505,7 +506,7 @@ function NouveauTransfertModal({ produits, onFermer, onCree }: NouveauTransfertM
           </button>
         </div>
 
-        {erreur && <div className="text-xs bg-danger-soft text-danger-deep rounded-lg px-3 py-2.5">{erreur}</div>}
+        <BandeauErreur message={erreur} className="text-xs bg-danger-soft text-danger-deep rounded-lg px-3 py-2.5" />
 
         <button type="submit" disabled={envoi} className={`mt-1 ${CLASSE_BOUTON_PRIMAIRE}`}>
           {envoi ? 'Envoi...' : 'Demander le transfert'}
@@ -626,7 +627,7 @@ function ExpedierTransfertModal({ transfert, lignes, onFermer, onExpedie }: Expe
           )
         })}
 
-        {erreur && <div className="text-xs bg-danger-soft text-danger-deep rounded-lg px-3 py-2.5">{erreur}</div>}
+        <BandeauErreur message={erreur} className="text-xs bg-danger-soft text-danger-deep rounded-lg px-3 py-2.5" />
 
         <button type="submit" disabled={envoi} className={`mt-1 ${CLASSE_BOUTON_PRIMAIRE}`}>
           {envoi ? 'Expédition...' : 'Expédier'}
@@ -755,7 +756,7 @@ function ReceptionnerTransfertModal({ transfert, lignes, onFermer, onReceptionne
           </div>
         ))}
 
-        {erreur && <div className="text-xs bg-danger-soft text-danger-deep rounded-lg px-3 py-2.5">{erreur}</div>}
+        <BandeauErreur message={erreur} className="text-xs bg-danger-soft text-danger-deep rounded-lg px-3 py-2.5" />
 
         <button type="submit" disabled={envoi} className={`mt-1 ${CLASSE_BOUTON_PRIMAIRE}`}>
           {envoi ? 'Réception...' : 'Réceptionner'}

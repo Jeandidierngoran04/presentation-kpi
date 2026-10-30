@@ -36,7 +36,7 @@ const COLONNES: { champ: Champ; titre: string; largeur: number }[] = [
 ]
 
 /** Titre sans accents, majuscules, astérisque ni ponctuation : « N° série » et « no serie » se valent. */
-function normaliser(texte: string): string {
+export function normaliser(texte: string): string {
   return texte
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
@@ -87,7 +87,14 @@ export async function telechargerModeleEntrees() {
   }).toFile('Modele_import_entrees.xlsx')
 }
 
-function texteCellule(valeur: unknown): string {
+/** Cellules d'un fichier Excel (première feuille) ou CSV, ligne par ligne. Partagé avec l'import des sorties. */
+export async function lireTableau(fichier: File): Promise<unknown[][]> {
+  if (/\.csv$/i.test(fichier.name) || fichier.type === 'text/csv') return lireCsv(await fichier.text())
+  const { readSheet } = await import('read-excel-file/browser')
+  return readSheet(fichier, 1)
+}
+
+export function texteCellule(valeur: unknown): string {
   if (valeur == null) return ''
   if (valeur instanceof Date) return dateISO(valeur)
   return String(valeur).trim()
@@ -150,13 +157,7 @@ function lireCsv(contenu: string): string[][] {
  * sont ignorées. Lève une erreur claire si l'en-tête n'est pas reconnu.
  */
 export async function lireFichierEntrees(fichier: File): Promise<LigneImportee[]> {
-  let tableau: unknown[][]
-  if (/\.csv$/i.test(fichier.name) || fichier.type === 'text/csv') {
-    tableau = lireCsv(await fichier.text())
-  } else {
-    const { readSheet } = await import('read-excel-file/browser')
-    tableau = await readSheet(fichier, 1)
-  }
+  const tableau = await lireTableau(fichier)
 
   // En-tête = première ligne qui contient une colonne Référence ou Désignation.
   const indexEntete = tableau.findIndex((ligne) =>

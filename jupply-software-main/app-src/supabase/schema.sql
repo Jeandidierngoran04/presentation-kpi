@@ -2360,13 +2360,26 @@ declare
   v_stock_apres integer;
   v_stock_lot_id uuid;
   v_lot stock_lots%rowtype;
+  v_entrepot_principal uuid;
+  v_entrepot_ligne uuid;
 begin
-  select entreprise_id into v_entreprise_id from entrepots where id = p_entrepot_id;
-  if v_entreprise_id is null then
-    raise exception 'Entrepot introuvable.';
-  end if;
-  if jsonb_array_length(p_lignes) = 0 then
+  if jsonb_array_length(coalesce(p_lignes, '[]'::jsonb)) = 0 then
     raise exception 'Une sortie doit contenir au moins une ligne.';
+  end if;
+  -- Une sortie peut prendre des produits dans plusieurs depots : le depot de
+  -- chaque ligne est celui de sa localisation. L'en-tete garde un depot
+  -- "principal" (celui passe en parametre, sinon celui de la premiere ligne).
+  v_entrepot_principal := coalesce(
+    p_entrepot_id,
+    (select e.entrepot_id from emplacements e where e.id = (p_lignes->0->>'emplacement_id')::uuid)
+  );
+  select entreprise_id into v_entreprise_id from entrepots where id = v_entrepot_principal;
+  if v_entreprise_id is null then
+    raise exception 'Ligne 1 : localisation introuvable ou depot non autorise.';
+  end if;
+  -- Une sortie est toujours destinée à quelqu'un (une personne, ou un service : Logistique...).
+  if nullif(btrim(coalesce(p_recu_par, '')), '') is null then
+    raise exception 'Le champ « Reçu par » est obligatoire : indique qui reçoit la sortie (une personne ou un service).';
   end if;
 
   v_date := coalesce(p_date_mouvement, now());
@@ -2374,7 +2387,7 @@ begin
 
   insert into bons_sortie (entreprise_id, numero, entrepot_id, demande_par, statut, motif, recu_par, cree_le)
   values (
-    v_entreprise_id, v_numero, p_entrepot_id, auth.uid(), 'confirmee', nullif(p_motif, ''), nullif(btrim(p_recu_par), ''), v_date
+    v_entreprise_id, v_numero, v_entrepot_principal, auth.uid(), 'confirmee', nullif(p_motif, ''), nullif(btrim(p_recu_par), ''), v_date
   )
   returning id into v_bon_id;
 
@@ -2390,8 +2403,20 @@ begin
       raise exception 'Ligne de sortie invalide (produit, emplacement et quantite requis).';
     end if;
 
+    select e.entrepot_id into v_entrepot_ligne from emplacements e where e.id = v_emplacement_id;
+    -- Une localisation d'un depot non attribue est invisible (securite) : meme message.
+    if v_entrepot_ligne is null then
+      raise exception 'Localisation introuvable ou depot non autorise.';
+    end if;
+    if v_entrepot_ligne not in (select entrepots_visibles()) then
+      raise exception 'Vous n''avez pas acces au depot de cette localisation.';
+    end if;
+    if not exists (select 1 from entrepots where id = v_entrepot_ligne and entreprise_id = v_entreprise_id) then
+      raise exception 'Le depot n''appartient pas a votre entreprise.';
+    end if;
+
     select quantite into v_stock_avant from stock_produits
-      where produit_id = v_produit_id and entrepot_id = p_entrepot_id and emplacement_id = v_emplacement_id
+      where produit_id = v_produit_id and entrepot_id = v_entrepot_ligne and emplacement_id = v_emplacement_id
       for update;
 
     if v_stock_avant is null or v_stock_avant < v_quantite then
@@ -2402,7 +2427,7 @@ begin
     if v_stock_lot_id is not null then
       select * into v_lot from stock_lots
         where id = v_stock_lot_id and produit_id = v_produit_id
-          and entrepot_id = p_entrepot_id and emplacement_id = v_emplacement_id
+          and entrepot_id = v_entrepot_ligne and emplacement_id = v_emplacement_id
         for update;
 
       if not found or v_lot.quantite < v_quantite then
@@ -2423,10 +2448,10 @@ begin
     v_stock_apres := v_stock_avant - v_quantite;
     if v_stock_apres = 0 then
       delete from stock_produits
-        where produit_id = v_produit_id and entrepot_id = p_entrepot_id and emplacement_id = v_emplacement_id;
+        where produit_id = v_produit_id and entrepot_id = v_entrepot_ligne and emplacement_id = v_emplacement_id;
     else
       update stock_produits set quantite = v_stock_apres
-        where produit_id = v_produit_id and entrepot_id = p_entrepot_id and emplacement_id = v_emplacement_id;
+        where produit_id = v_produit_id and entrepot_id = v_entrepot_ligne and emplacement_id = v_emplacement_id;
     end if;
 
     insert into bons_sortie_lignes (
@@ -2442,7 +2467,7 @@ begin
       type, quantite, stock_avant, stock_apres, utilisateur_id, reference, motif, lot, numero_serie, cree_le
     )
     values (
-      v_entreprise_id, v_produit_id, p_entrepot_id, v_emplacement_id,
+      v_entreprise_id, v_produit_id, v_entrepot_ligne, v_emplacement_id,
       'sortie', v_quantite, v_stock_avant, v_stock_apres, auth.uid(), v_numero, p_motif,
       v_lot.lot, v_lot.numero_serie, v_date
     );
@@ -2519,11 +2544,15 @@ begin
     end if;
 
     v_ligne_produit_id := null;
-    select bsl.produit_id, bs.entrepot_id, bsl.quantite, bsl.lot, bsl.numero_serie, bsl.date_expiration, bsl.date_entree_lot
+    -- Depot d'ou la ligne est sortie : celui de sa localisation (une sortie
+    -- peut couvrir plusieurs depots), a defaut celui de l'en-tete du bon.
+    select bsl.produit_id, coalesce(es.entrepot_id, bs.entrepot_id), bsl.quantite, bsl.lot, bsl.numero_serie,
+           bsl.date_expiration, bsl.date_entree_lot
       into v_ligne_produit_id, v_ligne_entrepot_id, v_ligne_quantite_sortie,
            v_ligne_lot, v_ligne_numero_serie, v_ligne_date_expiration, v_ligne_date_entree
       from bons_sortie_lignes bsl
       join bons_sortie bs on bs.id = bsl.bon_sortie_id
+      left join emplacements es on es.id = bsl.emplacement_id
       where bsl.id = v_bon_sortie_ligne_id and bs.statut = 'confirmee'
       for update of bsl;
 
@@ -2929,7 +2958,7 @@ select
   bsl.produit_id,
   p.reference as produit_reference,
   p.designation as produit_designation,
-  bs.entrepot_id,
+  coalesce(es.entrepot_id, bs.entrepot_id) as entrepot_id,
   bs.numero as bon_sortie_numero,
   bs.motif,
   bs.cree_le as sortie_le,
@@ -2938,6 +2967,7 @@ select
   (bsl.quantite - coalesce(reint.quantite_reintegree, 0))::int as quantite_disponible
 from bons_sortie_lignes bsl
 join bons_sortie bs on bs.id = bsl.bon_sortie_id
+left join emplacements es on es.id = bsl.emplacement_id
 join produits p on p.id = bsl.produit_id
 left join (
   select bon_sortie_ligne_id, sum(quantite) as quantite_reintegree

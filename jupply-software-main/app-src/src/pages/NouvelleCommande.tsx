@@ -18,6 +18,7 @@ import {
   CLASSE_CHAMP_LECTURE,
   CLASSE_LABEL,
 } from '../components/ui/styles'
+import { BandeauErreur } from '../components/ui/BandeauErreur'
 
 interface LigneSaisie {
   cle: string
@@ -261,7 +262,7 @@ export function NouvelleCommande() {
             </button>
           </div>
         </div>
-        {erreur && <div className="shrink-0 text-xs bg-danger-soft text-danger-deep rounded-lg px-3 py-2">{erreur}</div>}
+        <BandeauErreur message={erreur} className="shrink-0 text-xs bg-danger-soft text-danger-deep rounded-lg px-3 py-2" />
         <datalist id="references-commande">
           {produits.map((p) => (
             <option key={p.id} value={p.reference} label={p.designation} />

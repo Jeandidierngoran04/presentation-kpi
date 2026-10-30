@@ -24,6 +24,7 @@ import { TraitementModal } from '../components/quarantaine/TraitementModal'
 import { RechercheTraitementModal } from '../components/quarantaine/RechercheTraitementModal'
 import { ChampRecherche } from '../components/ui/ChampRecherche'
 import { DeclarationModal } from '../components/quarantaine/DeclarationModal'
+import { BandeauErreur } from '../components/ui/BandeauErreur'
 
 type FiltreStatut = 'actifs' | 'clotures' | 'tous'
 
@@ -255,7 +256,7 @@ export function Quarantaine() {
         </div>
       </div>
 
-      {erreur && <div className="shrink-0 text-xs bg-danger-soft text-danger-deep rounded-lg px-3 py-2">{erreur}</div>}
+      <BandeauErreur message={erreur} className="shrink-0 text-xs bg-danger-soft text-danger-deep rounded-lg px-3 py-2" />
 
       {/* Liste des dossiers */}
       <div className="flex-1 min-h-[200px] bg-card rounded-lg border border-border overflow-auto">

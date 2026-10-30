@@ -15,6 +15,7 @@ import type { LocalisationProduit, ProduitAvecStock, StatutStock } from '../type
 import { StatutBadge, STYLES_STATUT_STOCK } from '../components/dashboard/StatutBadge'
 import { CLASSE_CHAMP_COMPACT, CLASSE_LABEL } from '../components/ui/styles'
 import { CaseFiltre, PanneauFiltres, SectionFiltre } from '../components/ui/PanneauFiltres'
+import { BandeauErreur } from '../components/ui/BandeauErreur'
 
 type Periode = 'tout' | '7' | '30' | '90' | 'annee'
 
@@ -384,7 +385,7 @@ export function FicheStock() {
         </datalist>
       </div>
 
-      {erreur && <div className="shrink-0 text-xs bg-danger-soft text-danger-deep rounded-lg px-3 py-2">{erreur}</div>}
+      <BandeauErreur message={erreur} className="shrink-0 text-xs bg-danger-soft text-danger-deep rounded-lg px-3 py-2" />
 
       {!produitId ? (
         <div className="flex-1 flex items-center justify-center text-sm text-text-muted">

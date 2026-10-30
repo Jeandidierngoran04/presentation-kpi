@@ -42,6 +42,7 @@ import { StatutBadge } from '../components/dashboard/StatutBadge'
 import { CLASSE_LIGNE_INFO, ItemInfoPopover, useItemInfo } from '../components/ui/ItemInfo'
 import { ProduitInfoPanel } from '../components/produits/ProduitInfoPanel'
 import { ChampRecherche } from '../components/ui/ChampRecherche'
+import { BandeauErreur } from '../components/ui/BandeauErreur'
 
 const CLASSE_INPUT = 'border border-border rounded-lg px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30'
 const CLASSE_BOUTON_PRIMAIRE =
@@ -808,7 +809,7 @@ function NouveauProduitModal({
           </div>
         </div>
 
-        {erreur && <div className="text-xs bg-danger-soft text-danger-deep rounded-lg px-3 py-2.5">{erreur}</div>}
+        <BandeauErreur message={erreur} className="text-xs bg-danger-soft text-danger-deep rounded-lg px-3 py-2.5" />
 
         <button type="submit" disabled={envoi} className={`mt-1 ${CLASSE_BOUTON_PRIMAIRE}`}>
           {envoi ? 'Création...' : "Créer la référence"}
@@ -1012,7 +1013,7 @@ function AffecterLocalisationModal({ produit, onFermer, onAffecte }: AffecterLoc
           <input name="quantite" type="number" min="1" required defaultValue="1" className={CLASSE_INPUT} />
         </label>
 
-        {erreur && <div className="text-xs bg-danger-soft text-danger-deep rounded-lg px-3 py-2.5">{erreur}</div>}
+        <BandeauErreur message={erreur} className="text-xs bg-danger-soft text-danger-deep rounded-lg px-3 py-2.5" />
 
         <button type="submit" disabled={envoi} className={`mt-1 ${CLASSE_BOUTON_PRIMAIRE}`}>
           {envoi ? 'Affectation...' : 'Affecter'}
@@ -1148,7 +1149,7 @@ function ModifierLocalisationModal({ produit, localisations, onFermer, onDeplace
           />
         </label>
 
-        {erreur && <div className="text-xs bg-danger-soft text-danger-deep rounded-lg px-3 py-2.5">{erreur}</div>}
+        <BandeauErreur message={erreur} className="text-xs bg-danger-soft text-danger-deep rounded-lg px-3 py-2.5" />
 
         <button type="submit" disabled={envoi} className={`mt-1 ${CLASSE_BOUTON_PRIMAIRE}`}>
           {envoi ? 'Déplacement...' : 'Déplacer'}

@@ -14,7 +14,7 @@ function heure(iso: string): string {
 }
 
 /**
- * Liste des entrées. Un clic sur le numéro (ou un double-clic sur la ligne)
+ * Liste des entrées. Un clic n’importe où sur la ligne
  * ouvre la page de l'entrée, où l'on valide, modifie ou annule.
  */
 export function Receptions() {
@@ -117,26 +117,28 @@ export function Receptions() {
                 {receptionsFiltrees.map((r) => {
                   const annulee = r.statut === 'annulee'
                   return (
+                    // Un clic n'importe où sur la ligne ouvre l'entrée.
                     <tr
                       key={r.id}
-                      onClick={() => setSelectionId(r.id)}
-                      onDoubleClick={() => ouvrirEntree(r)}
-                      className={`border-t border-border cursor-pointer ${selectionId === r.id ? 'bg-accent-soft' : 'hover:bg-muted'} ${
-                        annulee ? 'text-text-muted' : ''
-                      }`}
+                      onClick={() => ouvrirEntree(r)}
+                      onContextMenu={(e) => {
+                        setSelectionId(r.id)
+                        ouvrirMenu(e, [
+                          { label: `Ouvrir ${r.numero}`, onClick: () => ouvrirEntree(r) },
+                          { label: 'Créer', onClick: creer },
+                        ])
+                      }}
+                      title={`Ouvrir l'entrée ${r.numero}`}
+                      className={`group border-t border-border cursor-pointer transition-colors ${
+                        selectionId === r.id ? 'bg-accent-soft' : 'hover:bg-accent-soft/60'
+                      } ${annulee ? 'text-text-muted' : ''}`}
                     >
                       <td className="py-1 px-2">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            ouvrirEntree(r)
-                          }}
-                          className={`font-mono text-xs hover:underline ${annulee ? 'text-text-muted line-through' : 'text-info-deep'}`}
-                          title="Ouvrir l'entrée"
+                        <span
+                          className={`font-mono text-xs group-hover:underline ${annulee ? 'text-text-muted line-through' : 'text-info-deep'}`}
                         >
                           {r.numero}
-                        </button>
+                        </span>
                       </td>
                       <td className={`py-1 px-2 font-medium ${annulee ? '' : 'text-text'}`} title={r.depots_noms.join(', ')}>
                         {r.depots_noms.join(', ')}
