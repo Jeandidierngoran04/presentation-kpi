@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
+import { effacerEtatsPersistants } from '../lib/etatPersistant'
 import type { Role } from '../types/stock'
 
 interface Profil {
@@ -72,6 +73,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function deconnexion() {
     await supabase.auth.signOut()
+    // Onglets et saisies gardés pour l'actualisation : rien ne doit rester pour le compte suivant.
+    effacerEtatsPersistants()
   }
 
   return (

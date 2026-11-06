@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, type ReactNode } from 'react'
+import { useEtatPersistant } from '../lib/etatPersistant'
 
 interface DemandeSortieManuelle {
   produitId: string | null
@@ -58,7 +59,8 @@ export function SelectionProvider({ children }: { children: ReactNode }) {
     setDemandeFicheStock((prev) => ({ produitId, jeton: (prev?.jeton ?? 0) + 1 }))
   }
   const [derniereSortie, setDerniereSortie] = useState<SortieValidee | null>(null)
-  const [entreeAfficheeId, afficherEntree] = useState<string | null>(null)
+  // Gardé à l'actualisation : l'onglet « Entrée » retrouve son document.
+  const [entreeAfficheeId, afficherEntree] = useEtatPersistant<string | null>('entree-affichee', null)
   const [demandeModificationEntree, setDemandeModificationEntree] = useState<{ receptionId: string; jeton: number } | null>(null)
 
   function demanderModificationEntree(receptionId: string) {

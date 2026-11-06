@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
 import { MODULE_PAR_ECRAN } from '../lib/modules'
 import { ConfirmationModal } from '../components/ui/ConfirmationModal'
+import { useEtatPersistant } from '../lib/etatPersistant'
 
 export type EcranId =
   | 'dashboard'
@@ -60,8 +61,9 @@ const groupeDe = (ecran: EcranId | null) => (ecran ? (MODULE_PAR_ECRAN[ecran] ??
 
 export function TabsProvider({ children }: { children: ReactNode }) {
   // Aucun écran n'est ouvert d'office : on choisit dans la barre latérale.
-  const [onglets, setOnglets] = useState<Onglet[]>([])
-  const [ongletActifId, setOngletActifId] = useState<EcranId | null>(null)
+  // Après une actualisation de la page, on retrouve les onglets et celui qui était actif.
+  const [onglets, setOnglets] = useEtatPersistant<Onglet[]>('onglets', [])
+  const [ongletActifId, setOngletActifId] = useEtatPersistant<EcranId | null>('onglet-actif', null)
 
   function ouvrirOnglet(ecran: EcranId, titre: string) {
     setOnglets((prev) =>
