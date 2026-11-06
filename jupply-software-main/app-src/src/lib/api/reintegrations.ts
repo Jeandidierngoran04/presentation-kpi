@@ -6,16 +6,16 @@ export interface FiltreDatesSorties {
   dateFin?: string | null
 }
 
-/** Lignes de sortie confirmées, encore (partiellement) réintégrables, pour un entrepôt donné. */
+/** Lignes de sortie confirmées, encore (partiellement) réintégrables ; entrepotId null = tous les dépôts visibles. */
 export async function getSortiesAReintegrer(
-  entrepotId: string,
+  entrepotId: string | null,
   filtre: FiltreDatesSorties = {},
 ): Promise<SortieAReintegrer[]> {
   let requete = supabase
     .from('v_sorties_a_reintegrer')
     .select('*')
-    .eq('entrepot_id', entrepotId)
     .order('sortie_le', { ascending: false })
+  if (entrepotId) requete = requete.eq('entrepot_id', entrepotId)
   if (filtre.dateDebut) requete = requete.gte('sortie_le', filtre.dateDebut)
   if (filtre.dateFin) requete = requete.lte('sortie_le', filtre.dateFin)
   const { data, error } = await requete
@@ -31,7 +31,8 @@ export interface LigneReintegration {
 }
 
 export async function creerReintegration(
-  entrepotId: string,
+  /** Dépôt principal ; chaque ligne revient dans le dépôt de sa localisation de retour. */
+  entrepotId: string | null,
   notes: string | null,
   lignes: LigneReintegration[],
   dateMouvement?: string | null,

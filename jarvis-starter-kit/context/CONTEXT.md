@@ -68,9 +68,11 @@ Liste des projets ou chantiers actifs sur lesquels je veux que Claude m'aide :
 
 ### Outils que j'utilise au quotidien
 
-- Claude IA
+- Claude IA (Claude Code dans VS Code)
 - Excel (analyse de données)
 - Power BI (analyse de données)
+- OneDrive (sauvegarde continue du dossier `PROJET SOFTWARE`) et GitHub (dépôt privé, à chaque `/commit`)
+- Python 3.13 (lecture et production de fichiers Excel, PDF, Word, PowerPoint ; `pandas` bloqué par le contrôle intelligent des applications de Windows, `openpyxl` le remplace)
 
 ### Style de communication préféré
 

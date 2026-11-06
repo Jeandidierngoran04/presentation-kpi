@@ -33,4 +33,8 @@ select '11. 2026-10-30-sortie-recu-par-obligatoire',
        pg_get_functiondef('public.creer_sortie'::regproc) ilike '%Reçu par%'
 union all
 select '12. 2026-10-30-sortie-multi-depots',
-       pg_get_functiondef('public.creer_sortie'::regproc) ilike '%v_entrepot_ligne%';
+       pg_get_functiondef('public.creer_sortie'::regproc) ilike '%v_entrepot_ligne%'
+union all
+select '13. 2026-10-30-reintegration-multi-depots',
+       exists (select 1 from information_schema.columns
+               where table_schema = 'public' and table_name = 'v_sorties_a_reintegrer' and column_name = 'recu_par');

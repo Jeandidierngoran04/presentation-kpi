@@ -235,6 +235,14 @@ export interface SortieAReintegrer {
   quantite_sortie: number
   quantite_reintegree: number
   quantite_disponible: number
+  /** Colonnes ajoutées par la migration réintégration multi-dépôts. */
+  bon_sortie_id: string
+  recu_par: string | null
+  emplacement_id: string | null
+  emplacement_code: string | null
+  lot: string | null
+  numero_serie: string | null
+  date_expiration: string | null
 }
 
 export type StatutTransfert = 'demande' | 'valide' | 'expedie' | 'en_transit' | 'recu'

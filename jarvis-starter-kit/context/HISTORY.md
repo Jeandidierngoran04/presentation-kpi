@@ -7,6 +7,15 @@
 
 ---
 
+## 2026-11-06
+
+### Sauvegarde du Jarvis et changement d'ordinateur
+- Le dossier `PROJET SOFTWARE` est désormais dans OneDrive (`OneDrive\Documents\PROJET SOFTWARE`) ; il reste aussi sur GitHub (dépôt privé vérifié)
+- Choix de Jean Didier : sauvegarde par GitHub et OneDrive (pas de clé USB)
+- Mémoire de Claude copiée dans `jarvis-starter-kit/memoire/` ; commande `/nouveau-pc` et guide `NOUVEAU-PC.md` créés
+- Python 3.13 installé avec les modules documents (Excel, PDF, Word, PowerPoint, graphiques) ; `pandas` bloqué par Windows
+- Reste à faire : ouvrir `OneDrive\Documents\PROJET SOFTWARE` dans VS Code et lancer `/nouveau-pc`
+
 ## 2026-10-01
 
 ### Remise à niveau du contexte (rattrapage depuis le 13/08)

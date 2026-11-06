@@ -2516,20 +2516,29 @@ declare
   v_disponible integer;
   v_stock_avant integer;
   v_stock_apres integer;
+  v_entrepot_principal uuid;
+  v_entrepot_ligne uuid;
 begin
-  select entreprise_id into v_entreprise_id from entrepots where id = p_entrepot_id;
-  if v_entreprise_id is null then
-    raise exception 'Entrepot introuvable.';
-  end if;
-  if jsonb_array_length(p_lignes) = 0 then
+  if jsonb_array_length(coalesce(p_lignes, '[]'::jsonb)) = 0 then
     raise exception 'Une reintegration doit contenir au moins une ligne.';
+  end if;
+  -- Une reintegration peut couvrir plusieurs depots : le depot de chaque ligne
+  -- est celui de sa localisation de retour. L'en-tete garde un depot
+  -- "principal" (celui passe en parametre, sinon celui de la premiere ligne).
+  v_entrepot_principal := coalesce(
+    p_entrepot_id,
+    (select e.entrepot_id from emplacements e where e.id = (p_lignes->0->>'emplacement_id')::uuid)
+  );
+  select entreprise_id into v_entreprise_id from entrepots where id = v_entrepot_principal;
+  if v_entreprise_id is null then
+    raise exception 'Ligne 1 : localisation introuvable ou depot non autorise.';
   end if;
 
   v_date := coalesce(p_date_mouvement, now());
   v_numero := 'REINT-' || to_char(v_date, 'YYYY') || '-' || lpad(nextval('reintegrations_numero_seq')::text, 5, '0');
 
   insert into reintegrations (entreprise_id, numero, entrepot_id, demande_par, notes, cree_le)
-  values (v_entreprise_id, v_numero, p_entrepot_id, auth.uid(), nullif(p_notes, ''), v_date)
+  values (v_entreprise_id, v_numero, v_entrepot_principal, auth.uid(), nullif(p_notes, ''), v_date)
   returning id into v_reintegration_id;
 
   for v_ligne in select * from jsonb_array_elements(p_lignes)
@@ -2541,6 +2550,15 @@ begin
 
     if v_bon_sortie_ligne_id is null or v_emplacement_id is null or v_quantite is null or v_quantite <= 0 then
       raise exception 'Ligne de reintegration invalide (ligne de sortie, emplacement et quantite requis).';
+    end if;
+
+    select e.entrepot_id into v_entrepot_ligne from emplacements e where e.id = v_emplacement_id;
+    -- Une localisation d'un depot non attribue est invisible (securite) : meme message.
+    if v_entrepot_ligne is null then
+      raise exception 'Localisation de retour introuvable ou depot non autorise.';
+    end if;
+    if v_entrepot_ligne not in (select entrepots_visibles()) then
+      raise exception 'Vous n''avez pas acces au depot de cette localisation.';
     end if;
 
     v_ligne_produit_id := null;
@@ -2559,8 +2577,9 @@ begin
     if v_ligne_produit_id is null then
       raise exception 'Ligne de sortie introuvable ou non confirmee.';
     end if;
-    if v_ligne_entrepot_id <> p_entrepot_id then
-      raise exception 'Cette ligne de sortie appartient a un autre entrepot.';
+    -- Le produit revient dans le depot d'ou il est sorti.
+    if v_ligne_entrepot_id <> v_entrepot_ligne then
+      raise exception 'Cette ligne de sortie appartient a un autre entrepot : choisis une localisation de ce depot.';
     end if;
 
     select coalesce(sum(rl.quantite), 0) into v_total_reintegre
@@ -2573,7 +2592,7 @@ begin
     end if;
 
     select quantite into v_stock_avant from stock_produits
-      where produit_id = v_ligne_produit_id and entrepot_id = p_entrepot_id and emplacement_id = v_emplacement_id;
+      where produit_id = v_ligne_produit_id and entrepot_id = v_entrepot_ligne and emplacement_id = v_emplacement_id;
     v_stock_avant := coalesce(v_stock_avant, 0);
     v_stock_apres := v_stock_avant + v_quantite;
 
@@ -2581,12 +2600,12 @@ begin
     -- quantite retrouve son lot d'origine (ou un lot "sans lot" date du jour
     -- pour les sorties anterieures au suivi par lot).
     perform ajouter_lot(
-      v_ligne_produit_id, p_entrepot_id, v_emplacement_id, v_ligne_lot, v_ligne_numero_serie,
+      v_ligne_produit_id, v_entrepot_ligne, v_emplacement_id, v_ligne_lot, v_ligne_numero_serie,
       v_ligne_date_expiration, coalesce(v_ligne_date_entree, v_date), null, v_quantite
     );
 
     insert into stock_produits (produit_id, entrepot_id, emplacement_id, quantite)
-    values (v_ligne_produit_id, p_entrepot_id, v_emplacement_id, v_quantite)
+    values (v_ligne_produit_id, v_entrepot_ligne, v_emplacement_id, v_quantite)
     on conflict (produit_id, entrepot_id, emplacement_id)
     do update set quantite = stock_produits.quantite + excluded.quantite;
 
@@ -2598,7 +2617,7 @@ begin
       type, quantite, stock_avant, stock_apres, utilisateur_id, reference, motif, lot, numero_serie, cree_le
     )
     values (
-      v_entreprise_id, v_ligne_produit_id, p_entrepot_id, v_emplacement_id,
+      v_entreprise_id, v_ligne_produit_id, v_entrepot_ligne, v_emplacement_id,
       'reintegration', v_quantite, v_stock_avant, v_stock_apres, auth.uid(), v_numero, v_notes_ligne,
       v_ligne_lot, v_ligne_numero_serie, v_date
     );
@@ -2964,7 +2983,14 @@ select
   bs.cree_le as sortie_le,
   bsl.quantite as quantite_sortie,
   coalesce(reint.quantite_reintegree, 0)::int as quantite_reintegree,
-  (bsl.quantite - coalesce(reint.quantite_reintegree, 0))::int as quantite_disponible
+  (bsl.quantite - coalesce(reint.quantite_reintegree, 0))::int as quantite_disponible,
+  bs.id as bon_sortie_id,
+  bs.recu_par,
+  bsl.emplacement_id,
+  es.code as emplacement_code,
+  bsl.lot,
+  bsl.numero_serie,
+  bsl.date_expiration
 from bons_sortie_lignes bsl
 join bons_sortie bs on bs.id = bsl.bon_sortie_id
 left join emplacements es on es.id = bsl.emplacement_id

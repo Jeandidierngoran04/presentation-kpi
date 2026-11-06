@@ -112,6 +112,20 @@ Une fois que je confirme, Claude met à jour le fichier en question et ajoute un
 
 Claude va effectuer une veille des actualités du jour, filtrée selon mon contexte personnel (mes objectifs, mes projets), et me proposer un focus pour la journée. Cette commande utilise la skill `recherche-actualites`.
 
+### /nouveau-pc
+
+**Objectif :** Retrouver tout mon Jarvis sur un nouvel ordinateur (ou relier la mémoire une première fois).
+
+Claude vérifie les outils (Git, Node.js, Python), relie sa mémoire longue durée au dossier `memoire/` et me montre un résumé. Mode d'emploi pour l'humain : `NOUVEAU-PC.md`.
+
+---
+
+## Sauvegarde
+
+- Tout le dossier `PROJET SOFTWARE` (Jarvis + Jupply) est dans **OneDrive** (`OneDrive\Documents\PROJET SOFTWARE`), synchronisé en continu, et sur **GitHub** (dépôt privé `Projet-Didier-Tety`) à chaque `/commit`.
+- La mémoire longue durée de Claude est dans `memoire/` (dans ce dossier), reliée au dossier mémoire de Claude Code par `/nouveau-pc`.
+- Le fichier des clés Supabase (`.env.local`) n'est jamais sur GitHub : il n'est sauvegardé que par OneDrive.
+
 ---
 
 ## Skills disponibles

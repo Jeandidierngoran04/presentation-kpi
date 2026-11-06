@@ -2151,7 +2151,7 @@ puisque cocher = ajouter au panier) :
 - [x] Import des sorties (`lib/import/sorties.ts`, lecture partagée avec
       les entrées) : 6 contrôles ; tests de l'import des entrées repassés.
 - [x] `tsc -b` + `vite build` OK
-- [ ] **Exécuter `2026-10-30-sortie-multi-depots.sql` dans Supabase**
+- [x] Migration `2026-10-30-sortie-multi-depots.sql` exécutée dans Supabase par Jean Didier (30/10/2026)
 - [ ] Vérification en local par Jean Didier
 
 Limite connue : la liste des sorties et l'Historique affichent le dépôt
@@ -2193,6 +2193,80 @@ principal du bon ; le détail montre la localisation de chaque ligne.
       lettre par lettre, barre lumineuse ; joué au moins 1,9 s puis fondu sur
       l'application ; rejoué à la connexion ; Light / Dark ; mouvements
       réduits respectés.
+
+# Réintégrations : même présentation que les sorties
+
+**Statut :** en cours de conception
+**Démarré le :** 30/10/2026
+
+## Objectif (demande de Jean Didier)
+
+- Un clic sur « Réintégrations » ouvre directement la feuille de saisie (pas
+  de liste ni d'historique ici : l'historique reste dans Historiques).
+- Pouvoir choisir **une sortie entière** : tout ce qui est sorti sur ce bon
+  arrive au panier, on garde les quantités à réintégrer, on retire le reste.
+- Même présentation simple que les sorties ; l'écran actuel prend trop de
+  place (bloc de champs, liste étroite, détail, panier, bouton en bas).
+
+## Analyse de l'existant
+
+- `pages/Reintegration.tsx` : en-tête de 9 champs, liste des références à
+  gauche, détail des sorties d'une référence, panier, un dépôt à la fois.
+- Données : vue `v_sorties_a_reintegrer` (ligne de sortie, produit, dépôt,
+  bon, motif, date, quantités sortie / réintégrée / disponible). Il lui
+  manque l'emplacement d'origine, le lot et le « Reçu par » du bon.
+- `creer_reintegration(p_entrepot_id, ...)` : une réintégration = un seul
+  dépôt.
+
+## Proposition
+
+- **En-tête sur une ligne** : Dépôt (« Tous les dépôts » par défaut),
+  Opérateur, Date du mouvement, case « Ajouter une note ».
+- **Vue « Choix »** : recherche (n° de bon, référence, désignation, reçu
+  par) ; liste des **bons de sortie** qui ont encore quelque chose à
+  réintégrer (n° BS, date, reçu par, motif, nombre de lignes, quantité
+  encore réintégrable). Chaque bon a une case : **cocher le bon = toutes ses
+  lignes** ; une flèche déplie le bon pour cocher seulement certaines lignes.
+  Bouton « Ajouter (n) ».
+- **Vue « Panier »** (pleine hauteur) : n° BS, référence, désignation, dépôt,
+  lot, quantité sortie, déjà réintégrée, **quantité à réintégrer**
+  (pré-remplie avec tout ce qui reste), **localisation de retour**
+  (pré-remplie avec l'emplacement d'où le produit est sorti) ; suppression
+  par ligne ; boutons « Ajouter d'autres », « Vider le panier »,
+  « Valider la réintégration » (avec confirmation).
+- Base : la vue reçoit l'emplacement d'origine, le lot et le « Reçu par » ;
+  une réintégration peut couvrir plusieurs dépôts (même principe que les
+  entrées et les sorties : dépôt de chaque ligne = dépôt de sa localisation
+  de retour). Migration testée sur base de test.
+
+## Décisions actées (30/10/2026)
+
+1. Une réintégration (un seul numéro REINT) peut couvrir plusieurs dépôts.
+2. Quantité à réintégrer **vide** : c'est l'opérateur qui la saisit.
+3. Pas de réponse : localisation de retour pré-remplie avec l'emplacement
+   d'origine (modifiable).
+
+## Avancement
+
+- [x] Points à trancher validés
+- [x] Migration `2026-10-30-reintegration-multi-depots.sql` + `schema.sql`
+      aligné : `creer_reintegration` (dépôt de chaque ligne = dépôt de sa
+      localisation de retour, qui doit être celui d'où le produit est
+      sorti ; dépôt principal = 1re ligne) ; `v_sorties_a_reintegrer`
+      enrichie (bon, reçu par, emplacement d'origine, lot). Testée : 9
+      contrôles (base actuelle + migration deux fois, et nouveau schéma) ;
+      sorties, entrées, « Reçu par », annuler / modifier et commandes sans
+      régression. Ligne 13 ajoutée à `verifier-migrations.sql`.
+- [x] Écran `pages/Reintegration.tsx` réécrit (vue « Choix » par bons de
+      sortie : cocher un bon = toutes ses lignes, flèche pour en choisir
+      certaines, coche verte pour ce qui est déjà au panier ; vue
+      « Panier » pleine hauteur : quantité à saisir, localisation de retour,
+      suppression, Vider le panier, Valider avec confirmation ; en-tête sur
+      une ligne avec « Tous les dépôts » et case « Ajouter une note »).
+- [x] `tsc -b` + `vite build` OK
+- [ ] **Exécuter la migration dans Supabase** (nécessaire : sans elle, les
+      bons ne se regroupent pas)
+- [ ] Vérification en local par Jean Didier
 
 ## Format utilisé pour chaque plan
 

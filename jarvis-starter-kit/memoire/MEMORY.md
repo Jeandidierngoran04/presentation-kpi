@@ -1,0 +1,2 @@
+- [Interface sans explication](interface-sans-explication.md) — Jupply : écrans évidents « comme WhatsApp », pas de phrases d'aide, termes simples
+- [Erreurs qui disparaissent](erreurs-disparaissent-une-fois-corrigees.md) — Jupply : tout message / case rouge s'efface dès que c'est corrigé (BandeauErreur)
