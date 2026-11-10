@@ -5,6 +5,8 @@ import { useSelection } from '../../context/SelectionContext'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
 import { useConfirmation } from '../../context/ConfirmationContext'
+import { useApparence } from '../../context/ApparenceContext'
+import { valeur } from '../../lib/apparence'
 import { ENTREE_MENU_PAR_ECRAN, MENU, MENU_PARAMETRE, type EntreeMenu, type GroupeMenu } from '../../lib/modules'
 import { InfoBulle } from './InfoBulle'
 import { MenuFlottant } from './MenuFlottant'
@@ -50,6 +52,7 @@ export function BarreLaterale() {
   const { produitSelectionneId, declencherSortieManuelle } = useSelection()
   const { profil, deconnexion } = useAuth()
   const { theme, basculer } = useTheme()
+  const { apparence, nom: nomEntreprise, panneauOuvert, ouvrirPanneau } = useApparence()
   const [reduite, setReduite] = useState<boolean>(() => lire(CLE_REDUITE, false))
   const [ouverts, setOuverts] = useState<string[]>(() => lire(CLE_OUVERTS, ['stock', 'mouvement']))
   const [menu, setMenu] = useState<MenuOuvert>(null)
@@ -75,6 +78,11 @@ export function BarreLaterale() {
   function ouvrirEcran(entree: EntreeMenu) {
     if (entree.bientot) return
     setMenu(null)
+    // Administration : panneau à droite de l'écran, l'application reste visible à côté.
+    if (entree.ecran === 'administration') {
+      ouvrirPanneau()
+      return
+    }
     // Depuis Produits, avec un produit sélectionné : "Sorties" ouvre directement
     // la feuille de saisie avec ce produit. Sinon, la liste du jour.
     if (entree.ecran === 'sorties' && ongletActifId === 'produits' && produitSelectionneId) {
@@ -139,14 +147,15 @@ export function BarreLaterale() {
   }
 
   function sousLignes(groupe: GroupeMenu) {
-    return (groupe.entrees ?? []).map((entree) => (
+    return (groupe.entrees ?? []).filter((e) => !e.adminSeulement || profil?.role === 'administrateur').map((entree) => (
       <button
         key={entree.ecran}
         type="button"
         onClick={() => ouvrirEcran(entree)}
         disabled={entree.bientot}
+        data-ouvre-admin={entree.ecran === 'administration' || undefined}
         className={`${CLASSE_SOUS_LIGNE} ${
-          estActif(entree.ecran)
+          estActif(entree.ecran) || (entree.ecran === 'administration' && panneauOuvert)
             ? 'nav-actif-lueur text-text font-semibold'
             : entree.bientot
               ? 'text-text-muted/60 cursor-default'
@@ -165,11 +174,24 @@ export function BarreLaterale() {
       onClick={clicBande}
       aria-label="Navigation principale"
     >
-      {/* Logo seul */}
-      <div className="shrink-0 h-14 flex items-center pl-[18px]">
-        <div className="w-7 h-7 rounded-lg bg-accent flex items-center justify-center" title="Jupply">
-          <span className="font-bold text-accent-contrast text-sm">J</span>
-        </div>
+      {/* Logo de l'entreprise (Paramètre > Administration) */}
+      <div className="shrink-0 h-14 flex items-center gap-2.5 pl-[18px] pr-3 overflow-hidden" title={nomEntreprise || 'Jupply'}>
+        {valeur(apparence, 'afficherLogo') &&
+          (valeur(apparence, 'logoType') === 'image' && apparence.logoImage ? (
+            <img
+              src={apparence.logoImage}
+              alt={nomEntreprise || 'Logo'}
+              style={{ height: Math.min(48, reduite ? valeur(apparence, 'logoHauteurReduite') : valeur(apparence, 'logoHauteur')) }}
+              className={`shrink-0 object-contain object-left ${reduite ? 'max-w-7' : 'max-w-full'}`}
+            />
+          ) : (
+            <div className="w-7 h-7 shrink-0 rounded-lg bg-accent flex items-center justify-center">
+              <span className="font-bold text-accent-contrast text-sm">{(nomEntreprise.trim().charAt(0) || 'J').toUpperCase()}</span>
+            </div>
+          ))}
+        {valeur(apparence, 'afficherNom') && nomEntreprise && (
+          <span className="libelle-nav min-w-0 truncate text-[15px] font-semibold text-text">{nomEntreprise}</span>
+        )}
       </div>
 
       {/* Entrées : défilement interne fin, le logo et le bas restent fixes */}

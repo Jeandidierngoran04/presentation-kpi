@@ -1,4 +1,4 @@
-import type { ReactElement } from 'react'
+import { useEffect, type ReactElement } from 'react'
 import { TabsProvider, useTabs, type EcranId } from '../../context/TabsContext'
 import { SelectionProvider } from '../../context/SelectionContext'
 import { BarreLaterale } from './BarreLaterale'
@@ -30,6 +30,8 @@ import { CommandesFournisseurs } from '../../pages/CommandesFournisseurs'
 import { NouvelleCommande } from '../../pages/NouvelleCommande'
 import { FicheStock } from '../../pages/FicheStock'
 import { DetailEntree } from '../../pages/DetailEntree'
+import { PanneauAdministration } from '../administration/PanneauAdministration'
+import { ApparenceProvider } from '../../context/ApparenceContext'
 
 const COMPOSANTS = {
   dashboard: Dashboard,
@@ -57,6 +59,8 @@ const COMPOSANTS = {
   entree: DetailEntree,
   // Même feuille que la saisie, pré-remplie avec une entrée en attente.
   'modifier-entree': () => <NouvelleReception modification />,
+  // Administration s'ouvre en panneau à droite, pas en onglet.
+  administration: () => <></>,
 } satisfies Record<EcranId, () => ReactElement>
 
 /** Raccourcis proposés quand aucun écran n'est ouvert. */
@@ -95,7 +99,11 @@ function Accueil() {
 }
 
 function ZoneContenu() {
-  const { onglets, ongletActifId } = useTabs()
+  const { onglets, ongletActifId, fermerOnglet } = useTabs()
+  // Ancien onglet « Administration » retrouvé après une actualisation : c'est désormais un panneau.
+  useEffect(() => {
+    if (onglets.some((o) => o.id === 'administration')) fermerOnglet('administration')
+  }, [onglets, fermerOnglet])
   return (
     <main className="flex-1 min-h-0 overflow-hidden bg-card">
       {onglets.length === 0 && <Accueil />}
@@ -113,6 +121,7 @@ function ZoneContenu() {
 
 export function AppShell() {
   return (
+    <ApparenceProvider>
     <SelectionProvider>
       <ToastProvider>
         <ConfirmationProvider>
@@ -124,10 +133,12 @@ export function AppShell() {
               <BarreOnglets />
               <ZoneContenu />
             </div>
+            <PanneauAdministration />
           </div>
         </TabsProvider>
         </ConfirmationProvider>
       </ToastProvider>
     </SelectionProvider>
+    </ApparenceProvider>
   )
 }

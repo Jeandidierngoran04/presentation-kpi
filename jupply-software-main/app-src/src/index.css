@@ -639,3 +639,9 @@ body {
   right: -10px;
   background: radial-gradient(circle at top left, transparent 10px, var(--card) 10.5px);
 }
+
+/* Panneau de réglages (Administration) : glisse depuis la droite à l'ouverture. */
+@keyframes panneau-entree {
+  from { transform: translateX(24px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}

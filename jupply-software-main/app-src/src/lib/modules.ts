@@ -17,6 +17,8 @@ export interface EntreeMenu {
   titreOnglet?: string
   /** Écran prévu mais pas encore construit : affiché grisé, non cliquable. */
   bientot?: boolean
+  /** Visible seulement par l'Administrateur. */
+  adminSeulement?: boolean
 }
 
 /**
@@ -78,7 +80,10 @@ export const MENU_PARAMETRE: GroupeMenu = {
   id: 'parametre',
   label: 'Paramètre',
   icone: Settings,
-  entrees: [{ ecran: 'entrepots', label: 'Entrepôts et emplacements' }],
+  entrees: [
+    { ecran: 'entrepots', label: 'Entrepôts et emplacements' },
+    { ecran: 'administration', label: 'Administration', adminSeulement: true },
+  ],
 }
 
 /**

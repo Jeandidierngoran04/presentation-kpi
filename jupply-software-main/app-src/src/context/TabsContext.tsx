@@ -28,6 +28,7 @@ export type EcranId =
   | 'fiche-stock'
   | 'entree'
   | 'modifier-entree'
+  | 'administration'
 
 export interface Onglet {
   id: EcranId

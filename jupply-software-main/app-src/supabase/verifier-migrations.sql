@@ -37,4 +37,8 @@ select '12. 2026-10-30-sortie-multi-depots',
 union all
 select '13. 2026-10-30-reintegration-multi-depots',
        exists (select 1 from information_schema.columns
-               where table_schema = 'public' and table_name = 'v_sorties_a_reintegrer' and column_name = 'recu_par');
+               where table_schema = 'public' and table_name = 'v_sorties_a_reintegrer' and column_name = 'recu_par')
+union all
+select '14. 2026-11-06-apparence-entreprise',
+       exists (select 1 from information_schema.columns
+               where table_schema = 'public' and table_name = 'entreprises' and column_name = 'apparence');
