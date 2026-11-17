@@ -101,7 +101,11 @@ export type Constat = {
   libelle: string
   valeur: string
   cible: string
+  /** Le constat en une phrase claire, pour le récapitulatif par pays */
+  phrase: string
 }
+
+const nf1 = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 })
 
 /** Tous les indicateurs évalués pour une période (la plus récente par défaut). */
 export function constats(ctx: Ctx, periodeDemandee?: string): Constat[] {
@@ -123,6 +127,7 @@ export function constats(ctx: Ctx, periodeDemandee?: string): Constat[] {
             libelle: `Couv. ${a.libelle}`,
             valeur: fmt(v, 'mois'),
             cible: `alerte à ${fmt(c.alerte, 'mois')}`,
+            phrase: `${a.libelle} : ${nf1.format(v)} mois de couverture${v <= c.alerte ? ', risque de rupture' : v < c.cible ? ', à commander' : ''}`,
           })
         }
         continue
@@ -138,6 +143,7 @@ export function constats(ctx: Ctx, periodeDemandee?: string): Constat[] {
           libelle: ind.libelle,
           valeur: ind.unite === 'modeles' ? `${v} / ${c.cible}` : fmt(v, ind.unite),
           cible: ind.unite === 'modeles' ? `cible ${c.cible} modèles` : `cible ${ind.sens === 'haut' ? '≥' : '≤'} ${fmt(c.cible, ind.unite)}`,
+          phrase: phraseConstat(ctx, ind, pays, v, c.cible, periode),
         })
       }
     }
@@ -175,3 +181,19 @@ export function scores(ctx: Ctx, periode?: string): Score[] {
 
 export const libellePays = nomPays
 export { indicateur }
+
+/** Une phrase claire par constat, calculée uniquement à partir des chiffres */
+function phraseConstat(ctx: Ctx, ind: (typeof CATALOGUE)[number], pays: string, v: number, cible: number, periode: string): string {
+  const u = ind.unite
+  if (ind.id === 'otd') {
+    const prec = [...ctx.periodes].filter((p) => p < periode).sort().at(-1)
+    const a = prec ? ctx.lignes.find((l) => l.pays === pays && l.indicateur === 'otd' && l.periode === prec)?.valeur : undefined
+    const evo = a != null ? v - a : null
+    const tendance = evo == null || Math.abs(evo) < 0.05 ? '' : evo > 0 ? `, en hausse de ${nf1.format(evo)} pt` : `, en baisse de ${nf1.format(-evo)} pt`
+    return `OTD à ${fmt(v, '%')}${tendance} (cible ${fmt(cible, '%')})`
+  }
+  if (u === 'modeles') return `${ind.libelle} : ${nf1.format(v)} modèles présents sur ${nf1.format(cible)} attendus`
+  if (ind.sens === 'bas' && cible === 0) return `${nf1.format(v)} ${ind.libelle.toLowerCase()} (objectif 0)`
+  const unite = u === '%' || u === '‰' || u === 'mois' ? u : undefined
+  return `${ind.libelle} à ${fmt(v, unite)}${u === '‰' ? ' pour 1 000 montages' : ''} (cible ${ind.sens === 'haut' ? '≥' : '≤'} ${fmt(cible, unite)})`
+}

@@ -73,7 +73,10 @@ export function CourbesOtd({
                   <Drapeau code={p} taille={petit ? 18 : 24} />
                   <span className="truncate">{nomPays(p)}</span>
                 </div>
-                <div className={`text-ink-2 ${petit ? 'text-[13px]' : 'text-[15px]'}`}>Cible {c} %</div>
+                <div className={`flex items-center gap-2 text-ink-2 ${petit ? 'text-[13px]' : 'text-[15px]'}`}>
+                  <svg width="22" height="4" aria-hidden><line x1="0" y1="2" x2="22" y2="2" stroke="currentColor" strokeWidth="2" strokeDasharray="4 3" /></svg>
+                  Cible {c} %
+                </div>
               </div>
               <div className="flex items-center gap-3 shrink-0">
                 {evo != null && (
@@ -102,9 +105,6 @@ export function CourbesOtd({
               <line x1={0} x2={gW} y1={gH - mBas} y2={gH - mBas} stroke="var(--color-base)" strokeWidth={1.5} />
               {/* cible */}
               <line x1={8} x2={gW - 8} y1={y(c)} y2={y(c)} stroke="var(--color-ink)" strokeOpacity={0.55} strokeWidth={1.6} strokeDasharray="6 6" />
-              <text x={gW - 8} y={y(c) - 6} textAnchor="end" fontSize={petit ? 12 : 14} fill="var(--color-ink-2)">
-                cible {c} %
-              </text>
               {aire && <path d={aire} fill={`url(#${idGrad})`} />}
               {idx.length > 1 && <path d={ligne} fill="none" stroke={couleur} strokeWidth={petit ? 3 : 4} strokeLinejoin="round" strokeLinecap="round" />}
 

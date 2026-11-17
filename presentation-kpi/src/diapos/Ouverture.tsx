@@ -1,4 +1,4 @@
-import { AlertTriangle, ArrowRight, XCircle } from 'lucide-react'
+import { AlertTriangle, ArrowRight, CheckCircle2, XCircle } from 'lucide-react'
 import { Diapo } from '../components/CadreDiapo'
 import { Drapeau } from '../components/Drapeau'
 import { Pastille, STATUTS } from '../components/Statut'
@@ -171,42 +171,69 @@ export function DiapoSynthese({ ctx }: { ctx: Ctx }) {
 
 export function DiapoAttention({ ctx }: { ctx: Ctx }) {
   const liste = constats(ctx)
-  const alertes = liste.filter((c) => c.statut === 'alerte')
-  const vigil = liste.filter((c) => c.statut === 'vigilance')
-  const Bloc = ({ titre, items, s }: { titre: string; items: typeof liste; s: 'alerte' | 'vigilance' }) => {
-    const Ic = s === 'alerte' ? XCircle : AlertTriangle
-    return (
-      <div className="flex-1 min-w-0 rounded-3xl p-8 flex flex-col" style={{ background: STATUTS[s].doux }}>
-        <div className="flex items-center gap-3 text-[28px] font-semibold" style={{ color: STATUTS[s].texte }}>
-          <Ic size={32} strokeWidth={2.4} />
-          {titre}
-          <span className="chiffres ml-auto text-[40px]">{items.length}</span>
-        </div>
-        <ul className="mt-6 space-y-3 overflow-hidden">
-          {items.length === 0 && <li className="text-[22px] text-ink-2">Rien à signaler.</li>}
-          {items.slice(0, 8).map((c, i) => (
-            <li key={i} className="flex items-center gap-4 rounded-2xl bg-white/80 px-5 py-3.5">
-              <Drapeau code={c.pays} taille={22} />
-              <span className="text-[22px] font-medium text-ink truncate">{c.libelle}</span>
-              <ArrowRight size={18} className="text-muted shrink-0" />
-              <span className="chiffres text-[22px] font-semibold text-ink whitespace-nowrap">{c.valeur}</span>
-              <span className="ml-auto text-[17px] text-muted whitespace-nowrap">{c.cible}</span>
-            </li>
-          ))}
-          {items.length > 8 && <li className="text-[18px] text-ink-2 pl-2">+ {items.length - 8} autres</li>}
-        </ul>
-      </div>
-    )
-  }
+  // Un récapitulatif par pays : d'abord ce qui est en alerte, puis ce qui est à surveiller
+  const pays = ctx.pres.pays
+    .map((p) => {
+      const cs = liste.filter((c) => c.pays === p)
+      return { p, alertes: cs.filter((c) => c.statut === 'alerte'), vigil: cs.filter((c) => c.statut === 'vigilance'), ok: cs.filter((c) => c.statut === 'bon').length, total: cs.length }
+    })
+    .filter((x) => x.total > 0)
+    .sort((x, y) => y.alertes.length - x.alertes.length || y.vigil.length - x.vigil.length)
+  const n = pays.length
+  const colonnes = n <= 3 ? n : n === 4 ? 2 : 3
+  const dense = n > 3
+  const max = dense ? 4 : 7
   return (
-    <Diapo
-      surtitre="À traiter"
-      titre="Points d'attention"
-      message={alertes.length ? `${alertes.length} point${alertes.length > 1 ? 's' : ''} à corriger en priorité, ${vigil.length} à surveiller.` : vigil.length ? `Aucune alerte · ${vigil.length} point${vigil.length > 1 ? 's' : ''} à surveiller.` : 'Aucun point bloquant cette fois-ci.'}
-    >
-      <div className="h-full flex gap-8">
-        <Bloc titre="Alertes" items={alertes} s="alerte" />
-        <Bloc titre="Vigilance" items={vigil} s="vigilance" />
+    <Diapo surtitre="À traiter" titre="Points d'attention par pays" legende>
+      <div className="h-full grid gap-5" style={{ gridTemplateColumns: `repeat(${colonnes}, minmax(0, 1fr))`, gridAutoRows: '1fr' }}>
+        {pays.map(({ p, alertes, vigil, ok, total }) => {
+          const items = [...alertes, ...vigil]
+          const visibles = items.slice(0, max)
+          return (
+            <div key={p} className="rounded-3xl bg-carte border border-ligne flex flex-col min-h-0 overflow-hidden">
+              <div className={`flex items-center justify-between gap-3 border-b border-ligne ${dense ? 'px-5 py-3' : 'px-7 py-5'}`}>
+                <span className={`flex items-center gap-3 font-bold text-ink ${dense ? 'text-[21px]' : 'text-[28px]'}`}>
+                  <Drapeau code={p} taille={dense ? 22 : 32} />
+                  {nomPays(p)}
+                </span>
+                <span className="flex items-center gap-2">
+                  {alertes.length > 0 && (
+                    <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[15px] font-bold" style={{ background: STATUTS.alerte.doux, color: STATUTS.alerte.texte }}>
+                      <XCircle size={16} strokeWidth={2.6} /> {alertes.length}
+                    </span>
+                  )}
+                  {vigil.length > 0 && (
+                    <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[15px] font-bold" style={{ background: STATUTS.vigilance.doux, color: STATUTS.vigilance.texte }}>
+                      <AlertTriangle size={16} strokeWidth={2.6} /> {vigil.length}
+                    </span>
+                  )}
+                </span>
+              </div>
+              <ul className={`flex-1 min-h-0 overflow-hidden ${dense ? 'px-5 py-3 space-y-2' : 'px-7 py-5 space-y-3.5'}`}>
+                {items.length === 0 && (
+                  <li className={`flex items-start gap-3 text-ink ${dense ? 'text-[17px]' : 'text-[21px]'}`}>
+                    <CheckCircle2 size={dense ? 20 : 24} className="shrink-0 mt-0.5" style={{ color: STATUTS.bon.couleur }} />
+                    Tous les indicateurs sont dans la cible.
+                  </li>
+                )}
+                {visibles.map((c, i) => {
+                  const S = STATUTS[c.statut]
+                  return (
+                    <li key={i} className={`flex items-start gap-3 leading-snug text-ink ${dense ? 'text-[16px]' : 'text-[21px]'}`}>
+                      <S.Icone size={dense ? 18 : 23} strokeWidth={2.5} className="shrink-0 mt-[0.15em]" style={{ color: c.statut === 'vigilance' ? S.texte : S.couleur }} />
+                      <span>{c.phrase}</span>
+                    </li>
+                  )
+                })}
+                {items.length > max && <li className="text-[15px] text-ink-2 pl-8">+ {items.length - max} autre{items.length - max > 1 ? 's' : ''} point{items.length - max > 1 ? 's' : ''}</li>}
+              </ul>
+              <div className={`border-t border-ligne flex items-center gap-2 text-ink-2 ${dense ? 'px-5 py-2 text-[14px]' : 'px-7 py-3 text-[16px]'}`}>
+                <CheckCircle2 size={dense ? 15 : 18} style={{ color: STATUTS.bon.couleur }} />
+                {ok} indicateur{ok > 1 ? 's' : ''} sur {total} dans la cible
+              </div>
+            </div>
+          )
+        })}
       </div>
     </Diapo>
   )
